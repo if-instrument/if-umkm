@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Aktivasi Akun - IF Instrument</title>
+    <link rel="stylesheet" href="styles.css?v=coffee-v137" />
+  </head>
+  <body class="login-page">
+    <main class="login-shell">
+      <section class="login-brand-panel">
+        <div class="brand login-brand">
+          <span class="brand-mark app-brand-logo" id="invitation-logo"><img src="assets/if-instrument-logo.jpg" alt="IF Instrument" /></span>
+          <div><h1 id="invitation-company">IF Instrument</h1><p>UMKM Solution</p></div>
+        </div>
+        <div class="login-copy">
+          <span class="hero-kicker">Account Invitation</span>
+          <h2>Aktifkan akun perusahaan Anda.</h2>
+          <p id="invitation-copy">Verifikasi undangan dan buat password untuk mulai menggunakan aplikasi.</p>
+        </div>
+      </section>
+
+      <section class="login-card">
+        <form id="invitation-form">
+          <div><span class="hero-kicker">Verifikasi Email</span><h3 id="invitation-title">Memuat undangan...</h3></div>
+          <label>Email <input id="invitation-email" readonly type="email" /></label>
+          <label>Password Baru <input id="invitation-password" autocomplete="new-password" minlength="8" required type="password" /></label>
+          <label>Konfirmasi Password <input id="invitation-password-confirmation" autocomplete="new-password" minlength="8" required type="password" /></label>
+          <button class="primary-button full" id="invitation-submit" type="submit">Aktifkan Akun</button>
+          <p class="form-feedback" id="invitation-feedback" role="status"></p>
+        </form>
+      </section>
+    </main>
+    <script type="module" src="scripts/pages/invitation.js?v=coffee-v137"></script>
+  </body>
+</html>

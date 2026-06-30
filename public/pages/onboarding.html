@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Setup Guide - IF Instrument</title>
+    <link rel="stylesheet" href="../styles.css?v=coffee-v137" />
+  </head>
+  <body data-page="onboarding" data-title="Setup Guide" data-eyebrow="Company Onboarding">
+    <template id="page-content">
+      <section class="content-grid single onboarding-workspace">
+        <div class="workspace-panel wide onboarding-summary-panel">
+          <div class="panel-heading">
+            <div>
+              <span class="hero-kicker">Getting Started</span>
+              <h3 id="onboarding-company-name">Persiapan Perusahaan</h3>
+              <p>Ikuti urutan setup agar POS, inventory, akses user, dan laporan siap digunakan.</p>
+            </div>
+          </div>
+          <div class="onboarding-progress-row">
+            <div class="onboarding-progress-copy"><strong id="onboarding-progress-label">0 dari 0 langkah</strong><span id="onboarding-progress-percent">0%</span></div>
+            <div class="onboarding-progress-track"><span id="onboarding-progress-bar"></span></div>
+          </div>
+        </div>
+
+        <div class="workspace-panel wide onboarding-guide-panel">
+          <section class="onboarding-step-section required">
+            <div class="panel-heading"><div><span class="hero-kicker">Prioritas Utama</span><h3>Setup Wajib</h3><p>Selesaikan berurutan agar produk dan recipe siap dipakai.</p></div><span class="status-pill status-low" id="required-step-summary">0 belum selesai</span></div>
+            <div class="onboarding-step-list" id="onboarding-required-list"></div>
+          </section>
+          <section class="onboarding-step-section optional">
+            <div class="panel-heading"><div><span class="hero-kicker">Sesuai Kebutuhan</span><h3>Setup Opsional</h3><p>Lengkapi setelah alur dasar siap atau ketika fiturnya mulai digunakan.</p></div></div>
+            <div class="onboarding-step-list" id="onboarding-optional-list"></div>
+          </section>
+          <p class="form-feedback" id="onboarding-feedback"></p>
+        </div>
+      </section>
+    </template>
+    <script type="module" src="../scripts/pages/onboarding.js?v=coffee-v137"></script>
+  </body>
+</html>

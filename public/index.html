@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dashboard - IFresso Coffee</title>
+    <link rel="stylesheet" href="styles.css?v=coffee-v137" />
+  </head>
+  <body data-page="dashboard" data-title="Dashboard" data-eyebrow="Operasional hari ini">
+    <template id="page-content">
+      <section>
+        <div class="metric-grid dashboard-kpis">
+          <article class="metric">
+            <span>Total Penjualan Hari Ini</span>
+            <strong id="metric-revenue">Rp0</strong>
+            <small id="metric-revenue-note">Omzet transaksi hari ini</small>
+          </article>
+          <article class="metric">
+            <span>Jumlah Transaksi</span>
+            <strong id="metric-transactions">0</strong>
+            <small id="metric-transaction-note">Transaksi hari ini</small>
+          </article>
+          <article class="metric">
+            <span>Gross Profit (Est.)</span>
+            <strong id="metric-profit">Rp0</strong>
+            <small>Omzet dikurangi HPP</small>
+          </article>
+          <article class="metric">
+            <span>Produk Terjual</span>
+            <strong id="metric-products-sold">0</strong>
+            <small>Jumlah item terjual hari ini</small>
+          </article>
+        </div>
+
+        <div class="esb-control-grid" id="dashboard-control-grid">
+          <section class="workspace-panel esb-command-panel" id="dashboard-module-panel">
+            <div class="panel-heading">
+              <div>
+                <h3>Kontrol Operasional</h3>
+                <p>Ringkasan modul aktif dan aktivitas outlet hari ini.</p>
+              </div>
+            </div>
+            <div class="esb-module-grid" id="esb-module-grid"></div>
+          </section>
+
+          <section class="workspace-panel esb-risk-panel" id="dashboard-attention-panel" hidden>
+            <div class="panel-heading">
+              <h3>Perlu Perhatian</h3>
+              <p>Kejadian operasional yang perlu ditindaklanjuti.</p>
+            </div>
+            <div class="esb-risk-list" id="esb-risk-list"></div>
+          </section>
+        </div>
+
+        <section class="workspace-panel esb-integration-panel" id="dashboard-payment-panel" hidden>
+          <div class="panel-heading">
+            <div>
+              <h3>Metode Pembayaran Aktif</h3>
+              <p>Metode bayar yang tersedia pada POS outlet aktif.</p>
+            </div>
+            <a class="ghost-button compact-button" data-permission="settings.payment:read" href="/pages/settings.html">Atur Metode Bayar</a>
+          </div>
+          <div class="esb-integration-grid" id="esb-integration-grid"></div>
+        </section>
+
+        <div class="dashboard-operational-grid" id="dashboard-operational-grid">
+          <section class="workspace-panel sales-chart-panel">
+            <div class="panel-heading">
+              <h3>Grafik Penjualan</h3>
+              <p>7 hari terakhir</p>
+            </div>
+            <canvas id="sales-chart" height="210"></canvas>
+          </section>
+
+          <section class="workspace-panel compact-dashboard-panel" id="dashboard-top-products-panel" hidden>
+            <div class="panel-heading">
+              <h3>Produk Paling Laris</h3>
+              <p>Hari ini</p>
+            </div>
+            <div class="ranking-list" id="top-product-list"></div>
+          </section>
+
+          <section class="workspace-panel compact-dashboard-panel" id="dashboard-low-stock-panel" hidden>
+            <div class="panel-heading">
+              <h3>Stok Hampir Habis</h3>
+              <p id="low-stock-summary">Lihat semua</p>
+            </div>
+            <div class="low-stock-list" id="dashboard-low-stock"></div>
+          </section>
+        </div>
+      </section>
+    </template>
+
+    <script type="module" src="scripts/pages/dashboard.js?v=coffee-v137"></script>
+  </body>
+</html>

@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Order Online - IF Instrument</title>
+    <link rel="stylesheet" href="../styles.css?v=coffee-v151" />
+  </head>
+  <body class="public-order-page">
+    <main class="public-order-shell public-order-book-shell">
+      <section class="public-book-frame" id="order-book-frame" aria-label="Buku menu online">
+        <div class="public-book-status" id="order-status">Memuat buku menu...</div>
+        <div class="public-book-spiral" aria-hidden="true"></div>
+        <button class="public-book-hit-zone public-book-hit-left" id="order-book-hit-prev" type="button" aria-label="Halaman sebelumnya"></button>
+        <button class="public-book-hit-zone public-book-hit-right" id="order-book-hit-next" type="button" aria-label="Halaman berikutnya"></button>
+        <div class="public-book-mini-cart" aria-live="polite">
+          <span id="order-cart-count">0 item</span>
+          <strong id="order-action-total">Rp0</strong>
+        </div>
+
+        <div class="public-flipbook" id="order-flipbook">
+          <article class="public-book-page public-blank-page" data-book-section="cover" aria-hidden="true"></article>
+          <article class="public-book-page public-blank-page" data-book-section="cover" aria-hidden="true"></article>
+
+          <article class="public-book-page public-cover-page hard" data-book-section="cover">
+            <div class="public-cover-poster">
+              <img id="order-cover-logo" alt="Logo perusahaan" />
+              <strong id="order-cover-title">IF Instrument</strong>
+              <span id="order-cover-subtitle">UMKM Solution</span>
+              <p id="order-cover-description">Pilih outlet dan mulai pemesanan dari buku menu digital.</p>
+            </div>
+            <div class="public-cover-outlets" id="order-cover-outlets-panel">
+              <h2 id="order-outlet-title">Pilih Outlet</h2>
+              <div class="public-choice-grid" id="order-outlet-choices"></div>
+            </div>
+          </article>
+
+          <article class="public-book-page public-service-page" data-book-section="cover" id="order-service-page">
+            <div class="public-step-heading">
+              <div>
+                <h1 id="order-service-title">Pilih Mode</h1>
+                <p id="order-service-description">Pilih tipe pembelian yang aktif di outlet ini.</p>
+              </div>
+            </div>
+            <div class="public-choice-grid" id="order-service-types"></div>
+            <section class="public-table-layout" id="order-table-section" hidden>
+              <div class="public-step-heading compact-heading">
+                <div>
+                  <h1 id="order-table-title">Table Layout</h1>
+                  <p id="order-table-description">Pilih meja untuk dine in.</p>
+                </div>
+              </div>
+              <div class="public-table-grid" id="order-table-choices"></div>
+            </section>
+          </article>
+
+          <article class="public-book-page public-menu-filter-page" data-book-section="menu" id="order-menu-filter-page">
+            <div class="public-step-heading">
+              <div>
+                <h1 id="order-menu-title">Pilih Menu</h1>
+                <p id="order-menu-description">Pilih kategori, cari menu, lalu tambahkan produk ke cart.</p>
+              </div>
+            </div>
+            <div class="public-menu-toolbar">
+              <label>
+                Cari menu
+                <input id="order-search" autocomplete="off" type="search" placeholder="Cari produk..." />
+              </label>
+              <label class="public-grid-size-picker">
+                <span id="order-grid-size-label">Grid</span>
+                <select id="order-grid-size-select">
+                  <option value="2">2x2</option>
+                  <option value="3" selected>3x3</option>
+                  <option value="4">4x4</option>
+                </select>
+              </label>
+              <div class="public-order-tabs" id="order-categories"></div>
+            </div>
+            <div class="public-menu-category-heading">
+              <h2 id="order-menu-category-title">Semua Menu</h2>
+              <span id="order-menu-summary">Produk akan tampil di bawah filter.</span>
+            </div>
+            <div class="public-order-grid public-order-grid-book grid-3 public-menu-first-grid" id="order-products-current"></div>
+          </article>
+
+          <article class="public-book-page" data-book-section="checkout">
+            <div class="public-step-heading">
+              <div>
+                <h1 id="order-cart-title">Cart</h1>
+                <p id="order-cart-description">Cek detail pesanan sebelum isi data customer.</p>
+              </div>
+            </div>
+            <div class="cart-list public-book-cart" id="order-cart"></div>
+            <div class="cart-summary public-bill-card">
+              <div><span>Subtotal</span><strong id="order-subtotal">Rp0</strong></div>
+              <div id="order-service-row" hidden><span id="order-service-label">Service Charge</span><strong id="order-service">Rp0</strong></div>
+              <div id="order-packaging-row" hidden><span>Kemasan</span><strong id="order-packaging">Rp0</strong></div>
+              <div><span id="order-tax-label">Pajak</span><strong id="order-tax">Rp0</strong></div>
+              <div id="order-payment-fee-row" hidden><span id="order-payment-fee-label">Payment Fee</span><strong id="order-payment-fee">Rp0</strong></div>
+              <div class="total"><span>Total</span><strong id="order-total">Rp0</strong></div>
+            </div>
+            <button class="primary-action wide-action public-cart-confirm" id="order-confirm-cart" type="button">Confirm Order</button>
+          </article>
+
+          <article class="public-book-page" data-book-section="checkout">
+            <div class="public-step-heading">
+              <div>
+                <h1 id="order-customer-title">Customer & Payment</h1>
+                <p id="order-customer-description">Data receipt dan metode pembayaran.</p>
+              </div>
+            </div>
+            <form class="public-order-form public-customer-form" id="order-customer-form">
+              <label>
+                Nama
+                <input id="order-customer-name" autocomplete="name" required type="text" placeholder="Nama pemesan" />
+              </label>
+              <div class="public-member-suggestions" id="order-member-suggestions" hidden></div>
+              <label>
+                Email Receipt
+                <input id="order-customer-email" autocomplete="email" required type="email" placeholder="nama@email.com" />
+              </label>
+              <label>
+                No HP
+                <input id="order-customer-phone" autocomplete="tel" required type="tel" placeholder="08xxxxxxxxxx" />
+              </label>
+              <label class="checkbox-line">
+                <input id="order-register-member" type="checkbox" />
+                Daftarkan sebagai member
+              </label>
+            </form>
+            <div class="payment-methods public-payment-grid" id="order-payments"></div>
+            <div class="public-payment-note" id="order-payment-note"></div>
+            <button class="primary-action wide-action" id="order-submit" type="button">Buat Order</button>
+          </article>
+
+          <article class="public-book-page" data-book-section="receipt">
+            <div class="public-step-heading">
+              <div>
+                <h1 id="order-receipt-title">Receipt Detail</h1>
+                <p id="order-receipt-description">Ringkasan akhir dan status pesanan.</p>
+              </div>
+            </div>
+            <div class="public-final-bill" id="order-final-bill"></div>
+          </article>
+
+          <article class="public-book-page public-back-cover-page hard" data-book-section="receipt">
+            <div class="public-cover-poster">
+              <img id="order-back-logo" alt="Logo perusahaan" />
+              <strong id="order-back-title">IF Instrument</strong>
+              <span id="order-back-subtitle">Terima kasih</span>
+              <p id="order-back-description">Pesanan Anda sudah diterima outlet. Simpan nomor order untuk konfirmasi.</p>
+              <button class="primary-action" id="order-reset-cover" type="button">Kembali ke Cover Depan</button>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <div class="public-menu-detail" id="order-menu-detail" hidden>
+        <div class="public-menu-detail-card">
+          <button class="icon-button" data-close-menu-detail type="button">×</button>
+          <div class="public-menu-detail-head">
+            <div class="public-product-photo" id="order-detail-photo"></div>
+            <div>
+              <strong id="order-detail-name">Produk</strong>
+              <p id="order-detail-description">-</p>
+              <span id="order-detail-price">Rp0</span>
+            </div>
+          </div>
+            <form id="order-modifier-form">
+              <input id="order-modifier-product-id" type="hidden" />
+              <input id="order-detail-line-id" type="hidden" />
+              <input id="order-detail-original-line-id" type="hidden" />
+              <input id="order-detail-edit-mode" type="hidden" value="0" />
+              <input id="order-detail-qty" type="hidden" value="1" />
+            <div class="public-detail-cart-options" id="order-existing-configs" hidden></div>
+            <div class="public-modifier-options" id="order-modifier-options"></div>
+            <div class="public-detail-action-row">
+              <div class="qty-control public-detail-qty">
+                <button class="qty-button" data-detail-qty-minus type="button">-</button>
+                <span id="order-detail-qty-label">1</span>
+                <button class="qty-button" data-detail-qty-plus type="button">+</button>
+              </div>
+              <strong id="order-detail-line-total">Rp0</strong>
+            </div>
+            <p class="public-detail-stock-note" id="order-detail-stock-note"></p>
+            <button class="primary-action wide-action" id="order-detail-submit-label" type="submit">Masukkan Cart</button>
+          </form>
+        </div>
+      </div>
+
+      <p class="form-feedback public-order-feedback" id="order-feedback" role="status"></p>
+    </main>
+
+    <script src="../vendor/turnjs/jquery.js?v=coffee-v151"></script>
+    <script src="../vendor/turnjs/turn.js?v=coffee-v151"></script>
+    <script type="module" src="../scripts/pages/order.js?v=coffee-v151"></script>
+  </body>
+</html>

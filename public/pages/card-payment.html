@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Online Card Payment - IF Instrument</title>
+    <link rel="stylesheet" href="../styles.css?v=coffee-v137" />
+  </head>
+  <body class="customer-payment-page">
+    <main class="customer-payment-shell">
+      <section class="customer-payment-card">
+        <div class="brand-mark">IF</div>
+        <span class="hero-kicker">Online Card Payment</span>
+        <h1 id="customer-payment-title">Memuat pembayaran...</h1>
+        <p id="customer-payment-subtitle">Mohon tunggu sebentar.</p>
+        <div class="customer-payment-summary">
+          <article><span>Order</span><strong id="customer-payment-order">-</strong></article>
+          <article><span>Total</span><strong id="customer-payment-amount">Rp0</strong></article>
+          <article><span>Status</span><strong id="customer-payment-status">-</strong></article>
+        </div>
+        <div class="customer-payment-secure-box">
+          <strong>Secure Card Payment</strong>
+          <p id="customer-payment-message">Anda akan diarahkan ke halaman aman gateway untuk mengisi detail kartu.</p>
+        </div>
+        <div class="customer-card-actions">
+          <button class="primary-button full" id="open-xendit-payment" type="button" disabled>Buka Form Pembayaran</button>
+          <p class="form-feedback show" id="customer-card-feedback">Menyiapkan halaman pembayaran...</p>
+        </div>
+      </section>
+    </main>
+    <script type="module" src="../scripts/pages/card-payment.js?v=coffee-v137"></script>
+  </body>
+</html>

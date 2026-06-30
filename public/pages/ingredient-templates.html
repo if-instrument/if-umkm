@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Template Bahan - IF Instrument</title>
+    <link rel="stylesheet" href="../styles.css?v=coffee-v137" />
+  </head>
+  <body data-page="ingredient-templates" data-title="Template Bahan" data-eyebrow="Produk & Recipe">
+    <template id="page-content">
+      <section class="content-grid single">
+        <div class="page-command-bar">
+          <div>
+            <span class="hero-kicker">Master Bahan</span>
+            <h3>Standar bahan untuk recipe produk dan modifier.</h3>
+            <p>Template tidak menyimpan stok. Outlet membuat bahan fisik sendiri lalu menghubungkannya ke template ini.</p>
+          </div>
+          <button class="primary-button" data-open-template-modal data-permission="ingredients.template:create" type="button">+ Template Bahan</button>
+        </div>
+
+        <div class="workspace-panel wide">
+          <div class="panel-heading">
+            <div>
+              <h3>Daftar Template</h3>
+              <p>Edit nama, kategori, satuan, dan status master bahan perusahaan.</p>
+            </div>
+            <div class="filter-toolbar compact-filter">
+              <label>Status
+                <select id="template-status-filter">
+                  <option value="">Semua</option>
+                  <option value="active">Aktif</option>
+                  <option value="inactive">Nonaktif</option>
+                </select>
+              </label>
+              <label>Cari
+                <input id="template-search" autocomplete="off" placeholder="Nama, kode, kategori..." type="search" />
+              </label>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Kode</th>
+                  <th>Nama Template</th>
+                  <th>Kategori</th>
+                  <th>Satuan</th>
+                  <th>Status</th>
+                  <th>Aksi</th>
+                </tr>
+              </thead>
+              <tbody id="template-table"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <div class="modal-backdrop" data-template-backdrop hidden>
+        <section class="modal-dialog" id="template-modal" aria-modal="true" role="dialog" aria-labelledby="template-modal-title" hidden>
+          <header class="modal-header">
+            <div>
+              <span class="hero-kicker">Template Bahan</span>
+              <h3 id="template-modal-title">Tambah Template</h3>
+              <p>Perubahan template akan ikut terbaca oleh recipe dan modifier yang memakai template ini.</p>
+            </div>
+            <button class="icon-button" data-close-template-modal type="button" aria-label="Tutup modal">x</button>
+          </header>
+          <form class="form-grid input-workflow" id="template-form">
+            <input id="template-id" type="hidden" />
+            <label>Kode <input id="template-code" autocomplete="off" placeholder="Otomatis jika kosong" type="text" /></label>
+            <label>Nama Template <input id="template-name" autocomplete="off" placeholder="Contoh: Susu Full Cream" required type="text" /></label>
+            <label>Kategori
+              <select id="template-category" required>
+                <option value="Raw Material">Raw Material</option>
+                <option value="Packaging">Packaging</option>
+                <option value="Consumable">Consumable</option>
+              </select>
+            </label>
+            <label>Satuan <input id="template-unit" autocomplete="off" placeholder="gram, ml, pcs" required type="text" /></label>
+            <label>Status
+              <select id="template-status">
+                <option value="active">Aktif</option>
+                <option value="inactive">Nonaktif</option>
+              </select>
+            </label>
+            <p class="form-preview full-row" id="template-preview">Gunakan template sebagai bahasa standar recipe. Stok fisik tetap dikelola per outlet.</p>
+            <div class="modal-actions full-row">
+              <button class="ghost-button" data-close-template-modal type="button">Batal</button>
+              <button class="primary-button" type="submit">Simpan Template</button>
+            </div>
+            <p class="form-feedback full-row" id="template-feedback" role="status"></p>
+          </form>
+        </section>
+      </div>
+    </template>
+    <script type="module" src="../scripts/pages/ingredient-templates.js?v=coffee-v137"></script>
+  </body>
+</html>

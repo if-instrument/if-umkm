@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>POS - IFresso Coffee</title>
+    <link rel="stylesheet" href="../styles.css?v=coffee-v148" />
+  </head>
+  <body data-page="pos" data-title="POS / Transaksi" data-eyebrow="Kasir">
+    <template id="page-content">
+      <section class="pos-command-bar">
+        <div class="service-modes" aria-label="Tipe layanan">
+          <button class="service-mode active" type="button">Dine In</button>
+          <button class="service-mode" type="button">Take Away</button>
+        </div>
+        <label class="pos-table-select">
+          Meja
+          <select id="pos-table"></select>
+        </label>
+        <label class="pos-pickup-name" id="pos-pickup-field" hidden>
+          Nama / Kode Order
+          <input id="pos-pickup-name" autocomplete="off" placeholder="Kosongkan untuk nomor otomatis" type="text" />
+        </label>
+        <label class="pos-search">
+          Cari produk
+          <input id="pos-product-search" autocomplete="off" placeholder="Cari produk..." type="search" />
+        </label>
+        <button class="pos-queue-trigger" data-permission="queue.cashier:read" id="open-pos-queue" type="button">
+          <span>Antrian</span>
+          <strong id="pos-queue-count">0</strong>
+        </button>
+        <button class="pos-queue-trigger approval-trigger" data-permission="queue.cashier:read" id="open-pos-approvals" type="button">
+          <span>Approve Online</span>
+          <strong id="pos-approval-count">0</strong>
+        </button>
+        <button class="pos-queue-trigger" data-permission="pos.payment:read" id="open-pos-tables" type="button">
+          <span>Open Table</span>
+          <strong id="pos-table-count">0</strong>
+        </button>
+        <div class="order-reference"><span>Order</span><strong>#POS-NEW</strong></div>
+      </section>
+      <section class="pos-layout">
+        <div class="workspace-panel product-browser">
+          <div class="pos-category-tabs" id="pos-category-tabs">
+            <button class="active" data-pos-category="all" type="button">Semua</button>
+          </div>
+          <div class="pos-browser-heading">
+            <div><strong>Pilih Produk</strong><span id="pos-product-result">0 produk tersedia</span></div>
+            <span class="status-pill status-ok">Stok Real-time</span>
+          </div>
+          <div class="product-grid" id="product-grid"></div>
+        </div>
+
+        <div class="workspace-panel cart-panel">
+          <div class="panel-heading">
+            <div><h3>Detail Pesanan</h3><p>#POS-NEW</p></div>
+            <span class="cart-count-badge" id="cart-count">0 item</span>
+          </div>
+          <div class="active-open-table-context" id="active-open-table-context" hidden></div>
+          <div class="cart-list" id="cart-list"></div>
+          <div class="packaging-control" id="packaging-control" hidden>
+            <span id="packaging-control-note">Kemasan tambahan otomatis</span>
+            <button class="ghost-button compact-button" data-permission="pos.transaction:create" id="open-packaging-override" type="button">Tambah Kemasan</button>
+          </div>
+          <div class="cart-summary">
+            <div><span>Subtotal</span><strong id="cart-subtotal">Rp0</strong></div>
+            <div class="cashier-internal-metric"><span>Internal Cost</span><strong id="cart-cogs">Rp0</strong></div>
+            <div id="cart-service-row"><span id="cart-service-label">Service Charge</span><strong id="cart-service-charge">Rp0</strong></div>
+            <div id="cart-packaging-row"><span>Kemasan Tambahan Order</span><strong id="cart-packaging-fee">Rp0</strong></div>
+            <div><span id="cart-tax-label">Pajak</span><strong id="cart-tax">Rp0</strong></div>
+            <div id="cart-payment-fee-row"><span id="cart-payment-fee-label">Payment Fee</span><strong id="cart-payment-fee">Rp0</strong></div>
+            <div class="cashier-internal-metric"><span>Internal Margin</span><strong id="cart-profit">Rp0</strong></div>
+            <div class="total"><span id="cart-total-label">Total Bayar</span><strong id="cart-grand-total">Rp0</strong></div>
+          </div>
+          <div class="payment-methods" id="payment-methods"></div>
+          <div class="pos-payment-panel" id="pos-payment-panel" hidden>
+            <div class="cash-payment-fields" id="cash-payment-fields" hidden>
+              <label>Nominal Bayar
+                <input id="cash-tendered" min="0" step="500" type="number" placeholder="Masukkan uang diterima" />
+              </label>
+              <div><span>Kembalian</span><strong id="cash-change">Rp0</strong></div>
+            </div>
+            <div class="third-party-payment" id="third-party-payment" hidden>
+              <span id="third-party-payment-label">Payment Gateway</span>
+              <strong id="third-party-payment-status">Belum dibuat</strong>
+              <small id="third-party-payment-note">Payment request dibuat saat checkout.</small>
+            </div>
+          </div>
+          <button class="primary-button full" data-permission="pos.transaction:create" id="checkout" type="button">Bayar Sekarang</button>
+          <p class="form-note" id="checkout-note"></p>
+        </div>
+      </section>
+
+      <div class="modal-backdrop" data-product-detail-backdrop hidden>
+        <section class="modal-dialog modal-dialog-wide" id="pos-product-detail-modal" aria-modal="true" role="dialog" aria-labelledby="pos-product-detail-title" hidden>
+          <header class="modal-header">
+            <div><span class="hero-kicker">Panduan Kasir</span><h3 id="pos-product-detail-title">Detail Produk</h3><p>Informasi produk untuk membantu menjelaskan menu kepada pelanggan.</p></div>
+            <button class="icon-button" data-close-product-detail type="button" aria-label="Tutup detail produk">x</button>
+          </header>
+          <div id="pos-product-detail"></div>
+        </section>
+      </div>
+      <div class="modal-backdrop" data-modifier-backdrop hidden>
+        <section class="modal-dialog" id="pos-modifier-modal" aria-modal="true" role="dialog" aria-labelledby="pos-modifier-title" hidden>
+          <header class="modal-header">
+            <div><span class="hero-kicker">Product Modifier</span><h3 id="pos-modifier-title">Pilih Modifier</h3><p>Pilihan akan mengubah harga dan bahan yang digunakan.</p></div>
+            <button class="icon-button" data-close-pos-modifier type="button" aria-label="Tutup modifier">x</button>
+          </header>
+          <form id="pos-modifier-form">
+            <input id="pos-modifier-product-id" type="hidden" />
+            <div class="modifier-option-list" id="pos-modifier-options"></div>
+            <div class="modal-actions"><button class="ghost-button" data-close-pos-modifier type="button">Batal</button><button class="primary-button" type="submit">Tambahkan ke Pesanan</button></div>
+          </form>
+        </section>
+      </div>
+      <div class="modal-backdrop" data-packaging-override-backdrop hidden>
+        <section class="modal-dialog" id="packaging-override-modal" aria-modal="true" role="dialog" aria-labelledby="packaging-override-title" hidden>
+          <header class="modal-header"><div><span class="hero-kicker">Manual Packaging</span><h3 id="packaging-override-title">Tambah Kemasan Tambahan</h3><p>Gunakan untuk permintaan pisah order, tambah paper bag, kardus, atau kemasan ekstra. Cup, gelas, lid, botol, atau pouch per produk tetap mengikuti recipe produk.</p></div><button class="icon-button" data-close-packaging-override type="button">x</button></header>
+          <form class="form-grid input-workflow" id="packaging-override-form">
+            <label data-packaging-override-mode-field>Jenis Kemasan
+              <select id="packaging-override-mode">
+                <option value="add_chargeable">Tambah kemasan untuk pisah order</option>
+                <option value="replace_shortage">Pakai kemasan pengganti</option>
+                <option value="replace_damage">Kemasan rusak / terbuang</option>
+              </select>
+            </label>
+            <label data-packaging-override-item-field>Item Kemasan Tambahan <select id="packaging-override-item" required></select></label>
+            <label>Jumlah <input id="packaging-override-qty" min="1" required type="number" value="1" /></label>
+            <div class="modal-actions"><button class="ghost-button" data-reset-packaging-override type="button">Reset Manual</button><button class="primary-button" id="packaging-override-submit" type="submit">Simpan Kemasan</button></div>
+          </form>
+        </section>
+      </div>
+      <div class="modal-backdrop" data-qris-payment-backdrop hidden>
+        <section class="modal-dialog qris-payment-modal" id="qris-payment-modal" aria-modal="true" role="dialog" aria-labelledby="qris-payment-title" hidden>
+          <header class="modal-header">
+            <div><span class="hero-kicker">QRIS Payment</span><h3 id="qris-payment-title">Scan QRIS</h3><p id="qris-payment-subtitle">Tampilkan atau print QRIS untuk pelanggan.</p></div>
+            <button class="icon-button" data-close-qris-payment type="button" aria-label="Tutup QRIS">x</button>
+          </header>
+          <div class="qris-payment-card" id="qris-payment-card">
+            <div class="qris-payment-brand">
+              <strong id="qris-payment-outlet">Outlet</strong>
+              <span id="qris-payment-order">#POS-NEW</span>
+            </div>
+            <div class="qris-code-frame">
+              <img id="qris-payment-image" alt="QRIS pembayaran" />
+              <div class="qris-code-placeholder" id="qris-payment-placeholder" hidden>
+                <strong>QRIS belum tersedia</strong>
+                <span>Provider mengirim payload testing yang tidak bisa discan.</span>
+              </div>
+            </div>
+            <div class="qris-payment-info">
+              <span>Total Bayar</span>
+              <strong id="qris-payment-amount">Rp0</strong>
+              <small id="qris-payment-reference">Reference</small>
+            </div>
+            <p class="qris-payment-note" id="qris-payment-note">Minta pelanggan scan QRIS ini, lalu konfirmasi setelah pembayaran berhasil.</p>
+          </div>
+          <div class="modal-actions">
+            <button class="ghost-button" data-print-qris-payment type="button">Print QRIS</button>
+            <button class="ghost-button" data-simulate-qris-payment type="button" hidden>Simulasi Terbayar</button>
+            <button class="primary-button" data-confirm-static-qris-payment type="button" hidden>Konfirmasi Sudah Dibayar</button>
+            <button class="primary-button" data-close-qris-payment type="button">Lanjut</button>
+          </div>
+        </section>
+      </div>
+      <div class="modal-backdrop" data-card-payment-backdrop hidden>
+        <section class="modal-dialog qris-payment-modal" id="card-payment-modal" aria-modal="true" role="dialog" aria-labelledby="card-payment-title" hidden>
+          <header class="modal-header">
+            <div><span class="hero-kicker">Card Payment</span><h3 id="card-payment-title">Approval Card / EDC</h3><p id="card-payment-subtitle">Scan QR untuk kartu online atau ikuti instruksi EDC offline.</p></div>
+            <button class="icon-button" data-close-card-payment type="button" aria-label="Tutup pembayaran kartu">x</button>
+          </header>
+          <div class="qris-payment-card card-payment-card">
+            <div class="qris-payment-brand">
+              <strong id="card-payment-outlet">Outlet</strong>
+              <span id="card-payment-order">#POS-NEW</span>
+            </div>
+            <div class="qris-code-frame card-payment-qr-frame" id="card-payment-qr-frame" hidden>
+              <img id="card-payment-qr" alt="QR halaman pembayaran kartu" />
+            </div>
+            <div class="card-payment-icon" id="card-payment-offline-panel">
+              <strong>CARD</strong>
+              <span id="card-payment-offline-label">Approval menggunakan mesin EDC</span>
+            </div>
+            <div class="qris-payment-info">
+              <span>Total Bayar</span>
+              <strong id="card-payment-amount">Rp0</strong>
+              <small id="card-payment-reference">Reference</small>
+            </div>
+            <p class="qris-payment-note" id="card-payment-note">Ikuti instruksi gateway sampai transaksi kartu approved.</p>
+          </div>
+          <div class="modal-actions">
+            <button class="ghost-button" id="print-card-payment-qr" type="button" hidden>Print QR Card</button>
+            <button class="ghost-button" id="open-card-payment-link" type="button">Buka Halaman Customer</button>
+            <button class="ghost-button" data-simulate-card-payment type="button" hidden>Simulasi Terbayar</button>
+            <button class="primary-button" data-close-card-payment type="button">Lanjut</button>
+          </div>
+        </section>
+      </div>
+      <div class="pos-queue-backdrop" data-pos-queue-backdrop hidden></div>
+      <div class="pos-queue-backdrop" data-pos-approval-backdrop hidden></div>
+      <div class="pos-queue-backdrop" data-pos-table-backdrop hidden></div>
+      <aside class="pos-queue-drawer" id="pos-queue-drawer" aria-labelledby="pos-queue-title" hidden>
+        <header class="pos-queue-drawer-header">
+          <div><span class="hero-kicker">Kitchen & Kasir</span><h3 id="pos-queue-title">Antrian Pesanan</h3><p>Pantau dan proses pesanan tanpa meninggalkan halaman kasir.</p></div>
+          <button class="icon-button" data-close-pos-queue type="button" aria-label="Tutup antrian pesanan">x</button>
+        </header>
+        <div class="pos-queue-summary" id="pos-queue-summary"></div>
+        <div class="pos-queue-board" id="pos-queue-board"></div>
+      </aside>
+      <aside class="pos-queue-drawer pos-approval-drawer" id="pos-approval-drawer" aria-labelledby="pos-approval-title" hidden>
+        <header class="pos-queue-drawer-header">
+          <div><span class="hero-kicker">Online Order</span><h3 id="pos-approval-title">Approve Pesanan Online</h3><p>Cek pesanan customer, terima pembayaran, lalu kirim ke kitchen.</p></div>
+          <button class="icon-button" data-close-pos-approvals type="button" aria-label="Tutup approve online">x</button>
+        </header>
+        <div class="pos-approval-list" id="pos-approval-list"></div>
+      </aside>
+      <aside class="pos-queue-drawer pos-table-drawer" id="pos-table-drawer" aria-labelledby="pos-table-title" hidden>
+        <header class="pos-queue-drawer-header">
+          <div><span class="hero-kicker">Table Service</span><h3 id="pos-table-title">Open Table</h3><p>Kelola bill meja berjalan, pindah meja, dan settlement tanpa mengganggu POS.</p></div>
+          <button class="icon-button" data-close-pos-tables type="button" aria-label="Tutup open table">x</button>
+        </header>
+        <div class="open-table-list" id="open-table-list"></div>
+      </aside>
+      <div class="modal-backdrop" data-bill-detail-backdrop hidden>
+        <section class="modal-dialog modal-dialog-wide" id="bill-detail-modal" aria-modal="true" role="dialog" aria-labelledby="bill-detail-title" hidden>
+          <header class="modal-header">
+            <div><span class="hero-kicker">Bill Confirmation</span><h3 id="bill-detail-title">Detail Bill</h3><p id="bill-detail-subtitle">Konfirmasi pesanan sebelum settlement.</p></div>
+            <button class="icon-button" data-close-bill-detail type="button" aria-label="Tutup detail bill">x</button>
+          </header>
+          <div id="bill-detail-content"></div>
+        </section>
+      </div>
+    </template>
+
+    <script type="module" src="../scripts/pages/pos.js?v=coffee-v148"></script>
+  </body>
+</html>

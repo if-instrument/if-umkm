@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Profit & Loss - IF Instrument</title>
+    <link rel="stylesheet" href="../styles.css?v=coffee-v137" />
+  </head>
+  <body data-page="reports" data-title="Profit & Loss" data-eyebrow="Keuangan">
+    <template id="page-content">
+      <section class="content-grid">
+        <div class="workspace-panel wide">
+          <div class="panel-heading">
+            <h3>Filter Periode Report</h3>
+            <p>Pilih periode laporan penjualan dan laba rugi berdasarkan tanggal transaksi.</p>
+          </div>
+          <form class="form-grid split-form input-workflow report-filter-form" id="report-filter-form">
+            <label>
+              Periode
+              <select id="report-period">
+                <option value="daily" selected>Harian</option>
+                <option value="weekly">Mingguan</option>
+                <option value="monthly">Bulanan</option>
+                <option value="yearly">Tahunan</option>
+              </select>
+            </label>
+            <label>
+              Tanggal Acuan
+              <input id="report-anchor-date" type="date" />
+            </label>
+            <div class="report-period-summary">
+              <span>Periode Aktif</span>
+              <strong id="report-period-label">-</strong>
+            </div>
+            <div class="report-period-summary">
+              <span>Outlet Aktif</span>
+              <strong id="report-outlet-label">-</strong>
+            </div>
+            <div class="report-export-actions">
+              <button class="ghost-button" data-export-report="excel" type="button">Export Report Excel</button>
+              <button class="primary-button" data-export-report="pdf" type="button">Export Report PDF</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="workspace-panel wide">
+          <div class="panel-heading">
+            <h3>Ringkasan Profit & Loss</h3>
+            <p>Omzet, HPP, laba kotor, waste/expired, dan laba operasional dari data POS serta stok outlet.</p>
+          </div>
+          <div class="metric-grid report-metrics">
+            <article class="metric">
+              <span>Omzet</span>
+              <strong id="report-revenue">Rp0</strong>
+              <small>Total penjualan POS</small>
+            </article>
+            <article class="metric">
+              <span>HPP Penjualan</span>
+              <strong id="report-cogs">Rp0</strong>
+              <small>Bahan outlet terpakai dari recipe</small>
+            </article>
+            <article class="metric">
+              <span>Laba Kotor</span>
+              <strong id="report-gross-profit">Rp0</strong>
+              <small>Omzet dikurangi HPP</small>
+            </article>
+            <article class="metric alert">
+              <span>Waste / Expired</span>
+              <strong id="report-waste">Rp0</strong>
+              <small>Bahan outlet rusak atau terbuang</small>
+            </article>
+            <article class="metric">
+              <span>Koreksi Stok</span>
+              <strong id="report-adjustment">Rp0</strong>
+              <small>Selisih stock opname outlet</small>
+            </article>
+            <article class="metric">
+              <span>Laba Operasional</span>
+              <strong id="report-operating-profit">Rp0</strong>
+              <small>Laba setelah kerugian stok</small>
+            </article>
+            <article class="metric">
+              <span>Beban Operasional</span>
+              <strong id="report-operating-expenses">Rp0</strong>
+              <small>Expense manual outlet</small>
+            </article>
+            <article class="metric">
+              <span>Net Cash Movement</span>
+              <strong id="report-net-cash">Rp0</strong>
+              <small>Kas masuk dikurangi fee merchant dan expense</small>
+            </article>
+          </div>
+        </div>
+
+        <div class="workspace-panel">
+          <div class="panel-heading">
+            <h3>Statement Laba Rugi</h3>
+            <p>Format akuntansi sederhana untuk owner dan manager perusahaan.</p>
+          </div>
+          <div class="pnl-statement" id="pnl-statement"></div>
+        </div>
+
+        <div class="workspace-panel">
+          <div class="panel-heading">
+            <h3>Kerugian Stok Outlet</h3>
+            <p>Expired, waste, dan koreksi stok bahan outlet yang mempengaruhi profit.</p>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Waktu</th>
+                  <th>Bahan Outlet</th>
+                  <th>Tipe</th>
+                  <th>Qty</th>
+                  <th>Nilai</th>
+                  <th>Catatan</th>
+                </tr>
+              </thead>
+              <tbody id="loss-table"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="workspace-panel wide">
+          <div class="panel-heading">
+            <h3>Riwayat Transaksi</h3>
+            <p>Setiap transaksi menyimpan omzet, HPP, dan laba kotor saat penjualan.</p>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Waktu</th>
+                  <th>Item</th>
+                  <th>Omzet</th>
+                  <th>HPP</th>
+                  <th>Laba</th>
+                </tr>
+              </thead>
+              <tbody id="transaction-table"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </template>
+
+    <script type="module" src="../scripts/pages/reports.js?v=coffee-v137"></script>
+  </body>
+</html>

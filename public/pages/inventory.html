@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Overview Stok Outlet - IFresso Coffee</title>
+    <link rel="stylesheet" href="../styles.css?v=coffee-v137" />
+  </head>
+  <body data-page="inventory-dashboard" data-title="Overview Stok Outlet" data-eyebrow="Gudang">
+    <template id="page-content">
+      <section class="content-grid single">
+        <div class="inventory-command">
+          <div>
+            <span class="hero-kicker">Stock Control Tower</span>
+            <h3>Ringkasan stok fisik outlet dalam satu layar.</h3>
+            <p>Owner dan manager outlet bisa melihat nilai stok, bahan yang perlu dibeli, dan risiko operasional sebelum stok kritis.</p>
+          </div>
+          <div class="inventory-actions">
+            <a class="primary-button" href="/pages/inventory-list.html">Kelola Stok Bahan</a>
+            <a class="ghost-button" href="/pages/finished-products.html">Stok Produk</a>
+          </div>
+        </div>
+
+        <div class="metric-grid">
+          <article class="metric">
+            <span>Nilai Stok</span>
+            <strong id="inventory-value">Rp0</strong>
+            <small>Modal bahan outlet saat ini</small>
+          </article>
+          <article class="metric">
+            <span>Bahan Outlet</span>
+            <strong id="ingredient-count">0</strong>
+            <small>Stok fisik aktif</small>
+          </article>
+          <article class="metric alert">
+            <span>Stok Kritis</span>
+            <strong id="critical-count">0</strong>
+            <small>Di bawah batas aman</small>
+          </article>
+          <article class="metric">
+            <span>Estimasi Reorder</span>
+            <strong id="reorder-value">Rp0</strong>
+            <small>Untuk kembali ke stok aman</small>
+          </article>
+        </div>
+
+        <div class="content-grid">
+          <div class="workspace-panel">
+            <div class="panel-heading">
+              <h3>Rekomendasi Pembelian</h3>
+              <p>Bahan outlet prioritas untuk dibeli.</p>
+            </div>
+            <div class="recommendation-list" id="inventory-reorder-list"></div>
+          </div>
+
+          <div class="workspace-panel">
+            <div class="panel-heading">
+              <h3>Kesehatan Stok</h3>
+              <p>Komposisi status bahan outlet.</p>
+            </div>
+            <div class="stock-health-list" id="stock-health-list"></div>
+          </div>
+        </div>
+
+        <div class="content-grid">
+          <div class="workspace-panel">
+            <div class="panel-heading">
+              <h3>Bahan Akan Expired</h3>
+              <p>Lot bahan outlet dengan expired date terdekat.</p>
+            </div>
+            <div class="recommendation-list" id="ingredient-expiry-list"></div>
+          </div>
+
+          <div class="workspace-panel">
+            <div class="panel-heading">
+              <h3>Produk Akan Expired</h3>
+              <p>Batch produk jadi atau barang dagang yang perlu diprioritaskan FEFO.</p>
+            </div>
+            <div class="recommendation-list" id="finished-expiry-list"></div>
+          </div>
+        </div>
+      </section>
+    </template>
+
+    <script type="module" src="../scripts/pages/inventory.js?v=coffee-v137"></script>
+  </body>
+</html>

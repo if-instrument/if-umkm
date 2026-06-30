@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Buat Recipe Template - IFresso Coffee</title>
+    <link rel="stylesheet" href="../styles.css?v=coffee-v143" />
+  </head>
+  <body data-page="recipes" data-title="Buat Recipe Template" data-eyebrow="Produk & Recipe">
+    <template id="page-content">
+      <section class="content-grid single">
+        <div class="page-command-bar">
+          <div class="recipe-product-picker">
+            <a href="/pages/products.html">Daftar Produk</a>
+            <span>›</span>
+            <select id="recipe-focus-product" aria-label="Pilih produk"></select>
+          </div>
+          <div class="inventory-actions">
+            <button class="ghost-button" type="button">Preview HPP Outlet</button>
+            <button class="primary-button" data-open-recipe-modal data-permission="recipes.template:create" type="button">+ Tambah Bahan Recipe</button>
+          </div>
+        </div>
+
+        <div class="form-preview full-row">
+          Area ini khusus untuk admin menyusun template recipe produk, termasuk bahan kemasan yang melekat ke produk seperti cup, lid, botol, atau pouch. Proses ini belum menambah stok outlet.
+        </div>
+
+        <div id="recipe-detail"></div>
+        <section class="workspace-panel wide">
+          <div class="panel-heading">
+            <div><h3>Modifier Produk</h3><p>Pilih master modifier yang boleh digunakan produk ini. Mapping bahan outlet dilakukan terpisah di menu Produk & Recipe.</p></div>
+            <button class="primary-button" data-open-modifier-modal data-permission="modifiers.master:create" type="button">+ Tambah Modifier Master</button>
+          </div>
+          <div class="modifier-assignment-bar">
+            <div class="modifier-checkbox-list" id="product-modifier-list"></div>
+            <button class="ghost-button compact-button" data-permission="recipes.template:update" id="save-product-modifiers" type="button">Simpan Pilihan</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Modifier</th><th>Harga Tambahan</th><th>Perubahan Recipe</th><th>Aksi</th></tr></thead>
+              <tbody id="modifier-table"></tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+
+      <div class="modal-backdrop" data-modal-backdrop hidden>
+        <section class="modal-dialog" id="recipe-modal" aria-modal="true" role="dialog" aria-labelledby="recipe-modal-title" hidden>
+          <header class="modal-header">
+            <div>
+              <span class="hero-kicker">Recipe Builder</span>
+              <h3 id="recipe-modal-title">Tambah Bahan Recipe</h3>
+              <p>Gunakan template bahan perusahaan. Cup, lid, botol, atau kemasan per produk dimasukkan di sini agar ikut HPP recipe.</p>
+            </div>
+            <button class="icon-button" data-close-modal type="button" aria-label="Tutup modal">x</button>
+          </header>
+          <form class="form-grid input-workflow" id="recipe-form">
+            <input id="recipe-original-template" type="hidden" />
+            <label>Produk <select id="recipe-product" required></select></label>
+            <label id="recipe-template-field">Template Bahan <select id="recipe-template" required></select></label>
+            <div class="form-grid full-row compact-subform" id="recipe-new-template-fields" hidden>
+              <label>Nama Template Baru <input id="recipe-new-template-name" autocomplete="off" placeholder="Contoh: Oat Milk" type="text" /></label>
+              <label>Kategori Template
+                <select id="recipe-new-template-category">
+                  <option value="Raw Material">Raw Material</option>
+                  <option value="Packaging">Packaging</option>
+                  <option value="Consumable">Consumable</option>
+                </select>
+              </label>
+              <label>Satuan Template <input id="recipe-new-template-unit" autocomplete="off" placeholder="gram, ml, pcs" type="text" /></label>
+              <p class="form-preview full-row">Template baru hanya menjadi standar recipe perusahaan. Outlet tetap perlu membuat atau menghubungkan bahan fisiknya di menu Stok Bahan Outlet.</p>
+            </div>
+            <label>Jumlah per Porsi <input id="recipe-qty" min="0.01" placeholder="Contoh: 180" step="0.01" type="number" required /></label>
+            <p class="form-preview" id="recipe-preview">Pilih template bahan, termasuk Packaging per produk bila diperlukan, lalu isi jumlah per porsi. HPP dihitung setelah outlet punya bahan fisik untuk template tersebut.</p>
+            <div class="modal-actions">
+              <button class="ghost-button" data-close-modal type="button">Batal</button>
+              <button class="primary-button" data-permission="recipes.template:create" id="recipe-submit-button" type="submit">Simpan ke Recipe</button>
+            </div>
+            <p class="form-feedback" id="recipe-feedback" role="status"></p>
+          </form>
+        </section>
+
+        <section class="modal-dialog" id="modifier-modal" aria-modal="true" role="dialog" aria-labelledby="modifier-modal-title" hidden>
+          <header class="modal-header">
+            <div><span class="hero-kicker">Modifier Template</span><h3 id="modifier-modal-title">Tambah Modifier</h3><p>Buat grup pilihan dan aturan perubahan template bahan. Mapping bahan outlet dikerjakan terpisah di menu Produk & Recipe.</p></div>
+            <button class="icon-button" data-close-modal type="button" aria-label="Tutup modal">x</button>
+          </header>
+          <form class="form-grid input-workflow two-column-form" id="modifier-form">
+            <input id="modifier-id" type="hidden" />
+            <label class="full-row">Nama Master <input id="modifier-name" placeholder="Contoh: Level Es, Pilihan Susu, Topping" required type="text" /></label>
+            <label>Ketersediaan Modifier
+              <select id="modifier-scope">
+                <option value="company">Global perusahaan - semua outlet</option>
+                <option value="outlet">Khusus outlet aktif</option>
+              </select>
+            </label>
+            <label>Tipe Pilihan di POS
+              <select id="modifier-choice-type">
+                <option value="multiple">Checkbox - bisa pilih beberapa</option>
+                <option value="single">Radio - pilih satu opsi</option>
+              </select>
+            </label>
+            <label class="full-row">Status <select id="modifier-status"><option value="active">Aktif</option><option value="inactive">Nonaktif</option></select></label>
+            <label class="toggle-row full-row">
+              <input id="modifier-required-selection" type="checkbox" />
+              <span><strong>Wajib pilih minimal satu opsi saat transaksi</strong><small>Untuk tipe Radio berarti wajib pilih satu. Untuk Checkbox berarti wajib pilih minimal satu.</small></span>
+            </label>
+            <div class="modifier-option-toolbar full-row">
+              <div>
+                <strong>Opsi Modifier</strong>
+                <span>Pilih template bahan existing atau buat template baru. Bahan outlet dimapping nanti oleh outlet.</span>
+              </div>
+              <button class="ghost-button compact-button" data-add-option data-permission="modifiers.options:create" type="button">+ Tambah Opsi</button>
+            </div>
+            <div class="modifier-option-editor full-row" id="modifier-option-editor"></div>
+            <p class="form-preview full-row" id="modifier-preview">Isi minimal opsi pertama. Setiap opsi bisa menambah, mengurangi, atau mengganti bahan.</p>
+            <div class="modal-actions full-row"><button class="ghost-button" data-close-modal type="button">Batal</button><button class="primary-button" type="submit">Simpan Modifier</button></div>
+          </form>
+        </section>
+
+        <section class="modal-dialog" id="outlet-ingredient-modal" aria-modal="true" role="dialog" aria-labelledby="outlet-ingredient-modal-title" hidden>
+          <header class="modal-header">
+            <div>
+              <span class="hero-kicker">Bahan Outlet</span>
+              <h3 id="outlet-ingredient-modal-title">Buat Bahan Outlet</h3>
+              <p>Buat bahan fisik outlet dari template yang belum dimapping agar recipe, modifier, stok, dan HPP langsung terhubung.</p>
+            </div>
+            <button class="icon-button" data-close-modal type="button" aria-label="Tutup modal">x</button>
+          </header>
+          <form class="form-grid input-workflow two-column-form" id="outlet-ingredient-form">
+            <input id="outlet-ingredient-template" type="hidden" />
+            <label class="full-row">Template Bahan <input id="outlet-ingredient-template-name" type="text" disabled /></label>
+            <label>SKU Bahan Outlet <input id="outlet-ingredient-sku" autocomplete="off" required type="text" /></label>
+            <label>Nama Bahan Outlet <input id="outlet-ingredient-name" autocomplete="off" required type="text" /></label>
+            <label>Kategori
+              <select id="outlet-ingredient-category" required>
+                <option value="Raw Material">Raw Material</option>
+                <option value="Packaging">Packaging</option>
+                <option value="Consumable">Consumable</option>
+              </select>
+            </label>
+            <label>Satuan <input id="outlet-ingredient-unit" autocomplete="off" required type="text" /></label>
+            <label>Stok Awal <input id="outlet-ingredient-stock" min="0" placeholder="0" step="0.01" type="number" value="0" required /></label>
+            <label>Nilai Stok Awal <input id="outlet-ingredient-cost" min="0" placeholder="0" step="500" type="number" value="0" required /></label>
+            <label>Standard Cost <input id="outlet-ingredient-standard-cost" min="0" placeholder="0" step="0.01" type="number" value="0" required /></label>
+            <label>Batas Aman <input id="outlet-ingredient-min" min="0" placeholder="0" step="0.01" type="number" value="0" required /></label>
+            <label>Manufactured Date <small>Opsional</small><input id="outlet-ingredient-manufactured-at" type="date" /></label>
+            <label>Expired Date <small>Opsional</small><input id="outlet-ingredient-expired-at" type="date" /></label>
+            <p class="form-preview full-row" id="outlet-ingredient-preview">Boleh dibuat dengan stok 0 untuk mapping awal. Stok bisa diisi nanti lewat Stok Bahan.</p>
+            <div class="modal-actions full-row"><button class="ghost-button" data-close-modal type="button">Batal</button><button class="primary-button" data-permission="inventory.ingredients:create" type="submit">Simpan Bahan Outlet</button></div>
+            <p class="form-feedback full-row" id="outlet-ingredient-feedback" role="status"></p>
+          </form>
+        </section>
+      </div>
+    </template>
+
+    <script type="module" src="../scripts/pages/recipes.js?v=coffee-v143"></script>
+  </body>
+</html>

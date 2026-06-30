@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Beban Operasional - IF Instrument</title>
+    <link rel="stylesheet" href="../styles.css?v=coffee-v137" />
+  </head>
+  <body data-page="finance-expenses" data-title="Beban Operasional" data-eyebrow="Keuangan">
+    <template id="page-content">
+      <section class="content-grid">
+        <div class="workspace-panel wide">
+          <div class="panel-heading">
+            <h3>Filter Beban Operasional</h3>
+            <p>Catat dan audit biaya outlet seperti payroll, sewa, listrik, marketing, maintenance, dan biaya platform.</p>
+          </div>
+          <form class="form-grid split-form input-workflow report-filter-form" id="expense-filter-form">
+            <label>Periode
+              <select id="expense-period">
+                <option value="daily" selected>Harian</option>
+                <option value="weekly">Mingguan</option>
+                <option value="monthly">Bulanan</option>
+                <option value="yearly">Tahunan</option>
+              </select>
+            </label>
+            <label>Tanggal Acuan <input id="expense-anchor-date" type="date" /></label>
+            <div class="report-period-summary"><span>Total Expense</span><strong id="expense-total">Rp0</strong></div>
+            <div class="report-export-actions">
+              <button class="primary-button" data-open-expense-modal data-permission="reports.operatingExpenses:create" type="button">+ Beban Operasional</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="workspace-panel wide">
+          <div class="panel-heading">
+            <h3>Summary Kategori</h3>
+            <p>Expense dikelompokkan agar owner mudah membaca struktur biaya outlet.</p>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Kategori</th><th>Jumlah Entry</th><th>Total</th></tr></thead>
+              <tbody id="expense-summary-table"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="workspace-panel wide">
+          <div class="panel-heading">
+            <h3>Daftar Beban</h3>
+            <p>Data yang di-void tidak dihapus fisik agar audit tetap utuh.</p>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Tanggal</th>
+                  <th>Kategori</th>
+                  <th>Nama Beban</th>
+                  <th>Metode</th>
+                  <th>Vendor</th>
+                  <th>Nominal</th>
+                  <th>Aksi</th>
+                </tr>
+              </thead>
+              <tbody id="expense-table"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <div class="modal-backdrop" data-modal-backdrop hidden>
+        <section class="modal-dialog" id="expense-modal" aria-modal="true" role="dialog" aria-labelledby="expense-modal-title" hidden>
+          <header class="modal-header">
+            <div><span class="hero-kicker">Finance</span><h3 id="expense-modal-title">Beban Operasional</h3><p>Catat biaya outlet agar laporan laba rugi lebih lengkap.</p></div>
+            <button class="icon-button" data-close-modal type="button" aria-label="Tutup modal">x</button>
+          </header>
+          <form class="form-grid input-workflow two-column-form" id="expense-form">
+            <input id="expense-id" type="hidden" />
+            <label>Tanggal Beban <input id="expense-date" required type="date" /></label>
+            <label>Kategori
+              <select id="expense-category">
+                <option value="Payroll">Payroll</option>
+                <option value="Rent">Rent</option>
+                <option value="Utilities">Utilities</option>
+                <option value="Marketing">Marketing</option>
+                <option value="Maintenance">Maintenance</option>
+                <option value="Platform Fee">Platform Fee</option>
+                <option value="Office Supplies">Office Supplies</option>
+                <option value="Other">Other</option>
+              </select>
+            </label>
+            <label>Nama Beban <input id="expense-name" autocomplete="off" required type="text" /></label>
+            <label>Nominal <input id="expense-amount" min="0" required step="500" type="number" /></label>
+            <label>Metode Bayar <input id="expense-payment-method" autocomplete="off" type="text" /></label>
+            <label>Vendor <input id="expense-vendor" autocomplete="off" type="text" /></label>
+            <label>Nomor Referensi <input id="expense-reference" autocomplete="off" type="text" /></label>
+            <label>Status <select id="expense-status"><option value="posted">Posted</option><option value="draft">Draft</option></select></label>
+            <label class="full-row">Catatan <input id="expense-notes" autocomplete="off" type="text" /></label>
+            <div class="modal-actions full-row"><button class="ghost-button" data-close-modal type="button">Batal</button><button class="primary-button" type="submit">Simpan Beban</button></div>
+            <p class="form-feedback full-row" id="expense-feedback" role="status"></p>
+          </form>
+        </section>
+      </div>
+    </template>
+
+    <script type="module" src="../scripts/pages/finance-expenses.js?v=coffee-v137"></script>
+  </body>
+</html>

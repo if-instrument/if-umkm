@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>User & Role - IF Instrument</title>
+    <link rel="stylesheet" href="../styles.css?v=coffee-v137" />
+  </head>
+  <body data-page="users" data-title="User & Role" data-eyebrow="Manajemen">
+    <template id="page-content">
+      <section class="content-grid single">
+        <div class="page-command-bar">
+          <div>
+            <span class="hero-kicker">SaaS Identity</span>
+            <h3 data-access-heading>Kelola perusahaan dan undangan administrator.</h3>
+          </div>
+          <div class="inventory-actions">
+            <button class="ghost-button" data-open-company-modal data-permission="admin.companies:create" data-super-admin-only type="button">+ Perusahaan</button>
+            <button class="ghost-button" data-company-admin-only data-open-role-modal data-permission="roles.manage:create" hidden type="button">+ Role</button>
+            <button class="ghost-button" data-company-admin-only data-open-outlet-modal data-permission="outlets.manage:create" hidden type="button">+ Outlet</button>
+            <button class="primary-button" data-company-admin-only data-open-user-modal data-permission="users.manage:create" hidden type="button">+ User</button>
+          </div>
+          <p class="form-feedback full-row" id="company-feedback"></p>
+        </div>
+
+        <div class="module-tabs user-admin-tabs" data-company-admin-only hidden>
+          <button class="active" data-user-tab="users" type="button">User</button>
+          <button data-user-tab="roles" type="button">Role & Permission</button>
+          <button data-user-tab="outlets" type="button">Outlet</button>
+        </div>
+
+        <section class="workspace-panel wide" data-super-admin-only>
+          <div class="panel-heading">
+            <div>
+              <h3>Super Admin Console</h3>
+              <p>Super admin hanya melihat dan membuat perusahaan serta administrator perusahaan. Tidak ada akses operasional outlet.</p>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Perusahaan</th><th>Admin Perusahaan</th><th>Branding</th><th>Status</th><th>Aksi</th></tr></thead>
+              <tbody id="company-table"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="workspace-panel wide tab-panel" data-company-admin-only data-user-tab-panel="roles" hidden>
+          <div class="panel-heading">
+            <h3>Role Perusahaan</h3>
+            <p>Role menentukan akses modul dan cakupan outlet. User hanya mengikuti cakupan outlet dari role ini.</p>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Role</th><th>Akses Outlet Role</th><th>Tanggung Jawab</th><th>Akses Modul</th><th>Status</th><th>Aksi</th></tr></thead>
+              <tbody id="role-table"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="workspace-panel wide tab-panel" data-company-admin-only data-user-tab-panel="outlets" hidden>
+          <div class="panel-heading">
+            <h3>Outlet</h3>
+            <p>Outlet nonaktif tetap tersimpan untuk audit, tapi tidak menjadi pilihan operasional aktif.</p>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Kode</th><th>Nama Outlet</th><th>Kota</th><th>Status</th><th>Aksi</th></tr></thead>
+              <tbody id="outlet-table"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="workspace-panel wide tab-panel active" data-company-admin-only data-user-tab-panel="users" hidden>
+          <div class="panel-heading">
+            <h3>User Perusahaan</h3>
+            <p>User mendapatkan role. Jika role Selected Outlet, centang outlet yang menjadi tanggung jawab user tersebut.</p>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Nama</th><th>Email</th><th>Role</th><th>Tanggung Jawab</th><th>Akses Outlet</th><th>Status</th><th>Aksi</th></tr></thead>
+              <tbody id="user-table"></tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+
+      <div class="modal-backdrop" data-modal-backdrop hidden>
+        <section class="modal-dialog" id="company-modal" aria-modal="true" role="dialog" aria-labelledby="company-modal-title" hidden>
+          <header class="modal-header">
+            <div><span class="hero-kicker">Super Admin</span><h3 id="company-modal-title">Tambah Perusahaan</h3><p>Administrator akan menerima email untuk verifikasi dan membuat password sendiri.</p></div>
+            <button class="icon-button" data-close-modal type="button" aria-label="Tutup modal">x</button>
+          </header>
+          <form class="form-grid input-workflow two-column-form" id="tenant-form">
+            <input id="tenant-id" type="hidden" />
+            <label>Nama Perusahaan <input id="tenant-name" required type="text" /></label>
+            <label>Route Company <input id="tenant-route-slug" pattern="[A-Za-z0-9-]+" placeholder="IFressoCoffee" required type="text" /></label>
+            <label>Status <select id="tenant-status"><option value="active">Aktif</option><option value="inactive">Nonaktif</option></select></label>
+            <label>Nama Admin <input id="tenant-admin-name" required type="text" /></label>
+            <label>Email Admin <input id="tenant-admin-email" required type="email" /></label>
+            <label class="logo-upload-field">Logo Perusahaan
+              <input id="tenant-logo-url" type="hidden" />
+              <span class="logo-upload-control">
+                <span class="logo-preview" id="tenant-logo-preview">IF</span>
+                <input id="tenant-logo-file" accept="image/png,image/jpeg,image/webp,image/gif" type="file" />
+              </span>
+            </label>
+            <label>Warna Tema <input id="tenant-theme-color" type="color" /></label>
+            <div class="modal-actions full-row"><button class="ghost-button" data-close-modal type="button">Batal</button><button class="primary-button" type="submit">Simpan Perusahaan</button></div>
+          </form>
+        </section>
+
+        <section class="modal-dialog" id="role-modal" aria-modal="true" role="dialog" aria-labelledby="role-modal-title" hidden>
+          <header class="modal-header">
+            <div><span class="hero-kicker">Custom Role</span><h3 id="role-modal-title">Tambah Role</h3><p>Role ini berlaku di perusahaan aktif.</p></div>
+            <button class="icon-button" data-close-modal type="button" aria-label="Tutup modal">x</button>
+          </header>
+          <form class="form-grid input-workflow two-column-form" id="role-form">
+            <input id="role-id" type="hidden" />
+            <label>Nama Role <input id="role-name" required type="text" /></label>
+            <label>Akses Outlet Role <select id="role-outlet-scope"><option value="selected">Selected Outlet</option><option value="all">All Outlet</option></select></label>
+            <label>Status <select id="role-status"><option value="active">Aktif</option><option value="inactive">Nonaktif</option></select></label>
+            <div class="full-row">
+              <div class="field-label">Permission Modul</div>
+              <div class="permission-matrix" id="role-permission-matrix"></div>
+              <p class="form-preview permission-preview" id="role-permission-preview">Centang C, R, U, D sesuai tanggung jawab role.</p>
+            </div>
+            <label class="full-row">Tanggung Jawab <textarea id="role-responsibility" required></textarea></label>
+            <div class="modal-actions full-row"><button class="ghost-button" data-close-modal type="button">Batal</button><button class="primary-button" type="submit">Simpan Role</button></div>
+          </form>
+        </section>
+
+        <section class="modal-dialog" id="user-modal" aria-modal="true" role="dialog" aria-labelledby="user-modal-title" hidden>
+          <header class="modal-header">
+            <div><span class="hero-kicker">Access Control</span><h3 id="user-modal-title">Tambah User</h3><p>User baru menerima email verifikasi untuk membuat password sendiri.</p></div>
+            <button class="icon-button" data-close-modal type="button" aria-label="Tutup modal">x</button>
+          </header>
+          <form class="form-grid input-workflow two-column-form" id="user-form">
+            <input id="user-id" type="hidden" />
+            <label>Nama <input id="user-name" required type="text" /></label>
+            <label>Email <input id="user-email" required type="email" /></label>
+            <label>Role <select id="user-role"></select></label>
+            <label>Status <select id="user-status"><option value="invited">Menunggu Aktivasi</option><option value="active">Aktif</option><option value="inactive">Nonaktif</option></select></label>
+            <label class="toggle-row full-row">
+              <input id="user-all-outlets" type="checkbox" />
+              <span><strong>Akses outlet mengikuti role</strong><small>Jika role All Outlet, user otomatis bisa semua outlet. Jika Selected Outlet, centang outlet tanggung jawab user.</small></span>
+            </label>
+            <div class="full-row" id="user-outlet-checklist-field">
+              <div class="field-label">Outlet Tugas</div>
+              <div class="outlet-checkbox-list" id="user-outlet-checklist"></div>
+            </div>
+            <p class="form-preview full-row" id="user-access-preview">Pilih role dan outlet untuk melihat ringkasan akses.</p>
+            <div class="modal-actions full-row"><button class="ghost-button" data-close-modal type="button">Batal</button><button class="primary-button" type="submit">Simpan User</button></div>
+          </form>
+        </section>
+
+        <section class="modal-dialog" id="outlet-modal" aria-modal="true" role="dialog" aria-labelledby="outlet-modal-title" hidden>
+          <header class="modal-header">
+            <div><span class="hero-kicker">Outlet Master</span><h3 id="outlet-modal-title">Tambah Outlet</h3><p>Outlet menjadi unit operasional untuk POS, inventory, dan laporan.</p></div>
+            <button class="icon-button" data-close-modal type="button" aria-label="Tutup modal">x</button>
+          </header>
+          <form class="form-grid input-workflow two-column-form" id="outlet-form">
+            <input id="outlet-id" type="hidden" />
+            <label>Kode Outlet <input id="outlet-code" required type="text" /></label>
+            <label>Nama Outlet <input id="outlet-name" required type="text" /></label>
+            <label>Kota / Area <input id="outlet-city" type="text" /></label>
+            <label>Status <select id="outlet-status"><option value="active">Aktif</option><option value="inactive">Nonaktif</option></select></label>
+            <div class="modal-actions full-row"><button class="ghost-button" data-close-modal type="button">Batal</button><button class="primary-button" type="submit">Simpan Outlet</button></div>
+          </form>
+        </section>
+      </div>
+    </template>
+    <script type="module" src="../scripts/pages/users.js?v=coffee-v137"></script>
+  </body>
+</html>

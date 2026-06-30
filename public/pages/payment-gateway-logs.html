@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Log Payment Gateway - IF Instrument</title>
+    <link rel="stylesheet" href="../styles.css?v=coffee-v137" />
+  </head>
+  <body data-page="payment-gateway-logs" data-title="Gateway & Settlement" data-eyebrow="Keuangan">
+    <template id="page-content">
+      <section class="content-grid single">
+        <div class="workspace-panel wide">
+          <div class="panel-heading split-heading">
+            <div>
+              <h3>Payment Gateway Log</h3>
+              <p>Audit request, response, webhook, dan simulasi pembayaran gateway.</p>
+            </div>
+          </div>
+          <div class="report-toolbar">
+            <label>Provider
+              <select id="gateway-log-provider">
+                <option value="">Semua Provider</option>
+                <option value="xendit">Xendit</option>
+                <option value="midtrans">Midtrans</option>
+                <option value="manual_qris">Manual QRIS</option>
+                <option value="manual_edc">Manual EDC</option>
+              </select>
+            </label>
+            <label>Status
+              <select id="gateway-log-status">
+                <option value="">Semua Status</option>
+                <option value="pending">Pending</option>
+                <option value="paid">Paid</option>
+                <option value="failed">Failed</option>
+                <option value="cancelled">Cancelled</option>
+                <option value="expired">Expired</option>
+              </select>
+            </label>
+            <label>Cari
+              <input id="gateway-log-search" type="search" placeholder="Order / reference / metode" />
+            </label>
+            <button class="primary-button compact-button" id="gateway-log-refresh" type="button">Refresh</button>
+          </div>
+          <div class="metric-grid compact-metrics" id="gateway-log-summary"></div>
+          <div class="table-shell">
+            <table>
+              <thead>
+                <tr>
+                  <th>Waktu</th>
+                  <th>Order</th>
+                  <th>Gateway</th>
+                  <th>Nominal</th>
+                  <th>Status</th>
+                  <th>Webhook</th>
+                  <th>Aksi</th>
+                </tr>
+              </thead>
+              <tbody id="gateway-log-table"></tbody>
+            </table>
+          </div>
+          <p class="form-feedback" id="gateway-log-feedback"></p>
+        </div>
+      </section>
+      <div class="modal-backdrop" data-gateway-log-backdrop hidden>
+        <section class="modal-dialog modal-dialog-wide" id="gateway-log-modal" aria-modal="true" role="dialog" aria-labelledby="gateway-log-title" hidden>
+          <header class="modal-header">
+            <div><span class="hero-kicker">Gateway Payload</span><h3 id="gateway-log-title">Detail Log</h3><p id="gateway-log-subtitle">Request dan response gateway.</p></div>
+            <button class="icon-button" data-close-gateway-log type="button" aria-label="Tutup detail log">x</button>
+          </header>
+          <div id="gateway-log-detail"></div>
+        </section>
+      </div>
+    </template>
+    <script type="module" src="../scripts/pages/payment-gateway-logs.js?v=coffee-v137"></script>
+  </body>
+</html>

@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Stok Produk - IFresso Coffee</title>
+    <link rel="stylesheet" href="../styles.css?v=coffee-v147" />
+  </head>
+  <body data-page="finished-products" data-title="Stok Produk" data-eyebrow="Gudang">
+    <template id="page-content">
+      <section class="content-grid single">
+        <div class="page-command-bar">
+          <div>
+            <span class="hero-kicker">Product Stock</span>
+            <h3>Monitor batch produk dan barang dagang per outlet.</h3>
+            <p>Lihat stok hasil produksi atau pembelian barang dagang, HPP batch, expired date, dan prioritas FEFO sebelum dijual di POS.</p>
+          </div>
+          <div class="inventory-actions">
+            <button class="primary-button" data-open-product-stock-modal="purchase" data-permission="products.catalog:update" type="button">+ Beli Barang Dagang</button>
+            <button class="ghost-button" data-open-product-stock-modal="production" data-permission="products.catalog:update" type="button">+ Produksi Produk</button>
+          </div>
+        </div>
+
+        <div class="metric-grid">
+          <article class="metric">
+            <span>Produk Stok Aktif</span>
+            <strong id="finished-product-count">0</strong>
+            <small>Produk jadi dan barang dagang</small>
+          </article>
+          <article class="metric">
+            <span>Total Batch Tersedia</span>
+            <strong id="finished-batch-count">0</strong>
+            <small>Batch dengan qty tersisa</small>
+          </article>
+          <article class="metric alert">
+            <span>Expired <= 7 Hari</span>
+            <strong id="finished-expiring-count">0</strong>
+            <small>Perlu prioritas jual / cek kualitas</small>
+          </article>
+          <article class="metric">
+            <span>Nilai Stok Produk</span>
+            <strong id="finished-stock-value">Rp0</strong>
+            <small>Qty tersisa x HPP batch</small>
+          </article>
+        </div>
+
+        <div class="workspace-panel wide">
+          <div class="panel-heading">
+            <h3>Daftar Batch Stok Produk</h3>
+            <p>Urutan FEFO: batch dengan expired terdekat dipakai lebih dulu saat POS menjual produk.</p>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Produk</th>
+                  <th>Batch</th>
+                  <th>Qty Tersisa</th>
+                  <th>HPP Batch</th>
+                  <th>Nilai Stok</th>
+                  <th>Manufactured</th>
+                  <th>Expired</th>
+                  <th>Status</th>
+                  <th>Aksi</th>
+                </tr>
+              </thead>
+              <tbody id="finished-product-table"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <div class="modal-backdrop" data-modal-backdrop hidden>
+        <section class="modal-dialog" id="product-stock-modal" aria-modal="true" role="dialog" aria-labelledby="product-stock-title" hidden>
+          <header class="modal-header">
+            <div>
+              <span class="hero-kicker" id="product-stock-eyebrow">Stok Produk</span>
+              <h3 id="product-stock-title">Stok Masuk / Produksi</h3>
+              <p id="product-stock-description">Pilih produk untuk menambah stok batch melalui pembelian barang dagang atau produksi.</p>
+            </div>
+            <button class="icon-button" data-close-modal type="button" aria-label="Tutup modal">x</button>
+          </header>
+          <form class="form-grid input-workflow" id="product-stock-form">
+            <label>Produk
+              <select id="product-stock-product" required></select>
+            </label>
+            <label><span id="product-stock-qty-label">Qty</span> <input id="product-stock-qty" min="1" step="1" type="number" required /></label>
+            <label id="product-stock-total-cost-field" hidden>Total Harga Beli <input id="product-stock-total-cost" min="0" step="1" type="number" value="0" /></label>
+            <label>Manufactured Date <input id="product-stock-manufactured-at" type="date" required /></label>
+            <label id="product-stock-expired-at-field" hidden>Expired Date <small>Opsional</small><input id="product-stock-expired-at" type="date" /></label>
+            <div class="form-preview" id="product-stock-expired-preview">Expired otomatis mengikuti shelf life produk jika tersedia.</div>
+            <label class="full-row">Catatan <input id="product-stock-note" autocomplete="off" placeholder="Contoh: pembelian supplier / produksi pagi" type="text" /></label>
+            <p class="form-preview full-row" id="product-stock-preview">Pilih produk untuk melihat aturan stok.</p>
+            <div class="modal-actions full-row">
+              <button class="ghost-button" data-close-modal type="button">Batal</button>
+              <button class="primary-button" id="product-stock-submit-button" type="submit">Simpan Stok</button>
+            </div>
+            <p class="form-feedback full-row" id="product-stock-feedback" role="status"></p>
+          </form>
+        </section>
+
+        <section class="modal-dialog" id="finished-loss-modal" aria-modal="true" role="dialog" aria-labelledby="finished-loss-title" hidden>
+          <header class="modal-header">
+            <div>
+              <span class="hero-kicker">Stok Produk</span>
+              <h3 id="finished-loss-title">Catat Waste / Loss Produk</h3>
+              <p>Qty batch akan berkurang dan nilai kerugian masuk laporan laba rugi sebagai inventory loss.</p>
+            </div>
+            <button class="icon-button" data-close-modal type="button" aria-label="Tutup modal">x</button>
+          </header>
+          <form class="form-grid input-workflow" id="finished-loss-form">
+            <input id="finished-loss-batch-id" type="hidden" />
+            <label>Produk <input id="finished-loss-product" type="text" disabled /></label>
+            <label>Batch <input id="finished-loss-batch" type="text" disabled /></label>
+            <label>Qty Loss <input id="finished-loss-qty" min="1" step="1" type="number" required /></label>
+            <label>Tipe
+              <select id="finished-loss-type" required>
+                <option value="expired">Expired</option>
+                <option value="waste">Rusak / Terbuang</option>
+                <option value="lost">Hilang</option>
+                <option value="sample">Sample / Tester</option>
+                <option value="adjustment">Koreksi</option>
+              </select>
+            </label>
+            <label class="full-row">Catatan <input id="finished-loss-note" autocomplete="off" placeholder="Contoh: kemasan bocor saat display" type="text" /></label>
+            <p class="form-preview full-row" id="finished-loss-preview">Estimasi nilai loss akan muncul setelah qty diisi.</p>
+            <div class="modal-actions full-row">
+              <button class="ghost-button" data-close-modal type="button">Batal</button>
+              <button class="primary-button" type="submit">Simpan Loss</button>
+            </div>
+            <p class="form-feedback full-row" id="finished-loss-feedback" role="status"></p>
+          </form>
+        </section>
+
+        <section class="modal-dialog modal-dialog-wide" id="finished-ledger-modal" aria-modal="true" role="dialog" aria-labelledby="finished-ledger-title" hidden>
+          <header class="modal-header">
+            <div>
+              <span class="hero-kicker">Kartu Stok</span>
+              <h3 id="finished-ledger-title">Kartu Stok Produk</h3>
+              <p id="finished-ledger-summary">Riwayat mutasi batch produk.</p>
+            </div>
+            <button class="icon-button" data-close-modal type="button" aria-label="Tutup modal">x</button>
+          </header>
+          <div class="filter-toolbar compact-filter">
+            <label>Batch Terpilih
+              <select id="finished-ledger-filter-batch" disabled></select>
+            </label>
+            <label>Tipe
+              <select id="finished-ledger-filter-type">
+                <option value="all">Semua Tipe</option>
+                <option value="production">Produksi</option>
+                <option value="purchase">Stok Masuk Retail</option>
+                <option value="sale">Penjualan POS</option>
+                <option value="sale_edit">Edit / Restock POS</option>
+                <option value="expired">Expired</option>
+                <option value="waste">Waste</option>
+                <option value="lost">Hilang</option>
+                <option value="sample">Sample</option>
+                <option value="adjustment">Koreksi</option>
+              </select>
+            </label>
+            <label>Dari <input id="finished-ledger-filter-from" type="date" /></label>
+            <label>Sampai <input id="finished-ledger-filter-to" type="date" /></label>
+            <label>Catatan <input id="finished-ledger-filter-search" autocomplete="off" placeholder="Cari catatan..." type="text" /></label>
+            <button class="ghost-button compact-button" id="finished-ledger-filter-reset" type="button">Reset</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Waktu</th>
+                  <th>Tipe</th>
+                  <th>Stok Awal</th>
+                  <th>Masuk</th>
+                  <th>Keluar</th>
+                  <th>Stok Akhir</th>
+                  <th>Nilai</th>
+                  <th>Catatan</th>
+                </tr>
+              </thead>
+              <tbody id="finished-ledger-table"></tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    </template>
+
+    <script type="module" src="../scripts/pages/finished-products.js?v=coffee-v147"></script>
+  </body>
+</html>

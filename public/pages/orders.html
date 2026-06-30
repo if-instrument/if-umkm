@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Antrian Pesanan - IFresso</title>
+    <link rel="stylesheet" href="../styles.css?v=coffee-v148" />
+  </head>
+  <body data-page="orders" data-title="Antrian Produksi" data-eyebrow="Dapur">
+    <template id="page-content">
+      <section class="content-grid single">
+        <div class="order-queue-toolbar">
+          <div class="queue-page-heading"><span>Kitchen & Kasir</span><strong>Operasional Pesanan Hari Ini</strong></div>
+          <div class="queue-summary" id="queue-summary"></div>
+          <div class="service-modes" id="queue-filters">
+            <button class="service-mode active" data-queue-filter="active" type="button">Pesanan Aktif</button>
+            <button class="service-mode" data-queue-filter="completed" type="button">Selesai Hari Ini</button>
+          </div>
+        </div>
+        <div class="order-board" id="order-board"></div>
+      </section>
+
+      <div class="modal-backdrop" data-order-detail-backdrop hidden>
+        <section class="modal-dialog" id="order-detail-modal" aria-modal="true" role="dialog" aria-labelledby="order-detail-title" hidden>
+          <header class="modal-header">
+            <div><span class="hero-kicker">Detail Pesanan</span><h3 id="order-detail-title">Pesanan</h3><p id="order-detail-meta"></p></div>
+            <button class="icon-button" data-close-order-detail type="button" aria-label="Tutup detail pesanan">x</button>
+          </header>
+          <div id="order-detail-content"></div>
+          <div class="modal-actions order-detail-actions" id="order-detail-actions"></div>
+        </section>
+      </div>
+    </template>
+    <script type="module" src="../scripts/pages/orders.js?v=coffee-v148"></script>
+  </body>
+</html>

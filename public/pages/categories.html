@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Kategori Produk - IFresso</title>
+    <link rel="stylesheet" href="../styles.css?v=coffee-v137" />
+  </head>
+  <body data-page="categories" data-title="Kategori Produk" data-eyebrow="Produk & Recipe">
+    <template id="page-content">
+      <section class="content-grid single">
+        <div class="page-command-bar category-board-command">
+          <div>
+            <span class="hero-kicker">Kategori Produk</span>
+            <h3>Kelola kategori dan susun produk outlet aktif</h3>
+            <p>Tambah atau edit kategori, lalu geser produk antar-kolom. Perubahan mapping hanya berlaku pada outlet aktif.</p>
+          </div>
+          <button class="primary-button" data-open-category-modal data-permission="categories.manage:create" type="button">+ Tambah Kategori</button>
+        </div>
+        <div class="workspace-panel wide category-board-tools">
+          <label class="category-board-search">Cari Produk
+            <input id="category-board-search" autocomplete="off" placeholder="Nama atau SKU produk..." type="search" />
+          </label>
+          <div class="module-tabs category-scope-filter" id="category-scope-filter">
+            <button class="active" data-category-scope-filter="all" type="button">Semua</button>
+            <button data-category-scope-filter="company" type="button">Global</button>
+            <button data-category-scope-filter="outlet" type="button">Outlet Aktif</button>
+          </div>
+          <div class="category-board-summary" id="category-board-summary">0 produk</div>
+        </div>
+        <div class="category-board" id="category-board" aria-live="polite"></div>
+        <p class="form-feedback" id="category-board-feedback" role="status"></p>
+      </section>
+      <div class="modal-backdrop" data-category-backdrop hidden>
+        <section class="modal-dialog" id="category-modal" aria-modal="true" role="dialog" aria-labelledby="category-modal-title" hidden>
+          <header class="modal-header">
+            <div><span class="hero-kicker">Master Kategori</span><h3 id="category-modal-title">Tambah Kategori</h3><p>Kategori menjadi pilihan saat membuat produk dan filter POS.</p></div>
+            <button class="icon-button" data-close-category-modal type="button" aria-label="Tutup modal">x</button>
+          </header>
+          <form class="form-grid input-workflow" id="category-form">
+            <input id="category-id" type="hidden" />
+            <label>Nama Kategori <input id="category-name" autocomplete="off" placeholder="Contoh: Minuman" required type="text" /></label>
+            <label>Lingkup Kategori
+              <select id="category-scope">
+                <option value="outlet">Outlet aktif</option>
+                <option value="company">Company - dapat dipakai semua outlet</option>
+              </select>
+            </label>
+            <label>Status <select id="category-status"><option value="active">Aktif</option><option value="inactive">Nonaktif</option></select></label>
+            <div class="modal-actions"><button class="ghost-button" data-close-category-modal type="button">Batal</button><button class="primary-button" type="submit">Simpan Kategori</button></div>
+          </form>
+        </section>
+      </div>
+    </template>
+    <script type="module" src="../scripts/pages/categories.js?v=coffee-v137"></script>
+  </body>
+</html>

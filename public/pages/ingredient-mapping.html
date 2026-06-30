@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Mapping Bahan Outlet - IFresso Coffee</title>
+    <link rel="stylesheet" href="../styles.css?v=coffee-v137" />
+  </head>
+  <body data-page="ingredient-mapping" data-title="Mapping Bahan Outlet" data-eyebrow="Produk & Recipe">
+    <template id="page-content">
+      <section class="content-grid single">
+        <div class="inventory-command">
+          <div>
+            <span class="hero-kicker">Outlet Mapping</span>
+            <h3>Hubungkan template bahan ke bahan fisik outlet aktif.</h3>
+            <p>Recipe dan modifier memakai template perusahaan. Di halaman ini manager outlet menentukan bahan outlet mana yang dipakai untuk HPP, stok POS, dan kapasitas produksi.</p>
+          </div>
+          <div class="inventory-actions">
+            <a class="ghost-button button-link" href="/pages/inventory-list.html">Kelola Bahan Outlet</a>
+            <button class="primary-button" id="refresh-mapping" type="button">Refresh Mapping</button>
+          </div>
+        </div>
+
+        <div class="metric-grid">
+          <article class="metric">
+            <span>Template Recipe</span>
+            <strong id="recipe-mapping-count">0</strong>
+            <small>Perlu bahan outlet</small>
+          </article>
+          <article class="metric">
+            <span>Template Modifier</span>
+            <strong id="modifier-mapping-count">0</strong>
+            <small>Perlu bahan outlet</small>
+          </article>
+          <article class="metric alert">
+            <span>Belum Lengkap</span>
+            <strong id="missing-mapping-count">0</strong>
+            <small>Mapping kosong</small>
+          </article>
+          <article class="metric">
+            <span>Bahan Outlet</span>
+            <strong id="outlet-ingredient-count">0</strong>
+            <small>Tersedia untuk mapping</small>
+          </article>
+        </div>
+
+        <div class="mapping-tabs" role="tablist" aria-label="Jenis mapping bahan">
+          <button class="active" data-mapping-tab="recipe" type="button">Recipe Produk</button>
+          <button data-mapping-tab="modifier" type="button">Modifier</button>
+        </div>
+
+        <div class="workspace-panel wide" data-mapping-panel="recipe">
+          <div class="panel-heading">
+            <h3>Mapping Recipe Produk</h3>
+            <p>Hubungkan setiap template bahan recipe ke bahan fisik outlet. Tidak mengubah struktur recipe produk.</p>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Produk</th>
+                  <th>Template Bahan</th>
+                  <th>Qty Recipe</th>
+                  <th>Bahan Outlet Saat Ini</th>
+                  <th>Mapping</th>
+                  <th>Aksi</th>
+                </tr>
+              </thead>
+              <tbody id="recipe-mapping-table"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="workspace-panel wide" data-mapping-panel="modifier" hidden>
+          <div class="panel-heading">
+            <h3>Mapping Modifier</h3>
+            <p>Hubungkan template bahan pada opsi modifier, termasuk bahan pengganti untuk modifier bertipe ganti bahan.</p>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Modifier</th>
+                  <th>Opsi</th>
+                  <th>Perlakuan</th>
+                  <th>Template Bahan</th>
+                  <th>Bahan Outlet Saat Ini</th>
+                  <th>Mapping</th>
+                  <th>Aksi</th>
+                </tr>
+              </thead>
+              <tbody id="modifier-mapping-table"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <p class="form-preview" id="mapping-feedback" role="status">Pilih bahan outlet yang sesuai dengan template. Jika bahan belum ada, buat dulu di menu Stok Bahan.</p>
+      </section>
+
+    </template>
+    <script type="module" src="../scripts/pages/ingredient-mapping.js?v=coffee-v137"></script>
+  </body>
+</html>

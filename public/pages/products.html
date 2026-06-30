@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Daftar Produk - IFresso Coffee</title>
+    <link rel="stylesheet" href="../styles.css?v=coffee-v147" />
+  </head>
+  <body data-page="products" data-title="Daftar Produk" data-eyebrow="Produk & Recipe">
+    <template id="page-content">
+      <section class="content-grid single">
+        <div class="page-command-bar">
+          <div>
+            <span class="hero-kicker">Master Produk</span>
+            <h3>Kelola menu perusahaan dan menu khusus outlet.</h3>
+            <p>Produk global bisa dipakai semua outlet. Produk outlet hanya tampil di outlet aktif dan hanya bisa dikelola oleh outlet tersebut.</p>
+          </div>
+          <button class="primary-button" data-open-product-modal data-permission="products.catalog:create" type="button">+ Produk Baru</button>
+        </div>
+        <div class="workspace-panel wide">
+          <div class="panel-heading">
+            <h3>Daftar Produk</h3>
+            <p>Menu aktif tersedia di POS setelah recipe template lengkap dan bahan outlet sudah dipetakan.</p>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Foto</th>
+                  <th>SKU</th>
+                  <th>Nama Produk</th>
+                  <th>Kategori Outlet Aktif</th>
+                  <th>Harga Outlet</th>
+                  <th>HPP</th>
+                  <th>Stok Produk</th>
+                  <th>Margin</th>
+                  <th>Status</th>
+                  <th>Aksi</th>
+                </tr>
+              </thead>
+              <tbody id="product-table"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <div class="modal-backdrop" data-modal-backdrop hidden>
+        <section class="modal-dialog modal-dialog-wide" id="product-modal" aria-modal="true" role="dialog" aria-labelledby="product-modal-title" hidden>
+          <header class="modal-header">
+            <div>
+              <span class="hero-kicker">Master Produk</span>
+              <h3 id="product-modal-title">Tambah Produk Baru</h3>
+              <p>Pilih scope dengan hati-hati: global perusahaan untuk semua outlet, outlet aktif untuk menu lokal.</p>
+            </div>
+            <button class="icon-button" data-close-modal type="button" aria-label="Tutup modal">x</button>
+          </header>
+          <form class="form-grid input-workflow two-column-form" id="product-modal-form">
+            <input id="modal-product-id" type="hidden" />
+            <label>SKU <input id="modal-product-sku" autocomplete="off" placeholder="Contoh: CF007" required type="text" /></label>
+            <label>Nama Produk <input id="modal-product-name" autocomplete="off" placeholder="Contoh: Iced Spanish Latte" required type="text" /></label>
+            <label>Harga Default Produk <input id="modal-product-price" min="0" placeholder="Contoh: 32000" step="500" type="number" required /></label>
+            <label>Tipe Pemotongan Stok
+              <select id="modal-product-inventory-type">
+                <option value="made_to_order">Made to Order - potong bahan saat order</option>
+                <option value="finished_good">Produk Jadi / Batch - produksi dulu</option>
+                <option value="retail">Retail / Barang Dagang - stok langsung produk</option>
+              </select>
+            </label>
+            <label id="modal-product-shelf-life-field">Shelf Life Produk Jadi (hari) <input id="modal-product-shelf-life" min="0" step="1" type="number" value="0" /></label>
+            <label>Ketersediaan Produk
+              <select id="modal-product-scope">
+                <option value="company">Global perusahaan - semua outlet</option>
+                <option value="outlet">Khusus outlet aktif</option>
+              </select>
+            </label>
+            <label>Status <select id="modal-product-status"><option value="active">Aktif</option><option value="inactive">Nonaktif</option></select></label>
+            <label class="product-upload-field full-row">Foto Produk
+              <input id="modal-product-image-url" type="hidden" />
+              <span class="product-upload-control">
+                <span class="product-image-preview" id="modal-product-image-preview">Foto</span>
+                <span>
+                  <strong>Upload foto produk</strong>
+                  <small>JPG, PNG, WEBP, atau GIF maksimal 3 MB.</small>
+                </span>
+                <input id="modal-product-image-file" accept="image/png,image/jpeg,image/webp,image/gif" type="file" />
+              </span>
+            </label>
+            <label class="full-row">Deskripsi Produk <textarea id="modal-product-description" placeholder="Jelaskan informasi produk yang perlu diketahui pelanggan." required></textarea></label>
+            <p class="form-preview full-row" id="modal-product-preview">Deskripsi produk akan tampil sebagai panduan kasir di POS.</p>
+            <div class="modal-actions full-row">
+              <button class="ghost-button" data-close-modal type="button">Batal</button>
+              <button class="primary-button" type="submit">Simpan Produk</button>
+            </div>
+            <p class="form-feedback full-row" id="modal-product-feedback" role="status"></p>
+          </form>
+        </section>
+
+        <section class="modal-dialog" id="product-price-modal" aria-modal="true" role="dialog" aria-labelledby="product-price-title" hidden>
+          <header class="modal-header">
+            <div>
+              <span class="hero-kicker">Harga Outlet</span>
+              <h3 id="product-price-title">Atur Harga Outlet</h3>
+              <p>Harga ini hanya berlaku untuk outlet aktif. Jika kosong sebelumnya, sistem memakai harga default produk.</p>
+            </div>
+            <button class="icon-button" data-close-price-modal type="button" aria-label="Tutup modal">x</button>
+          </header>
+          <form class="form-grid input-workflow" id="product-price-form">
+            <input id="price-product-id" type="hidden" />
+            <label>Produk <input id="price-product-name" type="text" disabled /></label>
+            <label>Harga Default <input id="price-product-base" type="text" disabled /></label>
+            <label>Harga Outlet Aktif <input id="price-product-outlet" min="0" placeholder="Contoh: 35000" step="500" type="number" required /></label>
+            <label>Catatan <input id="price-product-note" autocomplete="off" placeholder="Contoh: Harga area mall" type="text" /></label>
+            <p class="form-preview full-row" id="price-product-preview">Harga outlet akan dipakai di POS, margin recipe, dan laporan outlet aktif.</p>
+            <div class="modal-actions full-row">
+              <button class="ghost-button" data-close-price-modal type="button">Batal</button>
+              <button class="primary-button" type="submit">Simpan Harga Outlet</button>
+            </div>
+            <p class="form-feedback full-row" id="price-product-feedback" role="status"></p>
+          </form>
+        </section>
+      </div>
+    </template>
+
+    <script type="module" src="../scripts/pages/products.js?v=coffee-v147"></script>
+  </body>
+</html>

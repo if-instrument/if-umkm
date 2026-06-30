@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Settlement Payment - IF Instrument</title>
+    <link rel="stylesheet" href="../styles.css?v=coffee-v137" />
+  </head>
+  <body data-page="finance-settlement" data-title="Settlement Payment" data-eyebrow="Keuangan">
+    <template id="page-content">
+      <section class="content-grid">
+        <div class="workspace-panel wide">
+          <div class="panel-heading">
+            <h3>Filter Settlement</h3>
+            <p>Ringkasan metode bayar, MDR, dan estimasi dana bersih yang masuk ke settlement.</p>
+          </div>
+          <form class="form-grid split-form input-workflow report-filter-form" id="settlement-filter-form">
+            <label>Periode
+              <select id="settlement-period">
+                <option value="daily" selected>Harian</option>
+                <option value="weekly">Mingguan</option>
+                <option value="monthly">Bulanan</option>
+                <option value="yearly">Tahunan</option>
+              </select>
+            </label>
+            <label>Tanggal Acuan <input id="settlement-anchor-date" type="date" /></label>
+            <div class="report-period-summary"><span>Gross Payment</span><strong id="settlement-gross">Rp0</strong></div>
+            <div class="report-period-summary"><span>Net Settlement</span><strong id="settlement-net">Rp0</strong></div>
+          </form>
+        </div>
+
+        <div class="workspace-panel wide">
+          <div class="panel-heading">
+            <h3>Payment Settlement</h3>
+            <p>Dipisahkan dari P&L agar finance bisa rekonsiliasi metode bayar tanpa membuka laporan laba rugi.</p>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Metode Bayar</th>
+                  <th>Transaksi</th>
+                  <th>Gross</th>
+                  <th>Fee Customer</th>
+                  <th>Fee Merchant</th>
+                  <th>Estimasi Settlement</th>
+                </tr>
+              </thead>
+              <tbody id="payment-summary-table"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="workspace-panel wide">
+          <div class="panel-heading">
+            <h3>Transaksi Payment</h3>
+            <p>Rincian transaksi untuk rekonsiliasi kasir dan finance.</p>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Waktu</th><th>No Order</th><th>Metode</th><th>Gross</th><th>Fee</th><th>Net</th></tr></thead>
+              <tbody id="settlement-transaction-table"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </template>
+
+    <script type="module" src="../scripts/pages/finance-settlement.js?v=coffee-v137"></script>
+  </body>
+</html>

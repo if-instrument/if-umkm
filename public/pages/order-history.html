@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Riwayat Order - IF Instrument</title>
+    <link rel="stylesheet" href="../styles.css?v=coffee-v148" />
+  </head>
+  <body data-page="order-history" data-title="Riwayat Order" data-eyebrow="Front Office">
+    <template id="page-content">
+      <section class="content-grid single">
+        <div class="table-toolbar order-history-toolbar">
+          <div>
+            <h3>Riwayat Transaksi Outlet</h3>
+            <p>Lihat order lama berdasarkan tanggal transaksi, termasuk order kemarin.</p>
+          </div>
+          <div class="filter-toolbar compact-filter order-history-filter">
+            <select id="order-history-preset" aria-label="Filter cepat tanggal">
+              <option value="today">Hari Ini</option>
+              <option value="yesterday">Kemarin</option>
+              <option value="custom">Pilih Tanggal</option>
+            </select>
+            <input id="order-history-date" type="date" aria-label="Tanggal order" />
+            <select id="order-history-status" aria-label="Status order">
+              <option value="">Semua Status</option>
+              <option value="open">Belum Selesai</option>
+              <option value="00">00 - Menunggu Kasir</option>
+              <option value="10">10 - Pesanan Baru</option>
+              <option value="20">20 - Diproses</option>
+              <option value="30">30 - Siap Diambil</option>
+              <option value="90">90 - Selesai</option>
+              <option value="99">99 - Dibatalkan</option>
+            </select>
+            <input id="order-history-search" type="search" placeholder="Cari order, customer, item..." />
+          </div>
+        </div>
+
+        <div class="order-history-tabs" id="order-history-tabs">
+          <button class="active" data-history-status-tab="" type="button">Semua</button>
+          <button data-history-status-tab="open" type="button">Belum Selesai</button>
+          <button data-history-status-tab="90" type="button">Selesai</button>
+          <button data-history-status-tab="99" type="button">Dibatalkan</button>
+        </div>
+
+        <div class="summary-cards order-history-summary" id="order-history-summary"></div>
+
+        <section class="completed-orders-table-panel order-history-panel">
+          <div class="completed-orders-table-scroll">
+            <table class="completed-orders-table order-history-table">
+              <thead>
+                <tr>
+                  <th>Order</th>
+                  <th>Waktu</th>
+                  <th>Customer / Meja</th>
+                  <th>Layanan</th>
+                  <th>Status</th>
+                  <th>Item</th>
+                  <th>Pembayaran</th>
+                  <th>Total</th>
+                  <th>Aksi</th>
+                </tr>
+              </thead>
+              <tbody id="order-history-body"></tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+
+      <div class="modal-backdrop" data-history-detail-backdrop hidden>
+        <section class="modal-dialog" id="history-detail-modal" aria-modal="true" role="dialog" aria-labelledby="history-detail-title" hidden>
+          <header class="modal-header">
+            <div><span class="hero-kicker">Detail Order</span><h3 id="history-detail-title">Order</h3><p id="history-detail-meta"></p></div>
+            <button class="icon-button" data-close-history-detail type="button" aria-label="Tutup detail order">x</button>
+          </header>
+          <div id="history-detail-content"></div>
+          <div class="modal-actions">
+            <button class="ghost-button" data-close-history-detail type="button">Tutup</button>
+          </div>
+        </section>
+      </div>
+    </template>
+    <script type="module" src="../scripts/pages/order-history.js?v=coffee-v148"></script>
+  </body>
+</html>

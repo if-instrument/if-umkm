@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Finance Dashboard - IF Instrument</title>
+    <link rel="stylesheet" href="../styles.css?v=coffee-v137" />
+  </head>
+  <body data-page="finance-dashboard" data-title="Finance Dashboard" data-eyebrow="Keuangan">
+    <template id="page-content">
+      <section class="content-grid">
+        <div class="workspace-panel wide">
+          <div class="panel-heading">
+            <h3>Finance Overview</h3>
+            <p>Ringkasan cepat kondisi penjualan, biaya, settlement, dan profit outlet aktif.</p>
+          </div>
+          <form class="form-grid split-form input-workflow report-filter-form" id="finance-dashboard-filter">
+            <label>Periode
+              <select id="finance-period">
+                <option value="daily" selected>Harian</option>
+                <option value="weekly">Mingguan</option>
+                <option value="monthly">Bulanan</option>
+                <option value="yearly">Tahunan</option>
+              </select>
+            </label>
+            <label>Tanggal Acuan <input id="finance-anchor-date" type="date" /></label>
+          </form>
+        </div>
+
+        <div class="workspace-panel wide">
+          <div class="metric-grid report-metrics">
+            <article class="metric"><span>Omzet</span><strong id="finance-revenue">Rp0</strong><small>Penjualan periode aktif</small></article>
+            <article class="metric"><span>Laba Kotor</span><strong id="finance-gross-profit">Rp0</strong><small>Setelah HPP</small></article>
+            <article class="metric"><span>Beban Operasional</span><strong id="finance-expense">Rp0</strong><small>Expense posted</small></article>
+            <article class="metric"><span>Net Cash Movement</span><strong id="finance-net-cash">Rp0</strong><small>Estimasi kas bersih</small></article>
+          </div>
+        </div>
+
+        <div class="workspace-panel">
+          <div class="panel-heading"><h3>Top Expense</h3><p>Kategori biaya terbesar.</p></div>
+          <div class="table-wrap"><table><thead><tr><th>Kategori</th><th>Entry</th><th>Total</th></tr></thead><tbody id="finance-expense-summary"></tbody></table></div>
+        </div>
+
+        <div class="workspace-panel">
+          <div class="panel-heading"><h3>Settlement Snapshot</h3><p>Metode bayar periode aktif.</p></div>
+          <div class="table-wrap"><table><thead><tr><th>Metode</th><th>Gross</th><th>Net</th></tr></thead><tbody id="finance-payment-summary"></tbody></table></div>
+        </div>
+      </section>
+    </template>
+
+    <script type="module" src="../scripts/pages/finance-dashboard.js?v=coffee-v137"></script>
+  </body>
+</html>

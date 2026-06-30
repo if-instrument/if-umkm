@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pengaturan - IF Instrument</title>
+    <link rel="stylesheet" href="../styles.css?v=coffee-v137" />
+  </head>
+  <body data-page="settings" data-title="Pengaturan" data-eyebrow="Manajemen">
+    <template id="page-content">
+      <section class="content-grid single">
+        <div class="module-tabs settings-tabs">
+          <button class="active" data-permission="company.branding:read" data-setting-tab="company" type="button">Company</button>
+          <button data-permission="settings.outlet:read" data-setting-tab="outlet" type="button">Outlet & Transaksi</button>
+          <button data-permission="settings.costing:read" data-setting-tab="costing" type="button">Costing</button>
+          <button data-permission="settings.tables:read" data-setting-tab="tables" type="button">Table Layout</button>
+          <button data-permission="settings.payment:read" data-setting-tab="payment" type="button">Metode Bayar</button>
+          <button data-permission="settings.packaging:read" data-setting-tab="packaging" type="button">Packaging</button>
+          <button data-permission="settings.outlet:read" data-setting-tab="book-content" type="button">Buku Menu</button>
+        </div>
+
+        <div class="workspace-panel wide tab-panel active" data-setting-tab-panel="company">
+          <div class="panel-heading split-heading">
+            <div>
+              <h3>Company Setting</h3>
+              <p>Identitas perusahaan, route tenant, logo, warna tema, dan default outlet.</p>
+            </div>
+          </div>
+          <form class="form-grid input-workflow two-column-form company-access-form" id="company-form">
+            <label>Nama Perusahaan <input id="company-name" required type="text" /></label>
+            <label>Route Company <input id="company-route-slug" pattern="[A-Za-z0-9-]+" required type="text" /></label>
+            <label class="logo-upload-field">Logo Perusahaan
+              <input id="company-logo-url" type="hidden" />
+              <span class="logo-upload-control">
+                <span class="logo-preview" id="company-logo-preview">IF</span>
+                <input id="company-logo-file" accept="image/png,image/jpeg,image/webp,image/gif" type="file" />
+              </span>
+            </label>
+            <label>Warna Tema <input id="company-theme-color" type="color" /></label>
+            <label>Default Outlet <select id="company-default-outlet"></select></label>
+            <div class="modal-actions"><button class="primary-button" data-permission="company.branding:update" type="submit">Simpan Company</button></div>
+            <p class="form-feedback full-row" id="company-feedback"></p>
+          </form>
+        </div>
+
+        <div class="workspace-panel wide tab-panel" data-setting-tab-panel="costing">
+          <div class="panel-heading">
+            <h3>Costing Method</h3>
+            <p>Metode harga bahan untuk HPP produk dan valuation inventory.</p>
+          </div>
+          <form class="form-grid input-workflow" id="costing-form">
+            <label>
+              Metode Perhitungan
+              <select id="costing-method">
+                <option value="average">Average Cost</option>
+                <option value="fifo">FIFO</option>
+                <option value="standard">Standard Cost</option>
+              </select>
+            </label>
+            <p class="form-preview" id="costing-preview">Average Cost menghitung HPP dari harga rata-rata tertimbang.</p>
+          </form>
+          <div class="costing-guide inline-guide">
+            <article><strong>Average Cost</strong><span>Harga rata-rata tertimbang. Praktis untuk operasional harian.</span></article>
+            <article><strong>FIFO</strong><span>Memakai lot terlama terlebih dahulu. Cocok untuk bahan berumur simpan.</span></article>
+            <article><strong>Standard Cost</strong><span>Memakai biaya target untuk budgeting dan kontrol variance.</span></article>
+          </div>
+        </div>
+
+        <div class="workspace-panel wide tab-panel" data-setting-tab-panel="outlet">
+            <div class="panel-heading"><h3>Outlet & Transaksi</h3><p>Identitas outlet, channel order, pajak, dan printer kasir.</p></div>
+          <form class="form-grid input-workflow two-column-form" id="outlet-settings-form">
+            <label>Nama Outlet <input id="setting-outlet-name" required type="text" /></label>
+            <label>Pajak Penjualan (%) <input id="setting-tax-rate" min="0" max="100" step="0.1" required type="number" /></label>
+            <label>Service Charge Dine In (%) <input id="setting-dine-in-service-rate" min="0" max="100" step="0.1" required type="number" /></label>
+            <fieldset class="settings-checklist full-row">
+              <legend>Channel Order Aktif</legend>
+              <label><input id="order-channel-dine-in" type="checkbox" /> Dine In</label>
+              <label><input id="order-channel-take-away" type="checkbox" /> Take Away</label>
+              <label><input id="order-channel-delivery" type="checkbox" /> Delivery</label>
+            </fieldset>
+            <label class="full-row">Nama Printer
+              <span class="inline-input-action printer-picker">
+                <input id="setting-printer-name" autocomplete="off" type="text" placeholder="Kosongkan jika tidak memakai printer struk" />
+                <div class="printer-dropdown" id="printer-dropdown" hidden></div>
+              </span>
+              <small>Jika kosong, POS tidak akan melakukan print struk otomatis.</small>
+            </label>
+            <div class="modal-actions"><button class="primary-button" data-permission="settings.outlet:update" type="submit">Simpan Pengaturan</button></div>
+            <p class="form-feedback full-row" id="setting-feedback"></p>
+          </form>
+        </div>
+
+        <div class="workspace-panel wide tab-panel" data-setting-tab-panel="book-content">
+          <div class="panel-heading"><h3>Content Buku Menu</h3><p>Teks yang tampil pada halaman order customer, cover, receipt, dan sampul belakang.</p></div>
+          <form class="form-grid input-workflow two-column-form" id="book-content-form">
+            <label>Subtitle Cover <input id="book-cover-subtitle" type="text" /></label>
+            <label>Judul Pilih Outlet <input id="book-outlet-title" type="text" /></label>
+            <label class="full-row">Deskripsi Cover <textarea id="book-cover-description" rows="2"></textarea></label>
+            <label>Judul Mode <input id="book-service-title" type="text" /></label>
+            <label>Judul Meja <input id="book-table-title" type="text" /></label>
+            <label class="full-row">Deskripsi Mode <textarea id="book-service-description" rows="2"></textarea></label>
+            <label class="full-row">Deskripsi Meja <textarea id="book-table-description" rows="2"></textarea></label>
+            <label>Judul Menu <input id="book-menu-title" type="text" /></label>
+            <label>Judul Cart <input id="book-cart-title" type="text" /></label>
+            <label class="full-row">Deskripsi Menu <textarea id="book-menu-description" rows="2"></textarea></label>
+            <label>Judul Customer <input id="book-customer-title" type="text" /></label>
+            <label>Judul Receipt <input id="book-receipt-title" type="text" /></label>
+            <label class="full-row">Deskripsi Cart <textarea id="book-cart-description" rows="2"></textarea></label>
+            <label class="full-row">Deskripsi Customer <textarea id="book-customer-description" rows="2"></textarea></label>
+            <label class="full-row">Deskripsi Receipt <textarea id="book-receipt-description" rows="2"></textarea></label>
+            <label>Subtitle Sampul Belakang <input id="book-back-subtitle" type="text" /></label>
+            <label>Tombol Sampul Belakang <input id="book-back-button" type="text" /></label>
+            <label class="full-row">Deskripsi Sampul Belakang <textarea id="book-back-description" rows="2"></textarea></label>
+            <div class="modal-actions full-row"><button class="primary-button" data-permission="settings.outlet:update" type="submit">Simpan Content</button></div>
+            <p class="form-feedback full-row" id="book-content-feedback"></p>
+          </form>
+        </div>
+
+        <div class="workspace-panel wide tab-panel" data-setting-tab-panel="tables">
+          <div class="panel-heading split-heading">
+            <div><h3>Table Layout</h3><p>Kelola meja, area, kapasitas, dan status meja yang muncul di POS Dine In.</p></div>
+            <button class="primary-button compact-button" data-new-dining-table data-permission="settings.tables:create" type="button">Tambah Meja</button>
+          </div>
+          <form class="form-grid input-workflow two-column-form table-flow-form" id="table-flow-form">
+            <label>
+              Flow Dine In
+              <select id="table-service-mode">
+                <option value="free_seating_pay_first">Free Seating - Bayar di Muka</option>
+                <option value="assigned_pay_later">Assigned Table - Bayar Terakhir</option>
+              </select>
+            </label>
+            <p class="form-preview" id="table-flow-preview">Mode meja terassign membuka table dulu, lalu settlement dilakukan saat table ditutup.</p>
+          </form>
+          <div class="table-layout-preview" id="table-layout-preview"></div>
+          <div class="table-shell">
+            <table>
+              <thead><tr><th>Urutan</th><th>Nama Meja</th><th>Area</th><th>Kapasitas</th><th>Status</th><th>Aksi</th></tr></thead>
+              <tbody id="dining-table-table"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="workspace-panel wide tab-panel" data-setting-tab-panel="payment">
+          <div class="panel-heading split-heading">
+            <div><h3>Metode Bayar</h3><p>Atur metode pembayaran yang tersedia untuk kasir di POS.</p></div>
+            <button class="primary-button compact-button" data-new-payment-method data-permission="settings.payment:create" type="button">Tambah Metode</button>
+          </div>
+          <form class="form-grid input-workflow two-column-form" id="payment-gateway-form">
+            <label>Gateway Aktif
+              <select id="payment-gateway-provider">
+                <option value="manual">Manual / Offline</option>
+                <option value="xendit">Xendit</option>
+                <option value="midtrans">Midtrans</option>
+              </select>
+            </label>
+            <label id="payment-gateway-mode-field">Mode
+              <select id="payment-gateway-mode">
+                <option value="sandbox">Sandbox</option>
+                <option value="live">Live</option>
+              </select>
+            </label>
+            <label id="payment-gateway-timeout-field">Timeout Gateway (detik) <input id="payment-gateway-timeout" min="3" step="1" type="number" /></label>
+            <label class="gateway-secret-field" id="payment-gateway-xendit-secret-field">Xendit Secret Key
+              <span class="inline-input-action">
+                <input id="payment-gateway-xendit-secret" autocomplete="off" type="password" placeholder="Kosongkan jika tidak diubah" />
+                <button class="ghost-button compact-button" data-toggle-secret="payment-gateway-xendit-secret" type="button">View</button>
+              </span>
+            </label>
+            <label class="gateway-secret-field" id="payment-gateway-midtrans-secret-field">Midtrans Server Key
+              <span class="inline-input-action">
+                <input id="payment-gateway-midtrans-secret" autocomplete="off" type="password" placeholder="Kosongkan jika tidak diubah" />
+                <button class="ghost-button compact-button" data-toggle-secret="payment-gateway-midtrans-secret" type="button">View</button>
+              </span>
+            </label>
+            <p class="form-preview" id="payment-gateway-status">Gateway belum diset.</p>
+            <div class="modal-actions full-row"><button class="primary-button" data-permission="settings.payment:update" type="submit">Simpan Gateway</button></div>
+            <p class="form-feedback full-row" id="payment-gateway-feedback"></p>
+          </form>
+          <div class="table-shell">
+            <table>
+              <thead><tr><th>Urutan</th><th>Nama Metode</th><th>Tipe</th><th>Channel / Terminal</th><th>MDR / Fee</th><th>Akun Settlement</th><th>Status</th><th>Aksi</th></tr></thead>
+              <tbody id="payment-method-table"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="workspace-panel wide tab-panel" data-setting-tab-panel="packaging">
+          <div class="panel-heading split-heading">
+            <div><h3>Packaging Rules</h3><p>Atur kemasan tambahan level order seperti paper bag, kardus, atau bundle. Cup/gelas per produk sebaiknya masuk Recipe.</p></div>
+            <button class="primary-button compact-button" data-new-packaging-rule data-permission="settings.packaging:create" type="button">Tambah Rule</button>
+          </div>
+          <p class="form-preview">Gunakan rule ini untuk kemasan order-level. Pesanan di atas batas rule terbesar akan dipecah otomatis. Contoh: maksimum rule 10, pesanan 12 item memakai rule 10 + rule 2.</p>
+          <div class="form-preview">
+            <strong>Info:</strong> Satu kondisi order cukup dibuat sebagai satu rule. Di dalam rule, tambahkan beberapa item kemasan bila perlu, misalnya paper bag + kardus + segel. Paket pengganti dipakai jika stok paket kemasan normal pada rule tersebut tidak cukup.
+          </div>
+          <div class="table-shell">
+            <table><thead><tr><th>Jumlah Item Pesanan</th><th>Item Kemasan Otomatis</th><th>Aksi</th></tr></thead><tbody id="packaging-rule-table"></tbody></table>
+          </div>
+        </div>
+      </section>
+      <div class="modal-backdrop" data-modal-backdrop hidden>
+        <section class="modal-dialog" id="packaging-rule-modal" aria-modal="true" role="dialog" aria-labelledby="packaging-rule-modal-title" hidden>
+          <header class="modal-header"><div><span class="hero-kicker">Fulfillment</span><h3 id="packaging-rule-modal-title">Packaging Rule</h3><p>Pilih bahan kategori Packaging untuk kemasan tambahan level order. Kemasan per produk masuk ke Recipe.</p></div><button class="icon-button" data-close-modal type="button">x</button></header>
+          <form class="form-grid input-workflow" id="packaging-rule-form">
+            <input id="packaging-rule-id" type="hidden" />
+            <div class="two-column-form">
+              <label>Jumlah Minimum <input id="packaging-rule-min" min="1" required type="number" /></label>
+              <label>Jumlah Maksimum <input id="packaging-rule-max" min="1" required type="number" /></label>
+            </div>
+            <div class="modifier-option-toolbar full-row">
+              <div><strong>Item Kemasan Rule</strong><span>Semua item di daftar ini dipakai bersama saat jumlah order masuk ke rentang rule.</span></div>
+              <button class="ghost-button compact-button" data-add-packaging-item type="button">+ Tambah Item</button>
+            </div>
+            <p class="form-preview full-row">Dropdown bahan menampilkan HPP sebagai referensi. Harga / Kemasan adalah harga yang ingin ditagihkan outlet dan boleh diisi 0.</p>
+            <div class="full-row" id="packaging-rule-items"></div>
+            <div class="modifier-option-toolbar full-row">
+              <div><strong>Paket Pengganti</strong><span>Dipakai jika stok paket kemasan normal di rule ini tidak cukup. Kosongkan jika tidak ada pengganti.</span></div>
+              <button class="ghost-button compact-button" data-add-packaging-fallback type="button">+ Tambah Pengganti</button>
+            </div>
+            <div class="full-row" id="packaging-rule-fallbacks"></div>
+            <div class="compact-subform full-row" id="packaging-new-ingredient-panel" hidden>
+              <strong>Bahan Packaging Baru</strong>
+              <div class="two-column-form">
+                <label>Nama Bahan <input id="packaging-new-ingredient-name" type="text" placeholder="Contoh: Paper Bag Medium" /></label>
+                <label>Satuan <input id="packaging-new-ingredient-unit" type="text" value="pcs" /></label>
+                <label>Standard Cost <input id="packaging-new-ingredient-cost" min="0" step="1" type="number" value="0" /></label>
+                <label>Batas Aman <input id="packaging-new-ingredient-min-stock" min="0" step="1" type="number" value="0" /></label>
+              </div>
+              <button class="ghost-button compact-button" data-create-packaging-ingredient type="button">Buat & Pakai di Rule</button>
+            </div>
+            <div class="modal-actions"><button class="ghost-button" data-close-modal type="button">Batal</button><button class="primary-button" type="submit">Simpan Rule</button></div>
+            <p class="form-feedback" id="packaging-rule-feedback"></p>
+          </form>
+        </section>
+        <section class="modal-dialog" id="dining-table-modal" aria-modal="true" role="dialog" aria-labelledby="dining-table-modal-title" hidden>
+          <header class="modal-header"><div><span class="hero-kicker">Floor Plan</span><h3 id="dining-table-modal-title">Table Layout</h3><p>Meja aktif akan tersedia di POS untuk transaksi Dine In.</p></div><button class="icon-button" data-close-modal type="button">x</button></header>
+          <form class="form-grid input-workflow two-column-form" id="dining-table-form">
+            <input id="dining-table-id" type="hidden" />
+            <label>Nama Meja <input id="dining-table-name" required type="text" placeholder="Contoh: Table 01" /></label>
+            <label>Area <input id="dining-table-area" required type="text" placeholder="Indoor / Outdoor / VIP" /></label>
+            <label>Kapasitas <input id="dining-table-capacity" min="1" required type="number" /></label>
+            <label>Urutan Tampil <input id="dining-table-sort" min="1" required type="number" /></label>
+            <label>Status <select id="dining-table-status"><option value="active">Aktif</option><option value="inactive">Nonaktif</option></select></label>
+            <div class="modal-actions full-row"><button class="ghost-button" data-close-modal type="button">Batal</button><button class="primary-button" type="submit">Simpan Meja</button></div>
+            <p class="form-feedback full-row" id="dining-table-feedback"></p>
+          </form>
+        </section>
+        <section class="modal-dialog" id="payment-method-modal" aria-modal="true" role="dialog" aria-labelledby="payment-method-modal-title" hidden>
+          <header class="modal-header"><div><span class="hero-kicker">Payment</span><h3 id="payment-method-modal-title">Metode Bayar</h3><p>Metode aktif akan menjadi tombol pembayaran di POS.</p></div><button class="icon-button" data-close-modal type="button">x</button></header>
+          <form class="form-grid input-workflow two-column-form" id="payment-method-form">
+            <input id="payment-method-id" type="hidden" />
+            <label>Nama Metode <input id="payment-method-name" required type="text" placeholder="Cash / QRIS / Transfer" /></label>
+            <label>Tipe <select id="payment-method-type"><option value="cash">Cash</option><option value="qris">QRIS</option><option value="card">Card / EDC</option><option value="transfer">Transfer</option><option value="ewallet">E-Wallet</option><option value="other">Lainnya</option></select></label>
+            <label id="payment-qris-mode-field" hidden>Mode QRIS <select id="payment-qris-mode"><option value="online">Online / Dinamis (Gateway Aktif)</option><option value="offline">Offline / Static</option></select></label>
+            <label class="full-row" id="payment-qris-image-field" hidden>Gambar QRIS Static
+              <input id="payment-qris-image-file" accept="image/jpeg,image/png,image/webp" type="file" />
+              <input id="payment-qris-image-url" type="hidden" />
+              <span class="image-upload-preview qris-upload-preview" id="payment-qris-image-preview">Belum ada QRIS</span>
+              <small>Upload QRIS resmi outlet. JPG, PNG, atau WEBP maksimal 3 MB.</small>
+            </label>
+            <label id="payment-card-mode-field" hidden>Mode Card <select id="payment-card-mode"><option value="offline">Offline EDC</option><option value="online">Online (Gateway Aktif)</option></select></label>
+            <label id="payment-card-acquirer-field" hidden>Bank Acquirer EDC <select id="payment-card-acquirer"><option value="BCA">BCA</option><option value="BRI">BRI</option><option value="BNI">BNI</option><option value="Mandiri">Mandiri</option></select></label>
+            <label id="payment-edc-mode-field" hidden>Mode EDC <select id="payment-edc-mode"><option value="manual">Manual EDC</option><option value="integrated">Integrated Terminal</option></select></label>
+            <label>Channel / Acquirer <input id="payment-method-channel" type="text" placeholder="QRIS / BCA / CARDS" /></label>
+            <label>Terminal ID <input id="payment-method-terminal" type="text" placeholder="ID mesin EDC jika ada" /></label>
+            <label id="payment-merchant-id-field" hidden>Merchant ID <input id="payment-merchant-id" type="text" placeholder="MID dari acquirer / connector" /></label>
+            <label id="payment-terminal-serial-field" hidden>Serial Mesin <input id="payment-terminal-serial" type="text" placeholder="Serial fisik terminal EDC" /></label>
+            <label id="payment-connector-status-field" hidden>Status Connector <select id="payment-connector-status"><option value="not_configured">Belum dikonfigurasi</option><option value="ready">Ready</option><option value="inactive">Nonaktif</option></select></label>
+            <label>MDR / Fee (%) <input id="payment-method-fee" min="0" max="100" step="0.01" type="number" /></label>
+            <label>Fee Ditanggung <select id="payment-method-fee-payer"><option value="merchant">Merchant / Usaha</option><option value="customer">Customer</option></select></label>
+            <label>Akun Settlement <input id="payment-method-account" type="text" placeholder="Kas Tunai / Bank / Payment Gateway" /></label>
+            <label>Urutan Tampil <input id="payment-method-sort" min="1" required type="number" /></label>
+            <label>Status <select id="payment-method-status"><option value="active">Aktif</option><option value="inactive">Nonaktif</option></select></label>
+            <div class="modal-actions full-row"><button class="ghost-button" data-close-modal type="button">Batal</button><button class="primary-button" type="submit">Simpan Metode</button></div>
+            <p class="form-feedback full-row" id="payment-method-feedback"></p>
+          </form>
+        </section>
+      </div>
+    </template>
+
+    <script type="module" src="../scripts/pages/settings.js?v=coffee-v137"></script>
+  </body>
+</html>

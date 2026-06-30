@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Master Modifier - IFresso Coffee</title>
+    <link rel="stylesheet" href="../styles.css?v=coffee-v143" />
+  </head>
+  <body data-page="modifiers" data-title="Master Modifier" data-eyebrow="Produk & Recipe">
+    <template id="page-content">
+      <section class="content-grid single">
+        <div class="page-command-bar">
+          <div>
+            <span class="hero-kicker">Modifier Template</span>
+            <h3>Kelola pilihan tambahan yang bisa dipakai banyak produk.</h3>
+            <p>Modifier menyimpan aturan template bahan. Outlet tetap perlu mapping template ke bahan fisik outlet agar stok dan HPP tepat.</p>
+          </div>
+          <button class="primary-button" data-open-modifier-modal data-permission="modifiers.master:create" type="button">+ Modifier Baru</button>
+        </div>
+        <div class="workspace-panel wide">
+          <div class="panel-heading">
+            <h3>Daftar Modifier</h3>
+            <p>Hubungkan modifier ke produk melalui halaman Recipe Template. Warning muncul bila bahan outlet belum lengkap.</p>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Nama Master</th><th>Opsi</th><th>Aksi</th></tr></thead>
+              <tbody id="modifier-master-table"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <div class="modal-backdrop" data-modal-backdrop hidden>
+        <section class="modal-dialog" id="modifier-modal" aria-modal="true" role="dialog" aria-labelledby="modifier-modal-title" hidden>
+          <header class="modal-header">
+            <div><span class="hero-kicker">Modifier Template</span><h3 id="modifier-modal-title">Tambah Modifier</h3><p>Buat grup pilihan dan aturan perubahan template bahan. Mapping bahan outlet dikerjakan terpisah di menu Produk & Recipe.</p></div>
+            <button class="icon-button" data-close-modal type="button" aria-label="Tutup modal">x</button>
+          </header>
+          <form class="form-grid input-workflow two-column-form" id="modifier-form">
+            <input id="modifier-id" type="hidden" />
+            <label class="full-row">Nama Master <input id="modifier-name" placeholder="Contoh: Level Es, Pilihan Susu, Topping" required type="text" /></label>
+            <label>Ketersediaan Modifier
+              <select id="modifier-scope">
+                <option value="company">Global perusahaan - semua outlet</option>
+                <option value="outlet">Khusus outlet aktif</option>
+              </select>
+            </label>
+            <label>Tipe Pilihan di POS
+              <select id="modifier-choice-type">
+                <option value="multiple">Checkbox - bisa pilih beberapa</option>
+                <option value="single">Radio - pilih satu opsi</option>
+              </select>
+            </label>
+            <label class="full-row">Status <select id="modifier-status"><option value="active">Aktif</option><option value="inactive">Nonaktif</option></select></label>
+            <label class="toggle-row full-row">
+              <input id="modifier-required-selection" type="checkbox" />
+              <span><strong>Wajib pilih minimal satu opsi saat transaksi</strong><small>Untuk tipe Radio berarti wajib pilih satu. Untuk Checkbox berarti wajib pilih minimal satu.</small></span>
+            </label>
+            <div class="modifier-option-toolbar full-row">
+              <div>
+                <strong>Opsi Modifier</strong>
+                <span>Pilih template bahan existing atau buat template baru. Bahan outlet dimapping nanti oleh outlet.</span>
+              </div>
+              <button class="ghost-button compact-button" data-add-option data-permission="modifiers.options:create" type="button">+ Tambah Opsi</button>
+            </div>
+            <div class="modifier-option-editor full-row" id="modifier-option-editor"></div>
+            <p class="form-preview full-row" id="modifier-preview">Isi minimal opsi pertama. Setiap opsi bisa menambah, mengurangi, atau mengganti bahan.</p>
+            <div class="modal-actions full-row"><button class="ghost-button" data-close-modal type="button">Batal</button><button class="primary-button" type="submit">Simpan Modifier</button></div>
+          </form>
+        </section>
+
+        <section class="modal-dialog" id="modifier-price-modal" aria-modal="true" role="dialog" aria-labelledby="modifier-price-title" hidden>
+          <header class="modal-header">
+            <div><span class="hero-kicker">Harga Outlet</span><h3 id="modifier-price-title">Atur Harga Modifier</h3><p>Harga tambahan ini hanya berlaku untuk outlet aktif. Jika belum diatur, sistem memakai harga default opsi modifier.</p></div>
+            <button class="icon-button" data-close-price-modal type="button" aria-label="Tutup modal">x</button>
+          </header>
+          <form class="form-grid input-workflow" id="modifier-price-form">
+            <input id="price-modifier-id" type="hidden" />
+            <label class="full-row">Modifier <input id="price-modifier-name" type="text" disabled /></label>
+            <div class="modifier-price-editor full-row" id="modifier-price-editor"></div>
+            <p class="form-preview full-row" id="price-modifier-preview">Semua harga opsi di modifier group ini akan dipakai di POS untuk outlet aktif.</p>
+            <div class="modal-actions full-row"><button class="ghost-button" data-close-price-modal type="button">Batal</button><button class="primary-button" type="submit">Simpan Harga Outlet</button></div>
+            <p class="form-feedback full-row" id="price-modifier-feedback" role="status"></p>
+          </form>
+        </section>
+      </div>
+    </template>
+
+    <script type="module" src="../scripts/pages/modifiers.js?v=coffee-v143"></script>
+  </body>
+</html>

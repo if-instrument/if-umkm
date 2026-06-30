@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Login - IF Instrument</title>
+    <link rel="stylesheet" href="styles.css?v=coffee-v137" />
+  </head>
+  <body class="login-page">
+    <main class="login-shell">
+      <section class="login-brand-panel">
+        <div class="brand login-brand">
+          <span class="brand-mark app-brand-logo"><img src="assets/if-instrument-logo.jpg" alt="IF Instrument" /></span>
+          <div>
+            <h1>IF Instrument</h1>
+            <p>UMKM Solution</p>
+          </div>
+        </div>
+        <div class="login-copy">
+          <span class="hero-kicker">Secure Access</span>
+          <h2>Masuk sebagai Super Admin atau Admin Perusahaan.</h2>
+          <p>Super admin hanya mengelola tenant/perusahaan. Admin perusahaan mengelola operasional, outlet, user, role, dan branding perusahaannya.</p>
+        </div>
+        <div class="sample-login-grid">
+          <button class="sample-login-card" data-sample-login="super" type="button">
+            <strong>Super Admin</strong>
+            <span>superadmin@app.test</span>
+            <small>Akses list perusahaan saja</small>
+          </button>
+          <button class="sample-login-card" data-sample-login="company" type="button" hidden>
+            <strong>Admin Perusahaan</strong>
+            <span>admin@ifresso.id</span>
+            <small>Akses penuh perusahaan</small>
+          </button>
+          <button class="sample-login-card" data-sample-login="area" type="button" hidden>
+            <strong>Area Manager</strong>
+            <span>area@ifresso.id</span>
+            <small>All Outlet, report & operasional</small>
+          </button>
+          <button class="sample-login-card" data-sample-login="manager" type="button" hidden>
+            <strong>Outlet Manager</strong>
+            <span>manager@ifresso.id</span>
+            <small>Selected Outlet, operasional outlet</small>
+          </button>
+          <button class="sample-login-card" data-sample-login="cashier" type="button" hidden>
+            <strong>Kasir</strong>
+            <span>kasir@ifresso.id</span>
+            <small>POS dan antrian outlet</small>
+          </button>
+          <button class="sample-login-card" data-sample-login="kitchen" type="button" hidden>
+            <strong>Kitchen</strong>
+            <span>kitchen@ifresso.id</span>
+            <small>Antrian produksi outlet</small>
+          </button>
+          <button class="sample-login-card" data-sample-login="inventory" type="button" hidden>
+            <strong>Inventory Staff</strong>
+            <span>inventory@ifresso.id</span>
+            <small>Stok dan inventory outlet</small>
+          </button>
+        </div>
+        <div class="tenant-login-panel" id="tenant-login-panel" hidden>
+          <div>
+            <span class="hero-kicker">Company Login</span>
+            <h3>Pilih perusahaan</h3>
+          </div>
+          <div class="tenant-login-grid" id="tenant-login-list"></div>
+        </div>
+      </section>
+
+      <section class="login-card">
+        <form id="login-form">
+          <div>
+            <span class="hero-kicker">Login</span>
+            <h3>Masuk ke aplikasi</h3>
+          </div>
+          <label>Email <input id="login-email" autocomplete="username" required type="email" /></label>
+          <label>Password <input id="login-password" autocomplete="current-password" required type="password" /></label>
+          <p class="form-preview" id="login-preview">Login menggunakan email dan password user.</p>
+          <button class="primary-button full" type="submit">Masuk</button>
+          <p class="form-feedback" id="login-feedback" role="status"></p>
+        </form>
+      </section>
+    </main>
+    <script type="module" src="scripts/pages/login.js?v=coffee-v137"></script>
+  </body>
+</html>

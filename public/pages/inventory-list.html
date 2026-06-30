@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Stok Bahan Outlet - IFresso Coffee</title>
+    <link rel="stylesheet" href="../styles.css?v=coffee-v137" />
+  </head>
+  <body data-page="inventory-list" data-title="Stok Bahan Outlet" data-eyebrow="Gudang">
+    <template id="page-content">
+      <section class="content-grid single">
+        <div class="inventory-command">
+          <div>
+            <span class="hero-kicker">Outlet Ingredient</span>
+            <h3>Kelola bahan fisik milik outlet aktif.</h3>
+            <p>Template bahan adalah standar perusahaan untuk recipe. Bahan outlet adalah stok fisik yang dipakai transaksi, HPP, waste, dan kartu stok.</p>
+          </div>
+          <div class="inventory-actions">
+            <button class="ghost-button" data-open-modal="ingredient-modal" data-permission="inventory.ingredients:create" type="button">Tambah Bahan Outlet</button>
+          </div>
+        </div>
+
+        <div class="metric-grid">
+          <article class="metric">
+            <span>Bahan Aktif</span>
+            <strong id="ingredient-count">0</strong>
+            <small>Bahan fisik outlet</small>
+          </article>
+          <article class="metric">
+            <span>Total Lot Tersedia</span>
+            <strong id="ingredient-lot-count">0</strong>
+            <small>Lot dengan qty tersisa</small>
+          </article>
+          <article class="metric alert">
+            <span>Expired <= 7 Hari</span>
+            <strong id="ingredient-expiring-count">0</strong>
+            <small>Perlu prioritas pakai / cek kualitas</small>
+          </article>
+          <article class="metric">
+            <span>Nilai Stok Bahan</span>
+            <strong id="inventory-value">Rp0</strong>
+            <small>Qty tersisa x HPP lot</small>
+          </article>
+        </div>
+
+        <div class="workspace-panel wide">
+          <div class="panel-heading">
+            <h3>Daftar Lot Stok Bahan</h3>
+            <p>Urutan FEFO: lot bahan dengan expired terdekat dipakai lebih dulu saat POS dan produksi memotong bahan.</p>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Bahan</th>
+                  <th>Lot</th>
+                  <th>Qty Tersisa</th>
+                  <th>HPP Lot</th>
+                  <th>Nilai Stok</th>
+                  <th>Manufactured</th>
+                  <th>Expired</th>
+                  <th>Status</th>
+                  <th>Aksi</th>
+                </tr>
+              </thead>
+              <tbody id="ingredient-table"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <div class="modal-backdrop" data-modal-backdrop hidden>
+        <section class="modal-dialog" id="purchase-modal" aria-modal="true" role="dialog" aria-labelledby="purchase-modal-title" hidden>
+          <header class="modal-header">
+            <div>
+              <span class="hero-kicker">Stok Outlet</span>
+              <h3 id="purchase-modal-title">Catat Stok Masuk</h3>
+              <p>Pilih bahan fisik outlet. Pembelian akan memperbarui stok, average cost, dan kartu stok.</p>
+            </div>
+            <button class="icon-button" data-close-modal type="button" aria-label="Tutup modal">x</button>
+          </header>
+          <form class="form-grid input-workflow" id="modal-purchase-form">
+            <label>Bahan Outlet <select id="modal-purchase-ingredient" required></select></label>
+            <label>Jumlah Masuk <input id="modal-purchase-qty" min="0.01" placeholder="Contoh: 5000" step="0.01" type="number" required /></label>
+            <label>Total Biaya Pembelian <input id="modal-purchase-cost" min="0" placeholder="Contoh: 75000" step="500" type="number" required /></label>
+            <label>Manufactured Date <small>Opsional</small><input id="modal-purchase-manufactured-at" type="date" /></label>
+            <label>Expired Date <small>Opsional</small><input id="modal-purchase-expired-at" type="date" /></label>
+            <p class="form-preview" id="modal-purchase-preview">Biaya per satuan akan muncul saat jumlah dan total biaya diisi. Tanggal produksi boleh dikosongkan jika tidak tersedia.</p>
+            <div class="modal-actions">
+              <button class="ghost-button" data-close-modal type="button">Batal</button>
+              <button class="primary-button" type="submit">Simpan Stok Masuk</button>
+            </div>
+            <p class="form-feedback" id="modal-purchase-feedback" role="status"></p>
+          </form>
+        </section>
+
+        <section class="modal-dialog" id="waste-modal" aria-modal="true" role="dialog" aria-labelledby="waste-modal-title" hidden>
+          <header class="modal-header">
+            <div>
+              <span class="hero-kicker">Kerugian Stok</span>
+              <h3 id="waste-modal-title">Catat Waste / Expired</h3>
+              <p>Pilih bahan fisik outlet yang rusak, expired, tumpah, atau terbuang. Nilainya masuk kerugian stok outlet di laporan.</p>
+            </div>
+            <button class="icon-button" data-close-modal type="button" aria-label="Tutup modal">x</button>
+          </header>
+          <form class="form-grid input-workflow" id="modal-waste-form">
+            <label>Bahan Outlet <select id="modal-waste-ingredient" required></select></label>
+            <label>Jumlah Terbuang <input id="modal-waste-qty" min="0.01" placeholder="Contoh: 250" step="0.01" type="number" required /></label>
+            <label>Penyebab
+              <select id="modal-waste-type" required>
+                <option value="expired">Expired</option>
+                <option value="waste">Terbuang / Rusak</option>
+              </select>
+            </label>
+            <label class="full-row">Catatan <input id="modal-waste-note" autocomplete="off" placeholder="Contoh: susu basi saat opening" type="text" /></label>
+            <p class="form-preview full-row" id="modal-waste-preview">Estimasi nilai waste akan muncul setelah bahan outlet dan jumlah diisi.</p>
+            <div class="modal-actions full-row">
+              <button class="ghost-button" data-close-modal type="button">Batal</button>
+              <button class="primary-button" type="submit">Simpan Waste</button>
+            </div>
+            <p class="form-feedback full-row" id="modal-waste-feedback" role="status"></p>
+          </form>
+        </section>
+
+        <section class="modal-dialog" id="ingredient-modal" aria-modal="true" role="dialog" aria-labelledby="ingredient-modal-title" hidden>
+          <header class="modal-header">
+            <div>
+              <span class="hero-kicker">Bahan Outlet</span>
+              <h3 id="ingredient-modal-title">Tambah Bahan Outlet</h3>
+              <p>Buat stok fisik untuk outlet aktif. Nama bahan boleh mengikuti penamaan outlet, tapi harus dihubungkan ke template bila dipakai recipe.</p>
+            </div>
+            <button class="icon-button" data-close-modal type="button" aria-label="Tutup modal">x</button>
+          </header>
+          <form class="form-grid input-workflow two-column-form" id="modal-ingredient-form">
+            <label class="full-row">Hubungkan ke Template Bahan
+              <select id="modal-ingredient-template">
+                <option value="new">Buat template baru dari nama bahan outlet</option>
+              </select>
+            </label>
+            <label>SKU Bahan Outlet <input id="modal-ingredient-sku" autocomplete="off" placeholder="Otomatis" required type="text" /></label>
+            <label>Nama Bahan Outlet <input id="modal-ingredient-name" autocomplete="off" placeholder="Contoh: Oat Milk Bar A" required type="text" /></label>
+            <label>Kategori
+              <select id="modal-ingredient-category" required>
+                <option value="Raw Material">Raw Material</option>
+                <option value="Packaging">Packaging</option>
+                <option value="Consumable">Consumable</option>
+              </select>
+            </label>
+            <label>Satuan <input id="modal-ingredient-unit" autocomplete="off" placeholder="gram, ml, pcs" required type="text" /></label>
+            <label>Stok Awal <input id="modal-ingredient-stock" min="0" placeholder="Contoh: 10000" step="0.01" type="number" required /></label>
+            <label>Nilai Stok Awal <input id="modal-ingredient-cost" min="0" placeholder="Contoh: 120000" step="500" type="number" required /></label>
+            <label>Manufactured Date <small>Opsional</small><input id="modal-ingredient-manufactured-at" type="date" /></label>
+            <label>Expired Date <small>Opsional</small><input id="modal-ingredient-expired-at" type="date" /></label>
+            <label>Standard Cost <input id="modal-ingredient-standard-cost" min="0" placeholder="Contoh: 12" step="0.01" type="number" required /></label>
+            <label>Batas Aman <input id="modal-ingredient-min" min="0" placeholder="Contoh: 2000" step="0.01" type="number" required /></label>
+            <p class="form-preview full-row" id="modal-ingredient-preview">Average cost dihitung dari nilai stok awal. Standard cost diisi sebagai biaya target/budget.</p>
+            <div class="modal-actions full-row">
+              <button class="ghost-button" data-close-modal type="button">Batal</button>
+              <button class="primary-button" type="submit">Simpan Bahan</button>
+            </div>
+            <p class="form-feedback full-row" id="modal-ingredient-feedback" role="status"></p>
+          </form>
+        </section>
+
+        <section class="modal-dialog" id="edit-ingredient-modal" aria-modal="true" role="dialog" aria-labelledby="edit-ingredient-modal-title" hidden>
+          <header class="modal-header">
+            <div>
+              <span class="hero-kicker">Bahan Outlet</span>
+              <h3 id="edit-ingredient-modal-title">Edit Bahan Outlet & Stok</h3>
+              <p>Gunakan untuk koreksi stok fisik outlet, batas aman, average cost, dan standard cost.</p>
+            </div>
+            <button class="icon-button" data-close-modal type="button" aria-label="Tutup modal">x</button>
+          </header>
+          <form class="form-grid input-workflow two-column-form" id="modal-edit-ingredient-form">
+            <input id="modal-edit-ingredient-id" type="hidden" />
+            <label class="full-row">Template Bahan
+              <select id="modal-edit-template"></select>
+            </label>
+            <label>SKU Bahan Outlet <input id="modal-edit-sku" autocomplete="off" required type="text" /></label>
+            <label>Nama Bahan Outlet <input id="modal-edit-name" autocomplete="off" required type="text" /></label>
+            <label>Kategori
+              <select id="modal-edit-category" required>
+                <option value="Raw Material">Raw Material</option>
+                <option value="Packaging">Packaging</option>
+                <option value="Consumable">Consumable</option>
+              </select>
+            </label>
+            <label>Satuan <input id="modal-edit-unit" autocomplete="off" required type="text" /></label>
+            <label>Stok Aktual <input id="modal-edit-stock" min="0" step="0.01" type="number" required /></label>
+            <label>Batas Aman <input id="modal-edit-min" min="0" step="0.01" type="number" required /></label>
+            <label>Average Cost <input id="modal-edit-avg-cost" min="0" step="0.01" type="number" required /></label>
+            <label>Standard Cost <input id="modal-edit-standard-cost" min="0" step="0.01" type="number" required /></label>
+            <label class="full-row">Catatan Koreksi <input id="modal-edit-note" autocomplete="off" placeholder="Contoh: stock opname bulanan" type="text" /></label>
+            <p class="form-preview full-row" id="modal-edit-preview">Perubahan stok akan tercatat di kartu stok outlet.</p>
+            <div class="modal-actions full-row">
+              <button class="ghost-button" data-close-modal type="button">Batal</button>
+              <button class="primary-button" type="submit">Simpan Perubahan</button>
+            </div>
+            <p class="form-feedback full-row" id="modal-edit-feedback" role="status"></p>
+          </form>
+        </section>
+
+        <section class="modal-dialog modal-dialog-wide" id="ingredient-ledger-modal" aria-modal="true" role="dialog" aria-labelledby="ingredient-ledger-modal-title" hidden>
+          <header class="modal-header">
+            <div>
+              <span class="hero-kicker">Kartu Stok</span>
+              <h3 id="ingredient-ledger-modal-title">Kartu Stok Bahan</h3>
+              <p id="ingredient-ledger-summary">Riwayat in-out bahan fisik outlet terpilih.</p>
+            </div>
+            <button class="icon-button" data-close-modal type="button" aria-label="Tutup modal">x</button>
+          </header>
+          <div class="filter-toolbar compact-filter">
+            <label>Bahan Terpilih
+              <select id="ingredient-ledger-filter-ingredient" disabled></select>
+            </label>
+            <label>Tipe
+              <select id="ingredient-ledger-filter-type">
+                <option value="all">Semua Tipe</option>
+                <option value="opening_balance">Saldo Awal</option>
+                <option value="purchase">Stok Masuk</option>
+                <option value="sale">Pemakaian POS</option>
+                <option value="sale_edit">Edit Pesanan</option>
+                <option value="production_usage">Produksi</option>
+                <option value="adjustment">Koreksi</option>
+                <option value="waste">Waste</option>
+                <option value="expired">Expired</option>
+              </select>
+            </label>
+            <label>Dari <input id="ingredient-ledger-filter-from" type="date" /></label>
+            <label>Sampai <input id="ingredient-ledger-filter-to" type="date" /></label>
+            <label>Catatan <input id="ingredient-ledger-filter-search" autocomplete="off" placeholder="Cari catatan..." type="text" /></label>
+            <button class="ghost-button compact-button" id="ingredient-ledger-filter-reset" type="button">Reset</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Waktu</th>
+                  <th>Tipe</th>
+                  <th>Stok Awal</th>
+                  <th>In</th>
+                  <th>Out</th>
+                  <th>Stok Akhir</th>
+                  <th>Nilai</th>
+                  <th>Catatan</th>
+                </tr>
+              </thead>
+              <tbody id="ingredient-ledger-table"></tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    </template>
+
+    <script type="module" src="../scripts/pages/inventory.js?v=coffee-v137"></script>
+  </body>
+</html>
