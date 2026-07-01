@@ -2,6 +2,7 @@
 
 namespace App\Controllers;
 
+use App\Presenters\Page\LoginPagePresenter;
 use App\Services\Api\AuthApiService;
 use App\Services\TenantDatabaseService;
 
@@ -34,7 +35,7 @@ class LoginController extends BaseController
                 ]);
             }
 
-            return $data;
+            return (new LoginPagePresenter())->bootstrap($data);
         });
     }
 

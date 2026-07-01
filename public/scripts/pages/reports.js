@@ -1,8 +1,9 @@
 import { renderLayout } from "../layout.js?v=coffee-v150";
-import { apiGet, applyPermissionControls, loadSession, loadState, scopedApiUrl } from "../store.js?v=coffee-v150";
+import { applyPermissionControls, loadSession, loadState } from "../store.js?v=coffee-v150";
 import { formatQty, money, shortDate } from "../format.js";
 import { byId, setText } from "../dom.js";
 import { enhanceAllDataTables } from "../datatable.js";
+import { loadPageBootstrap } from "../page-engine.js?v=coffee-v154";
 
 renderLayout();
 
@@ -216,20 +217,16 @@ function escapeHtml(value) {
     .replaceAll("'", "&#039;");
 }
 
-function reportUrl() {
-  const params = new URLSearchParams({
+function fetchReport() {
+  const response = loadPageBootstrap("reports", state, session, {
+    view: "profit-loss",
     period: reportPeriod.value || "daily",
     anchor_date: reportAnchorDate.value || localDateValue()
   });
-  return scopedApiUrl(`/api/reports/profit-loss?${params.toString()}`, state, session);
-}
-
-function fetchReport() {
-  const response = apiGet(reportUrl());
   if (!response?.ok) {
     throw new Error(response?.message || "Laporan belum bisa diambil dari database.");
   }
-  return response.data;
+  return response.data?.report;
 }
 
 function renderStatement(report) {

@@ -2,6 +2,7 @@
 
 namespace App\Controllers;
 
+use App\Presenters\Page\OnlineOrderPagePresenter;
 use App\Services\Api\OnlineOrderApiService;
 use App\Services\TenantDatabaseService;
 
@@ -24,7 +25,9 @@ class OnlineOrderController extends BaseController
 
     public function bootstrap()
     {
-        return $this->jsonAction(fn () => (new OnlineOrderApiService())->bootstrap($this->request->getGet()));
+        return $this->jsonAction(fn () => (new OnlineOrderPagePresenter())->bootstrap(
+            (new OnlineOrderApiService())->bootstrap($this->request->getGet())
+        ));
     }
 
     public function member()

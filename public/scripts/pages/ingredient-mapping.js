@@ -1,9 +1,10 @@
 import { renderLayout } from "../layout.js?v=coffee-v150";
-import { apiGet, apiPut, appPath, applyPermissionControls, canUsePermission, loadSession, loadState, scopedApiUrl, scopedPayload, visibleForSession } from "../store.js?v=coffee-v150";
+import { apiPut, appPath, applyPermissionControls, canUsePermission, loadSession, loadState, scopedPayload, visibleForSession } from "../store.js?v=coffee-v150";
 import { formatQty } from "../format.js";
 import { byId, setText, showAlert } from "../dom.js";
 import { enhanceAllDataTables } from "../datatable.js";
 import { isInactiveStatus } from "../status-codes.js";
+import { loadPageBootstrap } from "../page-engine.js?v=coffee-v150";
 
 renderLayout();
 
@@ -21,16 +22,9 @@ function applySuite(data) {
 }
 
 function refreshSuite() {
-  const products = apiGet(scopedApiUrl("/api/product?per_page=100", state, session));
-  const modifiers = apiGet(scopedApiUrl("/api/modifier?per_page=100", state, session));
-  const ingredients = apiGet(scopedApiUrl("/api/ingredient?per_page=100", state, session));
-  const templates = apiGet(scopedApiUrl("/api/ingredient-template?per_page=100&status=active", state, session));
-  applySuite({
-    products: products?.data?.items || [],
-    modifiers: modifiers?.data?.items || [],
-    ingredients: ingredients?.data?.items || [],
-    ingredientTemplates: templates?.data?.items || []
-  });
+  const response = loadPageBootstrap("ingredientMapping", state, session, { view: "ingredient-mapping" });
+  if (!response?.ok) throw new Error(response?.message || "Data mapping bahan belum dapat dimuat.");
+  applySuite(response.data || {});
 }
 
 function escapeHtml(value) {

@@ -1,7 +1,24 @@
-import { apiGet, scopedApiUrl } from "./store.js";
+import { apiGet, scopedApiUrl } from "./store.js?v=coffee-v150";
 
 const PAGE_ENDPOINTS = {
-  pos: "/api/page/pos/bootstrap"
+  pos: "/api/page/pos/bootstrap",
+  settings: "/api/page/settings/bootstrap",
+  users: "/api/page/users/bootstrap",
+  products: "/api/page/products/bootstrap",
+  categories: "/api/page/products/bootstrap",
+  modifiers: "/api/page/products/bootstrap",
+  recipes: "/api/page/products/bootstrap",
+  ingredientMapping: "/api/page/products/bootstrap",
+  ingredientTemplates: "/api/page/products/bootstrap",
+  inventoryDashboard: "/api/page/inventory/bootstrap",
+  inventoryList: "/api/page/inventory/bootstrap",
+  purchases: "/api/page/inventory/bootstrap",
+  finishedProducts: "/api/page/inventory/bootstrap",
+  financeDashboard: "/api/page/finance/bootstrap",
+  reports: "/api/page/finance/bootstrap",
+  financeExpenses: "/api/page/finance/bootstrap",
+  financeSettlement: "/api/page/finance/bootstrap",
+  paymentGatewayLogs: "/api/page/finance/bootstrap"
 };
 
 export function pageDateValue(date = new Date()) {

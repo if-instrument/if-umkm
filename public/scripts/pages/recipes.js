@@ -1,10 +1,11 @@
 import { renderLayout } from "../layout.js?v=coffee-v150";
-import { apiGet, apiPost, apiPut, appPath, applyPermissionControls, canAccessAllOutlets, canManageCompanyMasters, canUsePermission, loadSession, loadState, primaryOutletId, scopedApiUrl, scopedPayload, stampScopedMaster, visibleForSession } from "../store.js?v=coffee-v150";
+import { apiPost, apiPut, appPath, applyPermissionControls, canAccessAllOutlets, canManageCompanyMasters, canUsePermission, loadSession, loadState, primaryOutletId, scopedPayload, stampScopedMaster, visibleForSession } from "../store.js?v=coffee-v150";
 import { formatQty, money } from "../format.js";
 import { byId, setText, showAlert } from "../dom.js";
 import { ingredientName, missingModifierOptions, missingModifierSummary, missingRecipeLines, missingRecipeSummary, productAvailability, productCogs, productModifiers } from "../inventory.js";
 import { enhanceAllDataTables } from "../datatable.js";
 import { COMMON_STATUS, isInactiveStatus } from "../status-codes.js";
+import { loadPageBootstrap } from "../page-engine.js?v=coffee-v150";
 
 renderLayout();
 
@@ -23,18 +24,9 @@ function applyProductSuite(data) {
 }
 
 function refreshProductSuite() {
-  const categories = apiGet(scopedApiUrl("/api/category?per_page=100", state, session));
-  const products = apiGet(scopedApiUrl("/api/product?per_page=100", state, session));
-  const modifiers = apiGet(scopedApiUrl("/api/modifier?per_page=100", state, session));
-  const ingredients = apiGet(scopedApiUrl("/api/ingredient?per_page=100", state, session));
-  const templates = apiGet(scopedApiUrl("/api/ingredient-template?per_page=100&status=active", state, session));
-  applyProductSuite({
-    categories: categories?.data?.items || [],
-    products: products?.data?.items || [],
-    modifiers: modifiers?.data?.items || [],
-    ingredients: ingredients?.data?.items || [],
-    ingredientTemplates: templates?.data?.items || []
-  });
+  const response = loadPageBootstrap("recipes", state, session, { view: "recipes" });
+  if (!response?.ok) throw new Error(response?.message || "Data recipe belum dapat dimuat.");
+  applyProductSuite(response.data || {});
 }
 
 function postProductSuite(url, payload) {

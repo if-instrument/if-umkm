@@ -1,9 +1,10 @@
 import { renderLayout } from "../layout.js?v=coffee-v150";
-import { apiGet, apiPost, applyPermissionControls, canUsePermission, loadSession, loadState, scopedApiUrl, scopedPayload, visibleForSession } from "../store.js?v=coffee-v150";
+import { apiPost, applyPermissionControls, canUsePermission, loadSession, loadState, scopedPayload, visibleForSession } from "../store.js?v=coffee-v150";
 import { formatQty, money, shortDate } from "../format.js";
 import { byId, setText, showAlert, showFeedback } from "../dom.js";
 import { enhanceAllDataTables } from "../datatable.js";
 import { isInactiveStatus } from "../status-codes.js";
+import { applyPageBootstrap, loadPageBootstrap } from "../page-engine.js?v=coffee-v154";
 
 renderLayout();
 
@@ -12,15 +13,17 @@ const session = loadSession();
 
 function applyInventoryData(data) {
   if (!data) return;
-  if (Array.isArray(data.ingredients)) state.ingredients = data.ingredients;
-  if (Array.isArray(data.stockMovements)) state.stockMovements = data.stockMovements;
+  applyPageBootstrap(state, data, ["ingredients", "stockMovements"]);
 }
 
 function refreshInventory() {
-  const ingredients = apiGet(scopedApiUrl("/api/ingredient?per_page=100", state, session));
-  const movements = apiGet(scopedApiUrl("/api/stock-movement?type=purchase&per_page=100", state, session));
-  state.ingredients = ingredients?.data?.items || [];
-  state.stockMovements = movements?.data?.items || [];
+  const response = loadPageBootstrap("purchases", state, session, {
+    view: "purchase",
+    ingredient_per_page: 100,
+    movement_per_page: 100
+  });
+  if (response?.ok) applyInventoryData(response.data);
+  return response;
 }
 
 function savePurchase(payload) {
@@ -123,7 +126,8 @@ document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") closeModal();
 });
 
-refreshInventory();
+const bootstrapResponse = refreshInventory();
+if (!bootstrapResponse?.ok) showAlert(bootstrapResponse?.message || "Data pembelian stok belum berhasil dimuat.");
 renderOptions();
 updatePreview();
 renderPurchaseHistory();

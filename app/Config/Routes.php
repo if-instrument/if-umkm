@@ -4,13 +4,13 @@ use CodeIgniter\Router\RouteCollection;
 
 /** @var RouteCollection $routes */
 $routes->setDefaultNamespace('App\Controllers');
-$routes->setDefaultController('LegacyFrontendController');
+$routes->setDefaultController('AppPageController');
 $routes->setDefaultMethod('dashboard');
 $routes->setTranslateURIDashes(false);
 $routes->set404Override();
 $routes->setAutoRoute(false);
 
-$routes->get('/', 'LegacyFrontendController::dashboard');
+$routes->get('/', 'AppPageController::dashboard');
 $routes->get('login', 'LoginController::show');
 $routes->get('login.html', 'LoginController::show');
 
@@ -34,8 +34,8 @@ $routes->group('api/page', static function ($routes) {
     $routes->get('order/member', 'OnlineOrderController::member');
     $routes->post('order/submit', 'OnlineOrderController::submit');
 });
-$routes->get('payment/card/(:segment)', 'LegacyFrontendController::cardPayment/$1');
-$routes->get('invitation/(:segment)', 'LegacyFrontendController::invitation/$1');
+$routes->get('payment/card/(:segment)', 'AppPageController::cardPayment/$1');
+$routes->get('invitation/(:segment)', 'AppPageController::invitation/$1');
 $routes->get('order', 'OnlineOrderController::show');
 
 $routes->group('api', ['namespace' => 'App\Controllers\Api', 'filter' => 'jwt-auth'], static function ($routes) {
@@ -65,6 +65,11 @@ $routes->group('api', ['namespace' => 'App\Controllers\Api', 'filter' => 'jwt-au
     $routes->get('dashboard', 'DashboardController::show');
     $routes->get('onboarding', 'OnboardingController::show');
     $routes->get('page/pos/bootstrap', '\App\Controllers\PosController::bootstrap');
+    $routes->get('page/settings/bootstrap', '\App\Controllers\SettingsPageController::bootstrap');
+    $routes->get('page/users/bootstrap', '\App\Controllers\UserRoleController::bootstrap');
+    $routes->get('page/products/bootstrap', '\App\Controllers\ProductPageController::bootstrap');
+    $routes->get('page/inventory/bootstrap', '\App\Controllers\InventoryPageController::bootstrap');
+    $routes->get('page/finance/bootstrap', '\App\Controllers\FinancePageController::bootstrap');
     $routes->get('setting', 'SettingsController::getGeneral');
     $routes->put('setting', 'SettingsController::general');
     $routes->get('printer', 'SettingsController::listPrinters');
@@ -143,11 +148,49 @@ $routes->group('api', ['namespace' => 'App\Controllers\Api', 'filter' => 'jwt-au
     $routes->put('payment-transaction/(:segment)/cancel', 'SalesController::cancelPayment/$1');
 });
 
-$routes->get('(:segment)', 'LegacyFrontendController::tenantDashboard/$1');
+$routes->get('(:segment)', 'AppPageController::tenantDashboard/$1');
 $routes->get('(:segment)/login', 'LoginController::tenant/$1');
 $routes->get('(:segment)/login.html', 'LoginController::tenant/$1');
 $routes->get('(:segment)/order', 'OnlineOrderController::tenant/$1');
-$routes->get('(:segment)/index.html', 'LegacyFrontendController::tenantDashboard/$1');
+$routes->get('(:segment)/index.html', 'AppPageController::tenantDashboard/$1');
 $routes->get('(:segment)/pages/pos.html', 'PosController::tenant/$1');
+$routes->get('(:segment)/pages/settings.html', 'SettingsPageController::tenant/$1');
+$routes->get('(:segment)/pages/users.html', 'UserRoleController::tenant/$1');
+$routes->get('(:segment)/pages/categories.html', 'ProductPageController::tenant/$1/categories');
+$routes->get('(:segment)/pages/products.html', 'ProductPageController::tenant/$1/products');
+$routes->get('(:segment)/pages/modifiers.html', 'ProductPageController::tenant/$1/modifiers');
+$routes->get('(:segment)/pages/recipes.html', 'ProductPageController::tenant/$1/recipes');
+$routes->get('(:segment)/pages/ingredient-mapping.html', 'ProductPageController::tenant/$1/ingredient-mapping');
+$routes->get('(:segment)/pages/ingredient-templates.html', 'ProductPageController::tenant/$1/ingredient-templates');
+$routes->get('(:segment)/pages/inventory.html', 'InventoryPageController::tenant/$1/overview');
+$routes->get('(:segment)/pages/inventory-list.html', 'InventoryPageController::tenant/$1/list');
+$routes->get('(:segment)/pages/purchases.html', 'InventoryPageController::tenant/$1/purchase');
+$routes->get('(:segment)/pages/finished-products.html', 'InventoryPageController::tenant/$1/finished-products');
+$routes->get('(:segment)/pages/finance-dashboard.html', 'FinancePageController::tenant/$1/dashboard');
+$routes->get('(:segment)/pages/reports.html', 'FinancePageController::tenant/$1/profit-loss');
+$routes->get('(:segment)/pages/finance-expenses.html', 'FinancePageController::tenant/$1/expenses');
+$routes->get('(:segment)/pages/finance-settlement.html', 'FinancePageController::tenant/$1/settlement');
+$routes->get('(:segment)/pages/payment-gateway-logs.html', 'FinancePageController::tenant/$1/gateway-logs');
+$routes->get('(:segment)/pages/onboarding.html', 'AppPageController::tenantPage/$1/onboarding.html');
+$routes->get('(:segment)/pages/order-history.html', 'AppPageController::tenantPage/$1/order-history.html');
 $routes->get('pages/pos.html', 'PosController::show');
-$routes->get('(:segment)/pages/(:any)', 'LegacyFrontendController::tenantPage/$1/$2');
+$routes->get('pages/settings.html', 'SettingsPageController::show');
+$routes->get('pages/users.html', 'UserRoleController::show');
+$routes->get('pages/categories.html', 'ProductPageController::show/categories');
+$routes->get('pages/products.html', 'ProductPageController::show/products');
+$routes->get('pages/modifiers.html', 'ProductPageController::show/modifiers');
+$routes->get('pages/recipes.html', 'ProductPageController::show/recipes');
+$routes->get('pages/ingredient-mapping.html', 'ProductPageController::show/ingredient-mapping');
+$routes->get('pages/ingredient-templates.html', 'ProductPageController::show/ingredient-templates');
+$routes->get('pages/inventory.html', 'InventoryPageController::show/overview');
+$routes->get('pages/inventory-list.html', 'InventoryPageController::show/list');
+$routes->get('pages/purchases.html', 'InventoryPageController::show/purchase');
+$routes->get('pages/finished-products.html', 'InventoryPageController::show/finished-products');
+$routes->get('pages/finance-dashboard.html', 'FinancePageController::show/dashboard');
+$routes->get('pages/reports.html', 'FinancePageController::show/profit-loss');
+$routes->get('pages/finance-expenses.html', 'FinancePageController::show/expenses');
+$routes->get('pages/finance-settlement.html', 'FinancePageController::show/settlement');
+$routes->get('pages/payment-gateway-logs.html', 'FinancePageController::show/gateway-logs');
+$routes->get('pages/onboarding.html', 'AppPageController::page/onboarding.html');
+$routes->get('pages/order-history.html', 'AppPageController::page/order-history.html');
+$routes->get('(:segment)/pages/(:any)', 'AppPageController::tenantPage/$1/$2');

@@ -1,10 +1,11 @@
 import { renderLayout } from "../layout.js?v=coffee-v150";
-import { apiDelete, apiGet, apiPost, apiPut, apiUpload, applyPermissionControls, canUsePermission, loadSession, loadState, scopedApiUrl, scopedPayload } from "../store.js?v=coffee-v150";
+import { apiDelete, apiGet, apiPost, apiPut, apiUpload, applyPermissionControls, canUsePermission, loadSession, loadState, scopedPayload } from "../store.js?v=coffee-v150";
 import { formatQty, money } from "../format.js";
 import { byId, setText, showAlert, showFeedback } from "../dom.js";
 import { costingMethodLabel, ingredientUnitCost } from "../inventory.js";
 import { enhanceAllDataTables } from "../datatable.js";
 import { COMMON_STATUS, CONNECTOR_STATUS, isActiveStatus, isInactiveStatus, statusLabel } from "../status-codes.js";
+import { loadPageBootstrap } from "../page-engine.js?v=coffee-v150";
 
 renderLayout();
 
@@ -78,19 +79,17 @@ function deleteSetting(url, payload = {}) {
 }
 
 function refreshSettingsData() {
-  const settings = apiGet(scopedApiUrl("/api/setting", state, session));
-  const ingredients = apiGet(scopedApiUrl("/api/ingredient?per_page=100", state, session));
-  const diningTables = apiGet(scopedApiUrl("/api/dining-table?per_page=100", state, session));
-  const paymentMethods = apiGet(scopedApiUrl("/api/payment-method?per_page=100", state, session));
-  const packagingRules = apiGet(scopedApiUrl("/api/packaging-rule?per_page=100", state, session));
-  state.companies = session?.accessContext?.companies || [];
-  state.outlets = session?.accessContext?.outlets || [];
-  state.activeCompanyId = session?.companyId || state.activeCompanyId;
-  state.settings = { ...state.settings, ...(settings?.data || {}) };
-  state.ingredients = (ingredients?.data?.items || []).map((item) => ({ ...item, minStock: item.minStock || 0, avgCost: item.avgCost || 0 }));
-  state.settings.diningTables = diningTables?.data?.items || [];
-  state.settings.paymentMethods = paymentMethods?.data?.items || [];
-  state.settings.packagingRules = packagingRules?.data?.items || [];
+  const response = loadPageBootstrap("settings", state, session);
+  if (!response?.ok) {
+    showFeedback("company-feedback", response?.message || "Data pengaturan gagal dimuat.");
+    return;
+  }
+  const data = response.data || {};
+  state.companies = data.companies || session?.accessContext?.companies || [];
+  state.outlets = data.outlets || session?.accessContext?.outlets || [];
+  state.activeCompanyId = data.activeCompanyId || session?.companyId || state.activeCompanyId;
+  state.settings = { ...state.settings, ...(data.settings || {}) };
+  state.ingredients = (data.ingredients || []).map((item) => ({ ...item, minStock: item.minStock || 0, avgCost: item.avgCost || 0 }));
 }
 
 function exists(id) {

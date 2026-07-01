@@ -1,8 +1,9 @@
 import { renderLayout } from "../layout.js?v=coffee-v150";
-import { apiGet, loadSession, loadState, scopedApiUrl } from "../store.js?v=coffee-v150";
+import { loadSession, loadState } from "../store.js?v=coffee-v150";
 import { formatQty, money, shortDate } from "../format.js";
 import { byId, setText } from "../dom.js";
 import { enhanceAllDataTables } from "../datatable.js";
+import { loadPageBootstrap } from "../page-engine.js?v=coffee-v154";
 
 renderLayout();
 
@@ -19,14 +20,13 @@ function escapeHtml(value) {
   return String(value ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#039;");
 }
 
-function reportUrl() {
-  const params = new URLSearchParams({ period: period.value || "daily", anchor_date: anchorDate.value || localDateValue() });
-  return scopedApiUrl(`/api/reports/profit-loss?${params.toString()}`, state, session);
-}
-
 function fetchReport() {
-  const response = apiGet(reportUrl());
-  return response?.ok ? response.data : null;
+  const response = loadPageBootstrap("financeSettlement", state, session, {
+    view: "settlement",
+    period: period.value || "daily",
+    anchor_date: anchorDate.value || localDateValue()
+  });
+  return response?.ok ? response.data?.report : null;
 }
 
 function renderPage() {

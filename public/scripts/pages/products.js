@@ -1,10 +1,11 @@
 import { renderLayout } from "../layout.js?v=coffee-v150";
-import { apiDelete, apiGet, apiPost, apiPut, apiUpload, appPath, applyPermissionControls, canAccessAllOutlets, canManageCompanyMasters, canUsePermission, legacyOutletDbId, loadSession, loadState, primaryOutletId, scopedApiUrl, scopedPayload, stampScopedMaster, visibleForSession } from "../store.js?v=coffee-v150";
+import { apiDelete, apiPost, apiPut, apiUpload, appPath, applyPermissionControls, canAccessAllOutlets, canManageCompanyMasters, canUsePermission, legacyOutletDbId, loadSession, loadState, primaryOutletId, scopedPayload, stampScopedMaster, visibleForSession } from "../store.js?v=coffee-v150";
 import { formatQty, money } from "../format.js";
 import { isStockedProduct, missingRecipeLines, missingRecipeSummary, productCogs } from "../inventory.js";
 import { byId, setText, showAlert, showFeedback } from "../dom.js";
 import { enhanceAllDataTables } from "../datatable.js";
 import { COMMON_STATUS, isInactiveStatus } from "../status-codes.js";
+import { loadPageBootstrap } from "../page-engine.js?v=coffee-v150";
 
 renderLayout();
 
@@ -24,14 +25,9 @@ function applyProductSuite(data) {
 }
 
 function refreshProductSuite() {
-  const categories = apiGet(scopedApiUrl("/api/category?per_page=100", state, session));
-  const products = apiGet(scopedApiUrl("/api/product?per_page=100", state, session));
-  const ingredients = apiGet(scopedApiUrl("/api/ingredient?per_page=100", state, session));
-  applyProductSuite({
-    categories: categories?.data?.items || [],
-    products: products?.data?.items || [],
-    ingredients: ingredients?.data?.items || []
-  });
+  const response = loadPageBootstrap("products", state, session, { view: "products" });
+  if (!response?.ok) throw new Error(response?.message || "Data produk belum dapat dimuat.");
+  applyProductSuite(response.data || {});
 }
 
 function postProductSuite(url, payload) {

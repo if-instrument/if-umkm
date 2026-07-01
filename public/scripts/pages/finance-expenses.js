@@ -1,8 +1,9 @@
 import { renderLayout } from "../layout.js?v=coffee-v150";
-import { apiDelete, apiGet, apiPost, apiPut, applyPermissionControls, loadSession, loadState, scopedApiUrl, scopedPayload } from "../store.js?v=coffee-v150";
+import { apiDelete, apiPost, apiPut, applyPermissionControls, loadSession, loadState, scopedPayload } from "../store.js?v=coffee-v150";
 import { money } from "../format.js";
 import { byId, setText, showAlert, showFeedback } from "../dom.js";
 import { enhanceAllDataTables } from "../datatable.js";
+import { loadPageBootstrap } from "../page-engine.js?v=coffee-v154";
 
 renderLayout();
 
@@ -16,14 +17,13 @@ function localDateValue(date = new Date()) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
-function expenseUrl() {
-  const params = new URLSearchParams({ period: period.value || "daily", anchor_date: anchorDate.value || localDateValue() });
-  return scopedApiUrl(`/api/finance/expense?${params.toString()}`, state, session);
-}
-
 function fetchExpenses() {
-  const response = apiGet(expenseUrl());
-  expenses = response?.data?.items || [];
+  const response = loadPageBootstrap("financeExpenses", state, session, {
+    view: "expenses",
+    period: period.value || "daily",
+    anchor_date: anchorDate.value || localDateValue()
+  });
+  expenses = response?.data?.expenses || [];
 }
 
 function escapeHtml(value) {

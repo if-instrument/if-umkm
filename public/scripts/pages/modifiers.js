@@ -1,10 +1,11 @@
 import { renderLayout } from "../layout.js?v=coffee-v150";
-import { apiDelete, apiGet, apiPost, apiPut, applyPermissionControls, canAccessAllOutlets, canManageCompanyMasters, canUsePermission, loadSession, loadState, primaryOutletId, scopedApiUrl, scopedPayload, stampScopedMaster, visibleForSession } from "../store.js?v=coffee-v150";
+import { apiDelete, apiPost, apiPut, applyPermissionControls, canAccessAllOutlets, canManageCompanyMasters, canUsePermission, loadSession, loadState, primaryOutletId, scopedPayload, stampScopedMaster, visibleForSession } from "../store.js?v=coffee-v150";
 import { formatQty, money } from "../format.js";
 import { byId, setText, showAlert } from "../dom.js";
 import { ingredientName, missingModifierOptions, missingModifierSummary } from "../inventory.js";
 import { enhanceAllDataTables } from "../datatable.js";
 import { COMMON_STATUS, isInactiveStatus } from "../status-codes.js";
+import { loadPageBootstrap } from "../page-engine.js?v=coffee-v150";
 
 renderLayout();
 
@@ -23,14 +24,9 @@ function applyProductSuite(data) {
 }
 
 function refreshProductSuite() {
-  const modifiers = apiGet(scopedApiUrl("/api/modifier?per_page=100", state, session));
-  const ingredients = apiGet(scopedApiUrl("/api/ingredient?per_page=100", state, session));
-  const templates = apiGet(scopedApiUrl("/api/ingredient-template?per_page=100&status=active", state, session));
-  applyProductSuite({
-    modifiers: modifiers?.data?.items || [],
-    ingredients: ingredients?.data?.items || [],
-    ingredientTemplates: templates?.data?.items || []
-  });
+  const response = loadPageBootstrap("modifiers", state, session, { view: "modifiers" });
+  if (!response?.ok) throw new Error(response?.message || "Data modifier belum dapat dimuat.");
+  applyProductSuite(response.data || {});
 }
 
 function postProductSuite(url, payload) {

@@ -1,10 +1,11 @@
 import { renderLayout } from "../layout.js?v=coffee-v150";
-import { apiDelete, apiGet, apiPost, apiPut, applyPermissionControls, canUsePermission, loadSession, loadState, scopedApiUrl, scopedPayload, visibleForSession } from "../store.js?v=coffee-v150";
+import { apiDelete, apiPost, apiPut, appPath, applyPermissionControls, canUsePermission, loadSession, loadState, scopedPayload, visibleForSession } from "../store.js?v=coffee-v150";
 import { formatQty, money, shortDate } from "../format.js";
 import { byId, setText, showAlert, showFeedback } from "../dom.js";
 import { costingMethodLabel, ingredientStockValue, ingredientUnitCost, isStockedProduct } from "../inventory.js";
 import { enhanceAllDataTables } from "../datatable.js";
 import { COMMON_STATUS, isInactiveStatus } from "../status-codes.js";
+import { applyPageBootstrap, loadPageBootstrap } from "../page-engine.js?v=coffee-v154";
 
 renderLayout();
 
@@ -12,23 +13,26 @@ let state = loadState();
 const session = loadSession();
 let standardCostTouched = false;
 let selectedLedgerIngredientId = "all";
+const inventoryView = document.body.dataset.page === "inventory-dashboard" ? "overview" : "list";
+const inventoryPageKey = document.body.dataset.page === "inventory-dashboard" ? "inventoryDashboard" : "inventoryList";
+
+document.querySelectorAll("[data-app-link]").forEach((link) => {
+  link.href = appPath(link.dataset.appLink || link.getAttribute("href") || "/");
+});
 
 function applyInventoryData(data) {
   if (!data) return;
-  if (Array.isArray(data.ingredients)) state.ingredients = data.ingredients;
-  if (Array.isArray(data.stockMovements)) state.stockMovements = data.stockMovements;
+  applyPageBootstrap(state, data, ["ingredients", "ingredientTemplates", "stockMovements", "products"]);
 }
 
 function refreshInventory() {
-  const ingredients = apiGet(scopedApiUrl("/api/ingredient?per_page=100", state, session));
-  const templates = apiGet(scopedApiUrl("/api/ingredient-template?per_page=100&status=active", state, session));
-  const movements = apiGet(scopedApiUrl("/api/stock-movement?per_page=100", state, session));
-  const products = exists("finished-expiry-list") ? apiGet(scopedApiUrl("/api/product?per_page=100", state, session)) : null;
-  if (ingredients?.ok) state.ingredients = ingredients.data?.items || [];
-  if (templates?.ok) state.ingredientTemplates = templates.data?.items || [];
-  if (movements?.ok) state.stockMovements = movements.data?.items || [];
-  if (products?.ok) state.products = products.data?.items || [];
-  return { ok: Boolean(ingredients?.ok && templates?.ok && movements?.ok), ingredients, templates, movements };
+  const response = loadPageBootstrap(inventoryPageKey, state, session, {
+    view: inventoryView,
+    ingredient_per_page: 100,
+    movement_per_page: 100
+  });
+  if (response?.ok) applyInventoryData(response.data);
+  return response;
 }
 
 function postInventory(url, payload) {
@@ -964,7 +968,8 @@ if (exists("modal-edit-template")) {
   byId("modal-edit-template").addEventListener("change", () => fillFromTemplate("modal-edit-template", "modal-edit-name", "modal-edit-category", "modal-edit-unit"));
 }
 
-refreshInventory();
+const bootstrapResponse = refreshInventory();
+if (!bootstrapResponse?.ok) showAlert(bootstrapResponse?.message || "Data inventory belum berhasil dimuat.");
 renderInventory();
 updatePurchasePreview();
 updateWastePreview();

@@ -62,6 +62,9 @@ class JwtAuthFilter implements FilterInterface
 
         if ($method === 'get') {
             if ($apiPath === 'page/pos/bootstrap') return [['pos.transaction', 'read'], ['pos.transaction', 'create']];
+            if ($apiPath === 'page/settings/bootstrap') return [['settings.outlet', 'read'], ['settings.payment', 'read'], ['settings.tables', 'read'], ['settings.packaging', 'read'], ['settings.costing', 'read'], ['company.branding', 'read']];
+            if ($apiPath === 'page/users/bootstrap') return [['users.manage', 'read'], ['roles.manage', 'read'], ['outlets.manage', 'read'], ['admin.companies', 'read']];
+            if ($apiPath === 'page/products/bootstrap') return [['categories.manage', 'read'], ['products.catalog', 'read'], ['modifiers.master', 'read'], ['recipes.template', 'read'], ['recipes.outletMapping', 'read'], ['ingredients.template', 'read']];
             if ($apiPath === 'dashboard') return [['dashboard.overview', 'read']];
             if ($apiPath === 'onboarding') return [['company.branding', 'read'], ['outlets.manage', 'read']];
             if (str_starts_with($apiPath, 'reports/')) return [['reports.profitLoss', 'read'], ['reports.sales', 'read'], ['reports.inventoryLoss', 'read']];

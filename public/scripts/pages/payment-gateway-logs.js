@@ -1,8 +1,9 @@
 import { renderLayout } from "../layout.js?v=coffee-v150";
-import { apiGet, legacyCompanyDbId, loadSession, loadState } from "../store.js?v=coffee-v150";
+import { loadSession, loadState } from "../store.js?v=coffee-v150";
 import { money } from "../format.js";
 import { byId } from "../dom.js";
 import { PAYMENT_STATUS, isPaidStatus, paymentStatusCode, statusLabel } from "../status-codes.js";
+import { loadPageBootstrap } from "../page-engine.js?v=coffee-v154";
 
 renderLayout();
 
@@ -43,28 +44,24 @@ function formatDate(value) {
 }
 
 function queryString() {
-  const params = new URLSearchParams({
-    company_id: String(legacyCompanyDbId(session?.companyId || state.activeCompanyId)),
-    per_page: "100"
-  });
-  const provider = byId("gateway-log-provider").value;
-  const status = byId("gateway-log-status").value;
-  const q = byId("gateway-log-search").value.trim();
-  if (provider) params.set("provider", provider);
-  if (status) params.set("status", status);
-  if (q) params.set("q", q);
-  return params.toString();
+  return {
+    view: "gateway-logs",
+    per_page: "100",
+    provider: byId("gateway-log-provider").value,
+    status: byId("gateway-log-status").value,
+    q: byId("gateway-log-search").value.trim()
+  };
 }
 
 function loadLogs() {
-  const response = apiGet(`/api/payment-gateway-log?${queryString()}`);
+  const response = loadPageBootstrap("paymentGatewayLogs", state, session, queryString());
   if (!response?.ok) {
     logs = [];
     byId("gateway-log-feedback").textContent = response?.message || "Log payment gateway tidak bisa dibuka.";
     renderLogs();
     return;
   }
-  logs = response.data?.items || [];
+  logs = response.data?.gatewayLogs || [];
   byId("gateway-log-feedback").textContent = "";
   renderLogs();
 }

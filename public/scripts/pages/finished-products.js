@@ -1,10 +1,11 @@
 import { renderLayout } from "../layout.js?v=coffee-v150";
-import { apiGet, apiPost, appPath, applyPermissionControls, canUsePermission, loadSession, loadState, scopedApiUrl, scopedPayload, visibleForSession } from "../store.js?v=coffee-v150";
+import { apiPost, applyPermissionControls, canUsePermission, loadSession, loadState, scopedPayload, visibleForSession } from "../store.js?v=coffee-v150";
 import { formatQty, money } from "../format.js";
 import { byId, setText, showAlert, showFeedback } from "../dom.js";
 import { enhanceAllDataTables } from "../datatable.js";
 import { ingredientById, isStockedProduct } from "../inventory.js";
 import { isInactiveStatus } from "../status-codes.js";
+import { applyPageBootstrap, loadPageBootstrap } from "../page-engine.js?v=coffee-v154";
 
 renderLayout();
 
@@ -75,8 +76,12 @@ function produceProduct(productId, payload) {
 }
 
 function refreshProducts() {
-  const products = apiGet(scopedApiUrl("/api/product?per_page=100", state, session));
-  if (products?.ok) state.products = products.data?.items || [];
+  const response = loadPageBootstrap("finishedProducts", state, session, {
+    view: "finished-products",
+    ingredient_per_page: 100
+  });
+  if (response?.ok) applyPageBootstrap(state, response.data, ["products", "ingredients"]);
+  return response;
 }
 
 function daysUntil(dateText) {
@@ -489,5 +494,6 @@ document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") closeModal();
 });
 
-refreshProducts();
+const bootstrapResponse = refreshProducts();
+if (!bootstrapResponse?.ok) showAlert(bootstrapResponse?.message || "Data stok produk belum berhasil dimuat.");
 renderFinishedProducts();

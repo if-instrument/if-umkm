@@ -1,7 +1,8 @@
 import { renderLayout } from "../layout.js?v=coffee-v150";
-import { apiGet, loadSession, loadState, scopedApiUrl } from "../store.js?v=coffee-v150";
+import { loadSession, loadState } from "../store.js?v=coffee-v150";
 import { money } from "../format.js";
 import { byId, setText } from "../dom.js";
+import { loadPageBootstrap } from "../page-engine.js?v=coffee-v154";
 
 renderLayout();
 
@@ -18,14 +19,13 @@ function escapeHtml(value) {
   return String(value ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#039;");
 }
 
-function reportUrl() {
-  const params = new URLSearchParams({ period: period.value || "daily", anchor_date: anchorDate.value || localDateValue() });
-  return scopedApiUrl(`/api/reports/profit-loss?${params.toString()}`, state, session);
-}
-
 function renderPage() {
-  const response = apiGet(reportUrl());
-  const report = response?.data || {};
+  const response = loadPageBootstrap("financeDashboard", state, session, {
+    view: "dashboard",
+    period: period.value || "daily",
+    anchor_date: anchorDate.value || localDateValue()
+  });
+  const report = response?.data?.report || {};
   setText("finance-revenue", money(report.totals?.revenue || 0));
   setText("finance-gross-profit", money(report.totals?.profit || 0));
   setText("finance-expense", money(report.totals?.operatingExpenses || 0));

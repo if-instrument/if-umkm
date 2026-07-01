@@ -1,7 +1,8 @@
 import { renderLayout } from "../layout.js?v=coffee-v150";
-import { apiDelete, apiGet, apiPost, apiPut, applyPermissionControls, canManageCompanyMasters, canUsePermission, legacyOutletDbId, loadSession, loadState, primaryOutletId, scopedApiUrl, scopedPayload, stampScopedMaster, visibleForSession } from "../store.js?v=coffee-v150";
+import { apiDelete, apiPost, apiPut, applyPermissionControls, canManageCompanyMasters, canUsePermission, legacyOutletDbId, loadSession, loadState, primaryOutletId, scopedPayload, stampScopedMaster, visibleForSession } from "../store.js?v=coffee-v150";
 import { byId, showAlert, showFeedback } from "../dom.js";
 import { COMMON_STATUS, isActiveStatus, isInactiveStatus } from "../status-codes.js";
+import { loadPageBootstrap } from "../page-engine.js?v=coffee-v150";
 
 renderLayout();
 
@@ -21,13 +22,10 @@ function escapeHtml(value) {
 }
 
 function refreshData() {
-  const categories = apiGet(scopedApiUrl("/api/category?per_page=100", state, session));
-  const products = apiGet(scopedApiUrl("/api/product?per_page=100", state, session));
-  if (!categories?.ok || !Array.isArray(categories?.data?.items)) {
-    throw new Error(categories?.message || "Daftar kategori belum dapat dimuat dari database.");
-  }
-  state.categories = categories.data.items;
-  state.products = products?.ok && Array.isArray(products?.data?.items) ? products.data.items : [];
+  const response = loadPageBootstrap("categories", state, session, { view: "categories" });
+  if (!response?.ok) throw new Error(response?.message || "Daftar kategori belum dapat dimuat dari database.");
+  state.categories = response.data?.categories || [];
+  state.products = response.data?.products || [];
 }
 
 function postCategory(url, payload) {

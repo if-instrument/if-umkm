@@ -1,0 +1,172 @@
+/* Page-specific styles moved from public/styles.css */
+.company-access-form {
+  margin-top: 6px;
+}
+
+.outlet-checkbox-list {
+  display: grid;
+  gap: 6px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.outlet-checkbox-card {
+  align-items: center;
+  border: 1px solid #eadfd5;
+  border-radius: 6px;
+  display: flex;
+  gap: 8px;
+  margin: 0;
+  min-height: 38px;
+  padding: 7px 9px;
+}
+
+.outlet-checkbox-card input {
+  accent-color: var(--brand);
+  flex: 0 0 auto;
+  height: 14px;
+  width: 14px;
+}
+
+.outlet-checkbox-card span {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.outlet-checkbox-card strong {
+  color: #2f231d;
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+.outlet-checkbox-card small {
+  color: #8a7565;
+  font-size: 9px;
+  font-weight: 760;
+  line-height: 1.2;
+}
+
+.field-label {
+  color: #4d3729;
+  display: block;
+  font-size: 11px;
+  font-weight: 850;
+  margin-bottom: 8px;
+}
+
+.permission-matrix {
+  border: 1px solid #eadfd5;
+  border-radius: 8px;
+  max-height: 300px;
+  overflow: auto;
+}
+
+.permission-row {
+  align-items: center;
+  border-bottom: 1px solid #f0e7df;
+  display: grid;
+  gap: 6px;
+  grid-template-columns: minmax(150px, 1fr) repeat(4, 30px);
+  margin: 0;
+  padding: 6px 9px;
+}
+
+.permission-row:last-child {
+  border-bottom: 0;
+}
+
+.permission-row > span:first-child {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.permission-row strong {
+  color: #2f231d;
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+.permission-row small {
+  color: #8a7565;
+  font-size: 9px;
+  font-weight: 760;
+  line-height: 1.2;
+}
+
+.permission-row input {
+  accent-color: var(--brand);
+  height: 14px;
+  justify-self: center;
+  width: 14px;
+}
+
+.permission-not-applicable {
+  color: #c8b9ab;
+  font-size: 10px;
+  font-weight: 900;
+  justify-self: center;
+}
+
+.permission-header {
+  background: #fbf6f1;
+  color: #765f4d;
+  font-size: 9px;
+  font-weight: 900;
+  position: sticky;
+  text-transform: uppercase;
+  top: 0;
+  z-index: 1;
+}
+
+.permission-header span:not(:first-child) {
+  justify-self: center;
+}
+
+.permission-preview {
+  margin-top: 8px;
+}
+
+.toggle-row {
+  align-items: center;
+  background: #fbf4ed;
+  border: 1px solid #eadfd5;
+  border-radius: 7px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  padding: 10px 12px;
+}
+
+.toggle-row input {
+  accent-color: #6e3a16;
+  height: 16px;
+  width: 16px;
+}
+
+.toggle-row span {
+  display: grid;
+  gap: 2px;
+}
+
+.toggle-row strong {
+  color: #2f2018;
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.toggle-row small {
+  color: #8a796d;
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.theme-swatch {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  border: 1px solid #eadfd5;
+  border-radius: 4px;
+  margin-right: 7px;
+  vertical-align: middle;
+}

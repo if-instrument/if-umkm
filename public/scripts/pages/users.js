@@ -1,8 +1,9 @@
 import { renderLayout } from "../layout.js?v=coffee-v150";
-import { apiDelete, apiGet, apiPost, apiPut, apiUpload, applyPermissionControls, canUsePermission, loadSession, loadState } from "../store.js?v=coffee-v150";
+import { apiDelete, apiPost, apiPut, apiUpload, applyPermissionControls, canUsePermission, loadSession, loadState } from "../store.js?v=coffee-v150";
 import { byId, setText, showAlert, showFeedback } from "../dom.js";
 import { enhanceAllDataTables } from "../datatable.js";
 import { COMMON_STATUS, INVITATION_STATUS, isActiveStatus, isInactiveStatus, statusLabel } from "../status-codes.js";
+import { loadPageBootstrap } from "../page-engine.js?v=coffee-v150";
 
 renderLayout();
 let state = loadState();
@@ -21,20 +22,12 @@ function applyAccessData(data) {
 }
 
 function loadAccessData() {
-  const companies = apiGet("/api/company?per_page=100");
-  const activeCompanyId = isSuperAdmin ? (companies?.data?.items?.[0]?.id || state.activeCompanyId) : session?.companyId;
-  const companyIdParam = activeCompanyId ? `&companyId=${encodeURIComponent(activeCompanyId)}` : "";
-  const numericCompanyId = activeCompanyId === "company-main" ? 1 : String(activeCompanyId || "").replace("company-", "");
-  const outlets = isSuperAdmin ? { data: { items: [] } } : apiGet(`/api/outlet?per_page=100${companyIdParam}`);
-  const roles = isSuperAdmin ? { data: { items: [] } } : apiGet(`/api/role?per_page=100${companyIdParam}`);
-  const users = isSuperAdmin ? { data: { items: [] } } : apiGet(`/api/user?company_id=${numericCompanyId}&per_page=100`);
-  applyAccessData({
-    activeCompanyId,
-    companies: companies?.data?.items || [],
-    outlets: outlets?.data?.items || [],
-    companyRoles: roles?.data?.items || [],
-    users: users?.data?.items || []
-  });
+  const response = loadPageBootstrap("users", state, session);
+  if (!response?.ok) {
+    showFeedback("company-feedback", response?.message || "Data user & role gagal dimuat.");
+    return;
+  }
+  applyAccessData(response.data || {});
 }
 
 function requestAccess(method, url, payload = {}) {

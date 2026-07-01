@@ -1,0 +1,301 @@
+/* Finance page-specific styles */
+.report-metrics {
+  margin-bottom: 0;
+}
+
+.report-filter-form {
+  align-items: end;
+}
+
+.report-period-summary {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f8faf9;
+  padding: 10px 12px;
+}
+
+.report-period-summary span {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.report-period-summary strong {
+  display: block;
+  margin-top: 4px;
+  color: var(--ink);
+}
+
+.report-export-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.report-export-actions .primary-button,
+.report-export-actions .ghost-button {
+  white-space: nowrap;
+}
+
+.pnl-statement {
+  display: grid;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+  background: #ffffff;
+}
+
+.pnl-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 1px solid var(--line);
+  background: #f8faf9;
+  padding: 16px;
+}
+
+.pnl-header span,
+.pnl-header small {
+  display: block;
+  color: var(--muted);
+}
+
+.pnl-header span {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.pnl-header strong {
+  display: block;
+  margin-top: 4px;
+  font-size: 18px;
+}
+
+.pnl-header small {
+  margin-top: 4px;
+  font-size: 12px;
+}
+
+.pnl-badge {
+  flex: 0 0 auto;
+  border: 1px solid #c9d9d4;
+  border-radius: 999px;
+  background: var(--brand-soft);
+  color: var(--brand-strong);
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.pnl-section-label {
+  background: #f2f5f4;
+  border-bottom: 1px solid var(--line);
+  color: var(--brand-strong);
+  padding: 10px 16px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.pnl-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 1px solid var(--line);
+  padding: 12px 16px;
+}
+
+.pnl-row span {
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.pnl-row strong {
+  white-space: nowrap;
+}
+
+.pnl-row.expense-row strong {
+  color: var(--red);
+}
+
+.pnl-row.income-row strong {
+  color: var(--brand-strong);
+}
+
+.pnl-row.total-row,
+.pnl-row.grand-total-row {
+  border-bottom: 0;
+  padding: 14px 16px;
+}
+
+.pnl-row.total-row {
+  background: #fbfcfd;
+  border-bottom: 1px solid var(--line);
+}
+
+.pnl-row.grand-total-row {
+  background: #17211f;
+}
+
+.pnl-row.grand-total-row span,
+.pnl-row.grand-total-row strong {
+  color: #ffffff;
+  font-size: 20px;
+}
+
+.gateway-log-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.gateway-log-detail-grid article {
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+  border: 1px solid #eadbcf;
+  border-radius: 7px;
+  background: #fffaf4;
+}
+
+.gateway-log-detail-grid span {
+  color: #8f7c6f;
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.gateway-log-detail-grid strong {
+  color: #2f2017;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.gateway-hit-log-section {
+  display: grid;
+  gap: 10px;
+  margin: 14px 0;
+}
+
+.gateway-hit-log-section > h4 {
+  margin: 0;
+  color: #2f2017;
+  font-size: 14px;
+}
+
+.gateway-hit-log-card {
+  padding: 12px;
+  border: 1px solid #eadbcf;
+  border-radius: 8px;
+  background: #fffaf4;
+}
+
+.gateway-hit-log-card summary {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.gateway-hit-log-card summary::-webkit-details-marker {
+  display: none;
+}
+
+.gateway-hit-log-card summary::before {
+  content: "+";
+  display: grid;
+  flex: 0 0 24px;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border: 1px solid #d9b99f;
+  border-radius: 6px;
+  color: #6b3a18;
+  font-weight: 900;
+}
+
+.gateway-hit-log-card[open] summary::before {
+  content: "-";
+}
+
+.gateway-hit-log-card summary div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.gateway-hit-log-card summary div:first-child {
+  display: grid;
+  gap: 4px;
+  flex: 1;
+}
+
+.gateway-hit-log-card strong {
+  color: #2f2017;
+}
+
+.gateway-hit-log-card span {
+  color: #7b6a5c;
+  font-size: 11px;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.gateway-hit-log-card .form-note,
+.gateway-hit-log-card .gateway-log-payload-grid {
+  margin-top: 10px;
+}
+
+.gateway-log-payload-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.gateway-log-payload-grid h4 {
+  margin: 0 0 8px;
+  color: #2f2017;
+}
+
+.gateway-log-payload-grid pre {
+  max-height: 360px;
+  overflow: auto;
+  margin: 0;
+  padding: 12px;
+  border: 1px solid #eadbcf;
+  border-radius: 7px;
+  background: #20150f;
+  color: #fff7ed;
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 760px) {
+  .pnl-header,
+  .pnl-section-label,
+  .pnl-row {
+    font-size: 10px;
+  }
+
+  .pnl-row.grand-total-row {
+    background: #43220d;
+  }
+
+  .gateway-log-detail-grid,
+  .gateway-log-payload-grid {
+    grid-template-columns: 1fr;
+  }
+}

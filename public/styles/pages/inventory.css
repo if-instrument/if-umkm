@@ -1,0 +1,26 @@
+/* Inventory page-specific styles */
+.stock-health-list {
+  display: grid;
+  gap: 10px;
+}
+
+.health-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #fffdfb;
+  padding: 12px;
+}
+
+.health-row span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.health-row strong {
+  color: var(--ink);
+  font-size: 18px;
+}
