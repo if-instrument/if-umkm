@@ -177,7 +177,7 @@ async function loadOrderData(outletId = "") {
     const query = new URLSearchParams();
     if (companySlug()) query.set("company", companySlug());
     if (outletId) query.set("outlet_id", outletId);
-    const data = await requestJson(`/api/public/order/bootstrap?${query.toString()}`);
+    const data = await requestJson(`/api/page/order/bootstrap?${query.toString()}`);
     const outlets = data.outlets || [];
     const savedOutletId = saved.outletId && outlets.some((outlet) => String(outlet.id) === String(saved.outletId)) ? saved.outletId : "";
     const requestedOutletId = outletId && outlets.some((outlet) => String(outlet.id) === String(outletId)) ? outletId : "";
@@ -1389,7 +1389,7 @@ function lookupMember() {
     try {
       const query = new URLSearchParams({ outlet_id: outletId, name });
       if (companySlug()) query.set("company", companySlug());
-      const members = await requestJson(`/api/public/order/member?${query.toString()}`);
+      const members = await requestJson(`/api/page/order/member?${query.toString()}`);
       renderMemberSuggestions(members);
     } catch {
       byId("order-member-suggestions").hidden = true;
@@ -1430,7 +1430,7 @@ async function submitOrder() {
       registerMember: byId("order-register-member").checked,
       paymentMethodId: state.paymentMethodId
     };
-    state.orderResult = await requestJson("/api/public/order", { method: "POST", body: JSON.stringify(payload) });
+    state.orderResult = await requestJson("/api/page/order/submit", { method: "POST", body: JSON.stringify(payload) });
     state.spread = "receipt";
     render();
     showFeedback("");

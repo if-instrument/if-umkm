@@ -1,0 +1,69 @@
+<?php
+
+namespace App\Controllers;
+
+use App\Services\Api\OnlineOrderApiService;
+use App\Services\TenantDatabaseService;
+
+class OnlineOrderController extends BaseController
+{
+    public function show()
+    {
+        return $this->renderOrderPage();
+    }
+
+    public function tenant(string $slug)
+    {
+        $company = (new TenantDatabaseService())->companyBySlug($slug);
+        if (! $company) {
+            return $this->response->setStatusCode(404)->setBody('Company route tidak ditemukan.');
+        }
+
+        return $this->renderOrderPage((string) ($company['route_slug'] ?? $slug));
+    }
+
+    public function bootstrap()
+    {
+        return $this->jsonAction(fn () => (new OnlineOrderApiService())->bootstrap($this->request->getGet()));
+    }
+
+    public function member()
+    {
+        return $this->jsonAction(fn () => (new OnlineOrderApiService())->member($this->request->getGet()));
+    }
+
+    public function submit()
+    {
+        return $this->jsonAction(fn () => (new OnlineOrderApiService())->submit($this->request->getJSON(true) ?: []));
+    }
+
+    private function renderOrderPage(string $companySlug = ''): \CodeIgniter\HTTP\ResponseInterface
+    {
+        $target = realpath(FCPATH . 'pages/order.html');
+        $publicRoot = realpath(FCPATH);
+        if (! $target || ! $publicRoot || ! str_starts_with($target, $publicRoot) || ! is_file($target)) {
+            return $this->response->setStatusCode(404)->setBody('Halaman order online tidak ditemukan.');
+        }
+
+        $html = file_get_contents($target) ?: '';
+        $inject = '<base href="/">';
+        if ($companySlug !== '') {
+            $inject .= '<script>window.__COMPANY_SLUG__=' . json_encode($companySlug) . ';</script>';
+        }
+        $html = str_replace('<head>', '<head>' . $inject, $html);
+
+        return $this->response->setContentType('text/html')->setBody($html);
+    }
+
+    private function jsonAction(callable $action)
+    {
+        try {
+            return $this->response->setJSON(['ok' => true, 'data' => $action()]);
+        } catch (\Throwable $exception) {
+            return $this->response->setStatusCode(422)->setJSON([
+                'ok' => false,
+                'message' => $exception->getMessage(),
+            ]);
+        }
+    }
+}

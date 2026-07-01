@@ -1,6 +1,7 @@
 import { isInactiveStatus } from "./status-codes.js";
 
 export const SESSION_KEY = "if-instrument-session";
+export const SESSION_VERSION = 2;
 
 const EMPTY_STATE = {
   activeCompanyId: "company-main",
@@ -61,7 +62,7 @@ export function loadSession() {
 }
 
 export function saveSession(session) {
-  localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+  localStorage.setItem(SESSION_KEY, JSON.stringify({ ...session, contextVersion: SESSION_VERSION }));
 }
 
 export function clearSession() {
@@ -74,6 +75,9 @@ function isValidSessionShape(session) {
     typeof session === "object" &&
     typeof session.token === "string" &&
     session.token.split(".").length === 3 &&
+    session.contextVersion === SESSION_VERSION &&
+    session.accessContext &&
+    typeof session.accessContext === "object" &&
     typeof session.authType === "string" &&
     typeof session.email === "string"
   );

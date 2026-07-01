@@ -11,7 +11,8 @@ $routes->set404Override();
 $routes->setAutoRoute(false);
 
 $routes->get('/', 'LegacyFrontendController::dashboard');
-$routes->get('login', 'LegacyFrontendController::login');
+$routes->get('login', 'LoginController::show');
+$routes->get('login.html', 'LoginController::show');
 
 $routes->group('api', ['namespace' => 'App\Controllers\Api'], static function ($routes) {
     $routes->post('auth/login', 'AuthController::login');
@@ -26,9 +27,16 @@ $routes->group('api', ['namespace' => 'App\Controllers\Api'], static function ($
     $routes->get('public/card-payment/(:segment)', 'SalesController::publicCardPayment/$1');
     $routes->post('public/card-payment/(:segment)/sync', 'SalesController::syncPublicCardPayment/$1');
 });
+$routes->group('api/page', static function ($routes) {
+    $routes->get('login/bootstrap', 'LoginController::bootstrap');
+    $routes->post('login/submit', 'LoginController::submit');
+    $routes->get('order/bootstrap', 'OnlineOrderController::bootstrap');
+    $routes->get('order/member', 'OnlineOrderController::member');
+    $routes->post('order/submit', 'OnlineOrderController::submit');
+});
 $routes->get('payment/card/(:segment)', 'LegacyFrontendController::cardPayment/$1');
 $routes->get('invitation/(:segment)', 'LegacyFrontendController::invitation/$1');
-$routes->get('order', 'LegacyFrontendController::publicOrder');
+$routes->get('order', 'OnlineOrderController::show');
 
 $routes->group('api', ['namespace' => 'App\Controllers\Api', 'filter' => 'jwt-auth'], static function ($routes) {
     $routes->get('company', 'AccessController::listCompanies');
@@ -136,9 +144,9 @@ $routes->group('api', ['namespace' => 'App\Controllers\Api', 'filter' => 'jwt-au
 });
 
 $routes->get('(:segment)', 'LegacyFrontendController::tenantDashboard/$1');
-$routes->get('(:segment)/login', 'LegacyFrontendController::tenantLogin/$1');
-$routes->get('(:segment)/login.html', 'LegacyFrontendController::tenantLogin/$1');
-$routes->get('(:segment)/order', 'LegacyFrontendController::tenantOrder/$1');
+$routes->get('(:segment)/login', 'LoginController::tenant/$1');
+$routes->get('(:segment)/login.html', 'LoginController::tenant/$1');
+$routes->get('(:segment)/order', 'OnlineOrderController::tenant/$1');
 $routes->get('(:segment)/index.html', 'LegacyFrontendController::tenantDashboard/$1');
 $routes->get('(:segment)/pages/pos.html', 'PosController::tenant/$1');
 $routes->get('pages/pos.html', 'PosController::show');

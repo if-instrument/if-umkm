@@ -1,5 +1,5 @@
-import { renderLayout } from "../layout.js?v=coffee-v137";
-import { apiGet, apiPut, appPath, applyPermissionControls, canUsePermission, loadSession, loadState, scopedApiUrl, scopedPayload, visibleForSession } from "../store.js?v=coffee-v137";
+import { renderLayout } from "../layout.js?v=coffee-v150";
+import { apiGet, apiPut, appPath, applyPermissionControls, canUsePermission, loadSession, loadState, scopedApiUrl, scopedPayload, visibleForSession } from "../store.js?v=coffee-v150";
 import { formatQty } from "../format.js";
 import { byId, setText, showAlert } from "../dom.js";
 import { enhanceAllDataTables } from "../datatable.js";

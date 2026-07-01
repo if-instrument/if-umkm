@@ -1,5 +1,5 @@
-import { renderLayout } from "../layout.js?v=coffee-v137";
-import { apiGet, apiPost, apiPut, appPath, applyPermissionControls, canAccessAllOutlets, canManageCompanyMasters, canUsePermission, loadSession, loadState, primaryOutletId, scopedApiUrl, scopedPayload, stampScopedMaster, visibleForSession } from "../store.js?v=coffee-v137";
+import { renderLayout } from "../layout.js?v=coffee-v150";
+import { apiGet, apiPost, apiPut, appPath, applyPermissionControls, canAccessAllOutlets, canManageCompanyMasters, canUsePermission, loadSession, loadState, primaryOutletId, scopedApiUrl, scopedPayload, stampScopedMaster, visibleForSession } from "../store.js?v=coffee-v150";
 import { formatQty, money } from "../format.js";
 import { byId, setText, showAlert } from "../dom.js";
 import { ingredientName, missingModifierOptions, missingModifierSummary, missingRecipeLines, missingRecipeSummary, productAvailability, productCogs, productModifiers } from "../inventory.js";

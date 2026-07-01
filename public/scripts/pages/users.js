@@ -1,5 +1,5 @@
-import { renderLayout } from "../layout.js?v=coffee-v137";
-import { apiDelete, apiGet, apiPost, apiPut, apiUpload, applyPermissionControls, canUsePermission, loadSession, loadState } from "../store.js?v=coffee-v137";
+import { renderLayout } from "../layout.js?v=coffee-v150";
+import { apiDelete, apiGet, apiPost, apiPut, apiUpload, applyPermissionControls, canUsePermission, loadSession, loadState } from "../store.js?v=coffee-v150";
 import { byId, setText, showAlert, showFeedback } from "../dom.js";
 import { enhanceAllDataTables } from "../datatable.js";
 import { COMMON_STATUS, INVITATION_STATUS, isActiveStatus, isInactiveStatus, statusLabel } from "../status-codes.js";

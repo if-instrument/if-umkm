@@ -1,5 +1,5 @@
-import { renderLayout } from "../layout.js?v=coffee-v137";
-import { apiGet, appPath, loadSession, loadState, scopedApiUrl } from "../store.js?v=coffee-v137";
+import { renderLayout } from "../layout.js?v=coffee-v150";
+import { apiGet, appPath, loadSession, loadState, scopedApiUrl } from "../store.js?v=coffee-v150";
 import { byId, setText, showFeedback } from "../dom.js";
 
 renderLayout();

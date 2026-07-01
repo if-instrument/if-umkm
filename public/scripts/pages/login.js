@@ -1,10 +1,12 @@
-import { apiGet, apiPost, appPath, currentCompanySlug, loadSession, saveSession } from "../store.js?v=coffee-v149";
+import { apiGet, apiPost, appPath, currentCompanySlug, loadSession, saveSession } from "../store.js?v=coffee-v150";
 import { byId, setText, showFeedback } from "../dom.js";
 
 const session = loadSession();
 const companySlug = currentCompanySlug();
-const tenant = companySlug ? apiGet(`/api/tenant/${companySlug}`)?.company : null;
-const tenants = !companySlug ? apiGet("/api/tenants")?.companies || [] : [];
+const loginBootstrapQuery = companySlug ? `?companySlug=${encodeURIComponent(companySlug)}` : "";
+const loginBootstrap = apiGet(`/api/page/login/bootstrap${loginBootstrapQuery}`)?.data || {};
+const tenant = loginBootstrap.company || null;
+const tenants = loginBootstrap.companies || [];
 
 if (session) {
   window.location.href = session.authType === "super_admin" ? "/pages/users.html" : appPath("/index.html");
@@ -69,7 +71,7 @@ function fillSample(type) {
 }
 
 function login(email, password) {
-  const result = apiPost("/api/auth/login", { email, password, companySlug });
+  const result = apiPost("/api/page/login/submit", { email, password, companySlug });
   if (!result?.ok || !result.user) {
     showFeedback("login-feedback", result?.message || "Email atau password tidak sesuai.");
     if (result?.routeUrl) {
@@ -98,6 +100,7 @@ function login(email, password) {
     canViewAllOutlets: Boolean(user.canViewAllOutlets || user.outletScope === "all"),
     outletIds: user.outletIds || [],
     selectedOutletId,
+    accessContext: result.accessContext || result.context || {},
     token: result.token,
     loggedInAt: new Date().toISOString()
   });

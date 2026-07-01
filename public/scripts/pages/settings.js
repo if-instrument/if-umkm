@@ -1,5 +1,5 @@
-import { renderLayout } from "../layout.js?v=coffee-v137";
-import { apiDelete, apiGet, apiPost, apiPut, apiUpload, applyPermissionControls, canUsePermission, loadSession, loadState, scopedApiUrl, scopedPayload } from "../store.js?v=coffee-v137";
+import { renderLayout } from "../layout.js?v=coffee-v150";
+import { apiDelete, apiGet, apiPost, apiPut, apiUpload, applyPermissionControls, canUsePermission, loadSession, loadState, scopedApiUrl, scopedPayload } from "../store.js?v=coffee-v150";
 import { formatQty, money } from "../format.js";
 import { byId, setText, showAlert, showFeedback } from "../dom.js";
 import { costingMethodLabel, ingredientUnitCost } from "../inventory.js";
@@ -78,16 +78,13 @@ function deleteSetting(url, payload = {}) {
 }
 
 function refreshSettingsData() {
-  const companyIdParam = session?.companyId ? `&companyId=${encodeURIComponent(session.companyId)}` : "";
-  const companies = apiGet("/api/company?per_page=100");
-  const outlets = apiGet(`/api/outlet?per_page=100${companyIdParam}`);
   const settings = apiGet(scopedApiUrl("/api/setting", state, session));
   const ingredients = apiGet(scopedApiUrl("/api/ingredient?per_page=100", state, session));
   const diningTables = apiGet(scopedApiUrl("/api/dining-table?per_page=100", state, session));
   const paymentMethods = apiGet(scopedApiUrl("/api/payment-method?per_page=100", state, session));
   const packagingRules = apiGet(scopedApiUrl("/api/packaging-rule?per_page=100", state, session));
-  state.companies = companies?.data?.items || [];
-  state.outlets = outlets?.data?.items || [];
+  state.companies = session?.accessContext?.companies || [];
+  state.outlets = session?.accessContext?.outlets || [];
   state.activeCompanyId = session?.companyId || state.activeCompanyId;
   state.settings = { ...state.settings, ...(settings?.data || {}) };
   state.ingredients = (ingredients?.data?.items || []).map((item) => ({ ...item, minStock: item.minStock || 0, avgCost: item.avgCost || 0 }));

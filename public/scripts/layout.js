@@ -1,4 +1,4 @@
-import { apiGet, appPath, applyPermissionControls, canAccessAllOutlets, canUsePermission, clearSession, loadSession, loadState, primaryOutletId, saveSession } from "./store.js?v=coffee-v149";
+import { apiGet, appPath, applyPermissionControls, canAccessAllOutlets, canUsePermission, clearSession, loadSession, loadState, primaryOutletId, saveSession } from "./store.js?v=coffee-v150";
 import { isInactiveStatus } from "./status-codes.js";
 
 const APP_LOGO = "/assets/if-instrument-logo.jpg";
@@ -71,19 +71,14 @@ function canAccessItem(item, state, session) {
 
 function applyAccessState(state, session) {
   if (!session?.token) return state;
-  const companies = apiGet("/api/company?per_page=100");
-  const outlets = apiGet(`/api/outlet?per_page=100${session.companyId ? `&companyId=${encodeURIComponent(session.companyId)}` : ""}`);
-  const roles = apiGet(`/api/role?per_page=100${session.companyId ? `&companyId=${encodeURIComponent(session.companyId)}` : ""}`);
-  const users = session?.authType === "super_admin" ? { data: { items: [] } } : apiGet(`/api/user?per_page=100&company_id=${session?.companyId === "company-main" ? 1 : String(session?.companyId || "").replace("company-", "")}`);
-  if (!companies?.ok || !outlets?.ok || !roles?.ok) return state;
-
-  state.companies = companies.data?.items || state.companies || [];
-  state.outlets = outlets.data?.items || state.outlets || [];
-  state.companyRoles = roles.data?.items || state.companyRoles || [];
-  state.users = users?.data?.items || state.users || [];
-  state.activeCompanyId = session?.authType === "super_admin"
+  const context = session.accessContext || {};
+  state.companies = context.companies || state.companies || [];
+  state.outlets = context.outlets || state.outlets || [];
+  state.companyRoles = context.companyRoles || state.companyRoles || [];
+  state.users = context.users || state.users || [];
+  state.activeCompanyId = context.activeCompanyId || (session?.authType === "super_admin"
     ? state.companies[0]?.id || state.activeCompanyId
-    : session?.companyId || state.companies[0]?.id || state.activeCompanyId;
+    : session?.companyId || state.companies[0]?.id || state.activeCompanyId);
   return state;
 }
 

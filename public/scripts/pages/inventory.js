@@ -1,5 +1,5 @@
-import { renderLayout } from "../layout.js?v=coffee-v137";
-import { apiDelete, apiGet, apiPost, apiPut, applyPermissionControls, canUsePermission, loadSession, loadState, scopedApiUrl, scopedPayload, visibleForSession } from "../store.js?v=coffee-v137";
+import { renderLayout } from "../layout.js?v=coffee-v150";
+import { apiDelete, apiGet, apiPost, apiPut, applyPermissionControls, canUsePermission, loadSession, loadState, scopedApiUrl, scopedPayload, visibleForSession } from "../store.js?v=coffee-v150";
 import { formatQty, money, shortDate } from "../format.js";
 import { byId, setText, showAlert, showFeedback } from "../dom.js";
 import { costingMethodLabel, ingredientStockValue, ingredientUnitCost, isStockedProduct } from "../inventory.js";

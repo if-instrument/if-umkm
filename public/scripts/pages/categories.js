@@ -1,5 +1,5 @@
-import { renderLayout } from "../layout.js?v=coffee-v137";
-import { apiDelete, apiGet, apiPost, apiPut, applyPermissionControls, canManageCompanyMasters, canUsePermission, legacyOutletDbId, loadSession, loadState, primaryOutletId, scopedApiUrl, scopedPayload, stampScopedMaster, visibleForSession } from "../store.js?v=coffee-v137";
+import { renderLayout } from "../layout.js?v=coffee-v150";
+import { apiDelete, apiGet, apiPost, apiPut, applyPermissionControls, canManageCompanyMasters, canUsePermission, legacyOutletDbId, loadSession, loadState, primaryOutletId, scopedApiUrl, scopedPayload, stampScopedMaster, visibleForSession } from "../store.js?v=coffee-v150";
 import { byId, showAlert, showFeedback } from "../dom.js";
 import { COMMON_STATUS, isActiveStatus, isInactiveStatus } from "../status-codes.js";
 

@@ -1,5 +1,5 @@
-import { renderLayout } from "../layout.js?v=coffee-v137";
-import { apiDelete, apiGet, apiPost, apiPut, applyPermissionControls, loadSession, loadState, scopedApiUrl, scopedPayload } from "../store.js?v=coffee-v137";
+import { renderLayout } from "../layout.js?v=coffee-v150";
+import { apiDelete, apiGet, apiPost, apiPut, applyPermissionControls, loadSession, loadState, scopedApiUrl, scopedPayload } from "../store.js?v=coffee-v150";
 import { money } from "../format.js";
 import { byId, setText, showAlert, showFeedback } from "../dom.js";
 import { enhanceAllDataTables } from "../datatable.js";
