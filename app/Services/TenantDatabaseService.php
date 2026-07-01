@@ -73,12 +73,28 @@ class TenantDatabaseService
             return null;
         }
 
-        return $this->centralConnection()
+        $company = $this->centralConnection()
             ->table('companies')
             ->where('route_slug', $slug)
-            ->where('status', 'active')
+            ->whereIn('status', [StatusCodeService::ACTIVE, 'active'])
             ->get()
-            ->getRowArray() ?: null;
+            ->getRowArray();
+        if ($company) {
+            return $company;
+        }
+
+        $normalized = $this->normalizedSlug($slug);
+        foreach ($this->centralConnection()
+            ->table('companies')
+            ->whereIn('status', [StatusCodeService::ACTIVE, 'active'])
+            ->get()
+            ->getResultArray() as $row) {
+            if ($this->normalizedSlug((string) ($row['route_slug'] ?? '')) === $normalized) {
+                return $row;
+            }
+        }
+
+        return null;
     }
 
     public function companyFromClaims(array $claims): ?array
@@ -88,7 +104,7 @@ class TenantDatabaseService
             $company = $this->centralConnection()
                 ->table('companies')
                 ->where('id', $companyId)
-                ->where('status', 'active')
+                ->whereIn('status', [StatusCodeService::ACTIVE, 'active'])
                 ->get()
                 ->getRowArray();
             if ($company) {
@@ -126,5 +142,10 @@ class TenantDatabaseService
         }
 
         return ctype_digit($code) ? (int) $code : 0;
+    }
+
+    private function normalizedSlug(string $slug): string
+    {
+        return strtolower(preg_replace('/[^a-z0-9]+/i', '', $slug) ?? '');
     }
 }

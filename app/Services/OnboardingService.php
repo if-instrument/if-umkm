@@ -91,7 +91,7 @@ class OnboardingService
             $builder->where('company_id', $companyId);
         }
         foreach ($where as $field => $value) $builder->where($field, $value);
-        if ($db->fieldExists('status', $table)) $builder->where('status !=', 'inactive');
+        if ($db->fieldExists('status', $table)) $builder->whereNotIn('status', [StatusCodeService::INACTIVE, 'inactive']);
         return $builder->countAllResults();
     }
 

@@ -56,6 +56,7 @@ $routes->group('api', ['namespace' => 'App\Controllers\Api', 'filter' => 'jwt-au
     $routes->delete('user/(:segment)', 'AccessController::deleteUser/$1');
     $routes->get('dashboard', 'DashboardController::show');
     $routes->get('onboarding', 'OnboardingController::show');
+    $routes->get('page/pos/bootstrap', '\App\Controllers\PosController::bootstrap');
     $routes->get('setting', 'SettingsController::getGeneral');
     $routes->put('setting', 'SettingsController::general');
     $routes->get('printer', 'SettingsController::listPrinters');
@@ -139,4 +140,6 @@ $routes->get('(:segment)/login', 'LegacyFrontendController::tenantLogin/$1');
 $routes->get('(:segment)/login.html', 'LegacyFrontendController::tenantLogin/$1');
 $routes->get('(:segment)/order', 'LegacyFrontendController::tenantOrder/$1');
 $routes->get('(:segment)/index.html', 'LegacyFrontendController::tenantDashboard/$1');
+$routes->get('(:segment)/pages/pos.html', 'PosController::tenant/$1');
+$routes->get('pages/pos.html', 'PosController::show');
 $routes->get('(:segment)/pages/(:any)', 'LegacyFrontendController::tenantPage/$1/$2');

@@ -61,6 +61,7 @@ class JwtAuthFilter implements FilterInterface
         $apiPath = str_starts_with($path, 'api/') ? substr($path, 4) : $path;
 
         if ($method === 'get') {
+            if ($apiPath === 'page/pos/bootstrap') return [['pos.transaction', 'read'], ['pos.transaction', 'create']];
             if ($apiPath === 'dashboard') return [['dashboard.overview', 'read']];
             if ($apiPath === 'onboarding') return [['company.branding', 'read'], ['outlets.manage', 'read']];
             if (str_starts_with($apiPath, 'reports/')) return [['reports.profitLoss', 'read'], ['reports.sales', 'read'], ['reports.inventoryLoss', 'read']];
@@ -149,7 +150,7 @@ class JwtAuthFilter implements FilterInterface
         $user = $db->table('users')
             ->where('id', $userId)
             ->where('email', $email)
-            ->where('status', 'active')
+            ->whereIn('status', [\App\Services\StatusCodeService::ACTIVE, 'active'])
             ->get()
             ->getRowArray();
         if (! $user) {

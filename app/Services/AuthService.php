@@ -40,7 +40,7 @@ class AuthService
         $company = $company ?: ($resolvedCompanyId ? $db->table('companies')->where('id', $resolvedCompanyId)->get()->getRowArray() : null);
         if ($companySlug !== '') {
             if ($user['type'] === 'super_admin') return null;
-            if (! $company || ($company['route_slug'] ?? '') !== $companySlug) return null;
+            if (! $company) return null;
         } elseif ($user['type'] !== 'super_admin') {
             return null;
         }

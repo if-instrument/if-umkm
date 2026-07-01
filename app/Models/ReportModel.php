@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\StatusCodeService;
 use CodeIgniter\Model;
 use Config\Database;
 
@@ -24,7 +25,7 @@ class ReportModel extends Model
         $builder = $db
             ->table('orders')
             ->where('outlet_id', $outletId)
-            ->where('payment_status !=', 'unpaid')
+            ->whereNotIn('payment_status', [StatusCodeService::PAYMENT_UNPAID, 'unpaid', 'pending'])
             ->where('created_at >=', $range['startDateTime'])
             ->where('created_at <=', $range['endDateTime'])
             ->orderBy('created_at', 'DESC');
@@ -96,7 +97,7 @@ class ReportModel extends Model
             ->where('outlet_id', $outletId)
             ->where('expense_date >=', $range['start'])
             ->where('expense_date <=', $range['end'])
-            ->where('status !=', 'void')
+            ->whereNotIn('status', [StatusCodeService::EXPENSE_VOID, 'void'])
             ->orderBy('expense_date', 'DESC')
             ->orderBy('id', 'DESC');
         if ($db->fieldExists('company_id', 'operating_expenses')) {

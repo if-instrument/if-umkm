@@ -4,6 +4,7 @@ import { formatQty, money } from "../format.js";
 import { isStockedProduct, missingRecipeLines, missingRecipeSummary, productCogs } from "../inventory.js";
 import { byId, setText, showAlert, showFeedback } from "../dom.js";
 import { enhanceAllDataTables } from "../datatable.js";
+import { COMMON_STATUS, isInactiveStatus } from "../status-codes.js";
 
 renderLayout();
 
@@ -132,7 +133,7 @@ function renderProducts() {
     const cogs = productCogs(state, product);
     const profit = product.price - cogs;
     const margin = product.price ? (profit / product.price) * 100 : 0;
-    const isInactive = product.status === "inactive";
+    const isInactive = isInactiveStatus(product.status);
     const missingRecipe = missingRecipeLines(state, product);
     const stockedProduct = isStockedProduct(product);
     const recipeStatus = isRetailProduct(product) ? "Siap Jual" : (!product.recipe.length ? "Recipe Kosong" : missingRecipe.length ? "Perlu Mapping Bahan" : "Recipe Siap");
@@ -283,7 +284,7 @@ if (exists("product-price-form")) byId("product-price-form").addEventListener("s
     putProductPrice(productId, {
       price: Number(byId("price-product-outlet").value),
       note: byId("price-product-note").value.trim(),
-      status: "active"
+      status: COMMON_STATUS.ACTIVE
     });
     closePriceModal();
     renderProducts();
@@ -304,11 +305,11 @@ document.addEventListener("click", (event) => {
     const product = state.products.find((item) => item.id === toggleButton.dataset.toggleProduct);
     if (!product) return;
     try {
-      if (product.status === "inactive") putProductSuite(`/api/product/${product.id}`, { ...product, status: "active" });
+      if (isInactiveStatus(product.status)) putProductSuite(`/api/product/${product.id}`, { ...product, status: COMMON_STATUS.ACTIVE });
       else deleteProductSuite(`/api/product/${product.id}`, {});
       const updated = state.products.find((item) => item.id === product.id) || product;
       renderProducts();
-      showFeedback("modal-product-feedback", `${updated.name} ${updated.status === "inactive" ? "dinonaktifkan" : "diaktifkan"} tanpa menghapus data audit.`);
+      showFeedback("modal-product-feedback", `${updated.name} ${isInactiveStatus(updated.status) ? "dinonaktifkan" : "diaktifkan"} tanpa menghapus data audit.`);
     } catch (error) {
       showFeedback("modal-product-feedback", error.message);
     }

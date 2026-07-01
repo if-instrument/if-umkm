@@ -4,6 +4,7 @@ import { formatQty, money, shortDate } from "../format.js";
 import { byId, setText, showAlert, showFeedback } from "../dom.js";
 import { costingMethodLabel, ingredientStockValue, ingredientUnitCost, isStockedProduct } from "../inventory.js";
 import { enhanceAllDataTables } from "../datatable.js";
+import { COMMON_STATUS, isInactiveStatus } from "../status-codes.js";
 
 renderLayout();
 
@@ -62,7 +63,7 @@ function visibleIngredients() {
 }
 
 function visibleTemplates() {
-  return (state.ingredientTemplates || []).filter((item) => item.status !== "inactive");
+  return (state.ingredientTemplates || []).filter((item) => !isInactiveStatus(item.status));
 }
 
 function nextIngredientSku() {
@@ -104,7 +105,7 @@ function writeHtml(id, value) {
 }
 
 function ingredientStatus(item) {
-  if (item.status === "inactive") return { label: "Nonaktif", className: "status-empty", level: "critical" };
+  if (isInactiveStatus(item.status)) return { label: "Nonaktif", className: "status-empty", level: "critical" };
   if (item.stock <= 0) return { label: "Habis", className: "status-empty", level: "critical" };
   if (item.stock <= item.minStock) return { label: "Menipis", className: "status-low", level: "low" };
   return { label: "Aman", className: "status-ok", level: "ok" };
@@ -245,7 +246,7 @@ function renderExpiryDashboard() {
 function renderIngredientOptions() {
   const options = state.ingredients
     .filter((item) => visibleForSession(item, state, session))
-    .filter((item) => item.status !== "inactive")
+    .filter((item) => !isInactiveStatus(item.status))
     .map((item) => `<option value="${item.id}">${item.name} (${item.unit})</option>`)
     .join("");
   if (exists("modal-purchase-ingredient")) byId("modal-purchase-ingredient").innerHTML = options;
@@ -264,7 +265,7 @@ function renderLedgerIngredientOptions() {
 }
 
 function renderTemplateOptions() {
-  const templates = (state.ingredientTemplates || []).filter((item) => item.status !== "inactive");
+  const templates = (state.ingredientTemplates || []).filter((item) => !isInactiveStatus(item.status));
   const usedTemplateIds = new Set(visibleIngredients().map((item) => item.templateId).filter(Boolean));
   const addableTemplates = templates.filter((item) => !usedTemplateIds.has(item.id));
   const addOptions = [
@@ -387,10 +388,10 @@ function renderInventory() {
       const qty = Number(lot.remainingQty || 0);
       const value = qty * unitCost;
       const lotStatus = qty <= 0 ? { label: "Habis", className: "status-empty" } : lotExpiryStatus(lot.expiredAt);
-      const cannotDeactivate = item.status !== "inactive" && Number(item.stock || 0) > 0;
+      const cannotDeactivate = !isInactiveStatus(item.status) && Number(item.stock || 0) > 0;
       const toggleButton = cannotDeactivate
         ? `<button class="ghost-button compact-button" disabled title="Stok harus habis dulu sebelum bahan dinonaktifkan" type="button">Nonaktif</button>`
-        : `<button class="ghost-button compact-button" data-toggle-ingredient="${item.id}" data-permission="inventory.ingredients:delete" type="button">${item.status === "inactive" ? "Aktifkan" : "Nonaktif"}</button>`;
+        : `<button class="ghost-button compact-button" data-toggle-ingredient="${item.id}" data-permission="inventory.ingredients:delete" type="button">${isInactiveStatus(item.status) ? "Aktifkan" : "Nonaktif"}</button>`;
       return `
         <tr>
           <td><strong>${item.name}</strong><br><small>${item.templateName ? `Template: ${item.templateName} · ` : "Belum terhubung template · "}${item.category || item.templateCategory || ""} · ${item.unit}</small></td>
@@ -400,7 +401,7 @@ function renderInventory() {
           <td>${money(value)}</td>
           <td>${lot.manufacturedAt || "-"}</td>
           <td>${lot.expiredAt || "-"}</td>
-          <td><span class="status-pill ${item.status === "inactive" ? "status-empty" : lotStatus.className}">${item.status === "inactive" ? "Nonaktif" : lotStatus.label}</span></td>
+          <td><span class="status-pill ${isInactiveStatus(item.status) ? "status-empty" : lotStatus.className}">${isInactiveStatus(item.status) ? "Nonaktif" : lotStatus.label}</span></td>
           <td>
             <div class="row-actions">
               <button class="ghost-button compact-button" data-purchase-ingredient="${item.id}" data-permission="inventory.purchase:create" type="button">Stok Masuk</button>
@@ -740,7 +741,7 @@ function savePurchase(event) {
     return;
   }
   const ingredient = state.ingredients.find((item) => item.id === byId("modal-purchase-ingredient").value);
-  if (!ingredient || ingredient.status === "inactive") {
+  if (!ingredient || isInactiveStatus(ingredient.status)) {
     showFeedback("modal-purchase-feedback", "Pilih bahan aktif terlebih dahulu.");
     return;
   }
@@ -829,7 +830,7 @@ function saveIngredient(event) {
       standardCost: Number(byId("modal-ingredient-standard-cost").value),
       minStock: Number(byId("modal-ingredient-min").value),
       category: exists("modal-ingredient-category") ? byId("modal-ingredient-category").value.trim() : "Raw Material",
-      status: "active"
+      status: COMMON_STATUS.ACTIVE
     });
     event.target.reset();
     updateIngredientPreview();
@@ -877,16 +878,16 @@ document.addEventListener("click", (event) => {
   if (toggleIngredient && canUsePermission("inventory.ingredients", "delete", state, session)) {
     const ingredient = state.ingredients.find((item) => item.id === toggleIngredient.dataset.toggleIngredient);
     if (!ingredient) return;
-    if (ingredient.status !== "inactive" && Number(ingredient.stock || 0) > 0) {
+    if (!isInactiveStatus(ingredient.status) && Number(ingredient.stock || 0) > 0) {
       writeText("movement-summary", `${ingredient.name} belum bisa dinonaktifkan karena stok masih ${formatQty(ingredient.stock)} ${ingredient.unit}. Habiskan stok dulu.`);
       return;
     }
     try {
-      if (ingredient.status === "inactive") putInventory(`/api/ingredient/${ingredient.id}`, { ...ingredient, status: "active" });
+      if (isInactiveStatus(ingredient.status)) putInventory(`/api/ingredient/${ingredient.id}`, { ...ingredient, status: COMMON_STATUS.ACTIVE });
       else deleteInventory(`/api/ingredient/${ingredient.id}`, {});
       const updated = state.ingredients.find((item) => item.id === ingredient.id) || ingredient;
       renderInventory();
-      writeText("movement-summary", `${updated.name} ${updated.status === "inactive" ? "dinonaktifkan" : "diaktifkan"} tanpa menghapus audit.`);
+      writeText("movement-summary", `${updated.name} ${isInactiveStatus(updated.status) ? "dinonaktifkan" : "diaktifkan"} tanpa menghapus audit.`);
     } catch (error) {
       writeText("movement-summary", error.message);
     }

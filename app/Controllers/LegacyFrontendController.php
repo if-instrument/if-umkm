@@ -2,6 +2,9 @@
 
 namespace App\Controllers;
 
+use App\Services\StatusCodeService;
+use App\Services\TenantDatabaseService;
+
 class LegacyFrontendController extends BaseController
 {
     private array $pageMap = [
@@ -74,7 +77,7 @@ class LegacyFrontendController extends BaseController
 
     public function tenantFile(string $slug, string $path)
     {
-        $company = model(\App\Models\CompanyModel::class)->where('route_slug', $slug)->where('status', 'active')->first();
+        $company = (new TenantDatabaseService())->companyBySlug($slug);
         if (! $company) {
             return $this->response->setStatusCode(404)->setBody('Company route tidak ditemukan.');
         }
@@ -86,7 +89,7 @@ class LegacyFrontendController extends BaseController
         }
 
         $html = file_get_contents($target) ?: '';
-        $html = str_replace('<head>', '<head><base href="/"><script>window.__COMPANY_SLUG__=' . json_encode($slug) . ';</script>', $html);
+        $html = str_replace('<head>', '<head><base href="/"><script>window.__COMPANY_SLUG__=' . json_encode($company['route_slug'] ?? $slug) . ';</script>', $html);
 
         return $this->response->setContentType('text/html')->setBody($html);
     }

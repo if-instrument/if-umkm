@@ -10,12 +10,12 @@ use Config\Database;
 
 class SalesService
 {
-    public const STATUS_PENDING_CASHIER = '00';
-    public const STATUS_WAITING = '10';
-    public const STATUS_PREPARING = '20';
-    public const STATUS_READY = '30';
-    public const STATUS_COMPLETED = '90';
-    public const STATUS_CANCELLED = '99';
+    public const STATUS_PENDING_CASHIER = StatusCodeService::ORDER_PENDING_CASHIER;
+    public const STATUS_WAITING = StatusCodeService::ORDER_WAITING;
+    public const STATUS_PREPARING = StatusCodeService::ORDER_PREPARING;
+    public const STATUS_READY = StatusCodeService::ORDER_READY;
+    public const STATUS_COMPLETED = StatusCodeService::ORDER_COMPLETED;
+    public const STATUS_CANCELLED = StatusCodeService::ORDER_CANCELLED;
 
     private $db;
     private SalesModel $sales;
@@ -62,15 +62,16 @@ class SalesService
 
     public function orderPage(int $companyId, int $outletId, array $filters = []): array
     {
-        $orders = $this->sales->orders($companyId, $outletId);
+        $orders = $this->sales->orders($companyId, $outletId, $filters);
         if (($filters['status'] ?? '') !== '') {
             $filterStatus = $this->normalizeStatus((string) $filters['status']);
             $orders = array_values(array_filter($orders, fn ($order) => $this->normalizeStatus((string) ($order['status'] ?? '')) === $filterStatus));
         }
         if (($filters['payment_status'] ?? '') !== '') {
-            $orders = array_values(array_filter($orders, fn ($order) => $order['payment_status'] === $filters['payment_status']));
+            $filterPaymentStatus = StatusCodeService::payment((string) $filters['payment_status']);
+            $orders = array_values(array_filter($orders, fn ($order) => StatusCodeService::payment($order['payment_status'] ?? '') === $filterPaymentStatus));
         }
-        if (($filters['date'] ?? '') !== '') {
+        if (($filters['date'] ?? '') !== '' && ! filter_var($filters['include_open'] ?? $filters['includeOpen'] ?? false, FILTER_VALIDATE_BOOLEAN)) {
             $orders = array_values(array_filter($orders, fn ($order) => str_starts_with((string) $order['created_at'], (string) $filters['date'])));
         }
         $items = $this->sales->orderItems(array_column($orders, 'id'));
@@ -113,7 +114,7 @@ class SalesService
             'status' => $status,
             'status_updated_at' => date('Y-m-d H:i:s'),
         ];
-        if ($status === self::STATUS_COMPLETED && $order['payment_status'] !== 'unpaid') {
+        if ($status === self::STATUS_COMPLETED && ! StatusCodeService::isUnpaid($order['payment_status'] ?? '')) {
             $data['paid_at'] = $order['paid_at'] ?: date('Y-m-d H:i:s');
         }
         $this->orders->update($orderId, $data);
@@ -147,7 +148,7 @@ class SalesService
             $this->applyUsageDiff([], $items, $companyId, $outletId, $orderId, $order['order_no']);
         }
         $this->orders->update($orderId, [
-            'payment_status' => 'paid',
+            'payment_status' => StatusCodeService::PAYMENT_PAID,
             'payment_method' => $paymentMethod ?: 'Settlement',
             'cash_tendered' => (float) ($payment['cashTendered'] ?? 0),
             'change_due' => (float) ($payment['changeDue'] ?? 0),
@@ -182,7 +183,7 @@ class SalesService
         $this->db->transStart();
         $this->applyUsageDiff([], $items, $companyId, $outletId, $orderId, $order['order_no']);
         $this->orders->update($orderId, [
-            'payment_status' => 'paid',
+            'payment_status' => StatusCodeService::PAYMENT_PAID,
             'payment_method' => $paymentMethod ?: 'Cash',
             'cash_tendered' => (float) ($payment['cashTendered'] ?? 0),
             'change_due' => (float) ($payment['changeDue'] ?? 0),
@@ -237,13 +238,13 @@ class SalesService
             'status' => $initialStatus,
             'status_updated_at' => $now,
             'ready_item_keys' => json_encode([]),
-            'payment_status' => $payload['paymentStatus'] ?? 'paid',
+            'payment_status' => StatusCodeService::payment($payload['paymentStatus'] ?? 'paid', StatusCodeService::PAYMENT_PAID),
             'payment_method' => $payload['paymentMethod'] ?? null,
             'cash_tendered' => (float) ($payload['cashTendered'] ?? 0),
             'change_due' => (float) ($payload['changeDue'] ?? 0),
             'payment_provider' => $payload['paymentProvider'] ?? null,
             'payment_reference' => $payload['paymentReference'] ?? null,
-            'paid_at' => ($payload['paymentStatus'] ?? 'paid') === 'paid' ? $now : null,
+            'paid_at' => StatusCodeService::isPaid($payload['paymentStatus'] ?? 'paid') ? $now : null,
             'subtotal' => (float) ($payload['productRevenue'] ?? 0),
             'packaging_fee' => (float) ($payload['packagingFee'] ?? 0),
             'payment_fee' => (float) ($payload['paymentFee'] ?? 0),
@@ -266,7 +267,7 @@ class SalesService
         $this->db->transComplete();
 
         $detail = $this->orderDetail((string) $orderId, $companyId, $outletId);
-        if (($payload['paymentStatus'] ?? 'paid') === 'paid') {
+        if (StatusCodeService::isPaid($payload['paymentStatus'] ?? 'paid')) {
             $this->notifyPaidOrder($orderId);
         }
         return $detail;
@@ -279,7 +280,7 @@ class SalesService
             throw new \InvalidArgumentException('Pesanan tidak ditemukan.');
         }
         $currentStatus = $this->normalizeStatus((string) ($order['status'] ?? ''));
-        if ($order['payment_status'] !== 'unpaid' || ! in_array($currentStatus, [self::STATUS_PENDING_CASHIER, self::STATUS_WAITING], true)) {
+        if (! StatusCodeService::isUnpaid($order['payment_status'] ?? '') || ! in_array($currentStatus, [self::STATUS_PENDING_CASHIER, self::STATUS_WAITING], true)) {
             throw new \InvalidArgumentException('Pesanan hanya bisa diedit saat masih baru dan belum dibayar.');
         }
 
@@ -465,7 +466,7 @@ class SalesService
         $lotBuilder = $this->db->table('product_batches')
             ->where('outlet_id', $outletId)
             ->where('product_id', $productId)
-            ->where('status', 'active')
+            ->whereIn('status', [StatusCodeService::ACTIVE, 'active'])
             ->where('qty_remaining >', 0)
             ->orderBy('expired_at IS NULL', 'ASC', false)
             ->orderBy('expired_at', 'ASC')
@@ -629,9 +630,9 @@ class SalesService
             'profit' => (float) $order['gross_profit'],
             'tax' => $tax,
             'total' => (float) $order['grand_total'],
-            'paymentStatus' => $order['payment_status'],
+            'paymentStatus' => StatusCodeService::payment($order['payment_status'] ?? ''),
             'paidAt' => $this->isoDate($order['paid_at'] ?? null),
-            'paymentMethod' => $order['payment_method'] ?: ($order['payment_status'] === 'paid' ? 'Cash' : 'Belum dibayar'),
+            'paymentMethod' => $order['payment_method'] ?: (StatusCodeService::isPaid($order['payment_status'] ?? '') ? 'Cash' : 'Belum dibayar'),
             'cashTendered' => (float) ($order['cash_tendered'] ?? 0),
             'changeDue' => (float) ($order['change_due'] ?? 0),
             'paymentProvider' => $order['payment_provider'] ?? '',
@@ -641,15 +642,7 @@ class SalesService
 
     private function normalizeStatus(string $status): string
     {
-        return match ($status) {
-            'pending_cashier', self::STATUS_PENDING_CASHIER => self::STATUS_PENDING_CASHIER,
-            'waiting', self::STATUS_WAITING => self::STATUS_WAITING,
-            'preparing', self::STATUS_PREPARING => self::STATUS_PREPARING,
-            'ready', self::STATUS_READY => self::STATUS_READY,
-            'completed', self::STATUS_COMPLETED => self::STATUS_COMPLETED,
-            'cancelled', self::STATUS_CANCELLED => self::STATUS_CANCELLED,
-            default => self::STATUS_WAITING,
-        };
+        return StatusCodeService::order($status, self::STATUS_WAITING);
     }
 
     private function orderItemPayloads(array $items): array

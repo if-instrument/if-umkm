@@ -1,3 +1,5 @@
+import { isInactiveStatus } from "./status-codes.js";
+
 export const SESSION_KEY = "if-instrument-session";
 
 const EMPTY_STATE = {
@@ -43,6 +45,10 @@ export function loadSession() {
 
   try {
     const session = JSON.parse(saved);
+    if (!isValidSessionShape(session)) {
+      clearSession();
+      return null;
+    }
     if (isJwtExpired(session?.token)) {
       clearSession();
       return null;
@@ -60,6 +66,17 @@ export function saveSession(session) {
 
 export function clearSession() {
   localStorage.removeItem(SESSION_KEY);
+}
+
+function isValidSessionShape(session) {
+  return Boolean(
+    session &&
+    typeof session === "object" &&
+    typeof session.token === "string" &&
+    session.token.split(".").length === 3 &&
+    typeof session.authType === "string" &&
+    typeof session.email === "string"
+  );
 }
 
 export function currentCompanySlug() {
@@ -80,7 +97,7 @@ export function primaryOutletId(state, session = loadSession()) {
   const companyId = session?.companyId || state.activeCompanyId;
   if (session?.selectedOutletId) return session.selectedOutletId;
   if (session?.outletIds?.length) return session.outletIds[0];
-  return state.outlets?.find((outlet) => outlet.companyId === companyId && outlet.status !== "inactive")?.id || state.outlets?.[0]?.id || "";
+  return state.outlets?.find((outlet) => outlet.companyId === companyId && !isInactiveStatus(outlet.status))?.id || state.outlets?.[0]?.id || "";
 }
 
 export function canAccessAllOutlets(session) {

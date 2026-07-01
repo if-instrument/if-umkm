@@ -119,8 +119,7 @@ class ProfitLossService
     public function saveExpense(array $payload, int $companyId = 1, int $outletId = 1): array
     {
         $id = $this->numericId($payload['id'] ?? null);
-        $status = $payload['status'] ?? 'posted';
-        $status = in_array($status, ['posted', 'draft', 'void'], true) ? $status : 'posted';
+        $status = StatusCodeService::expense($payload['status'] ?? 'posted');
         $row = $this->withCompanyData('operating_expenses', [
             'company_id' => $companyId,
             'outlet_id' => $outletId,
@@ -159,7 +158,7 @@ class ProfitLossService
         if (! $row || ! $this->rowBelongsToCompany($row, $companyId) || (int) $row['outlet_id'] !== $outletId) {
             throw new \InvalidArgumentException('Beban operasional tidak ditemukan.');
         }
-        $this->expenses->update($id, ['status' => 'void']);
+        $this->expenses->update($id, ['status' => StatusCodeService::EXPENSE_VOID]);
         return $this->expensePayload($this->expenses->find($id));
     }
 
@@ -198,7 +197,7 @@ class ProfitLossService
             'vendor' => $expense['vendor'] ?? '',
             'referenceNo' => $expense['reference_no'] ?? '',
             'notes' => $expense['notes'] ?? '',
-            'status' => $expense['status'] ?? 'posted',
+            'status' => StatusCodeService::expense($expense['status'] ?? 'posted'),
         ];
     }
 

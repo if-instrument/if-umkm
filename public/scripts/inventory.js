@@ -1,4 +1,4 @@
-import { ORDER_STATUS, orderStatusIs } from "./order-status.js";
+import { ORDER_STATUS, isInactiveStatus, orderStatusIs } from "./status-codes.js";
 
 export function ingredientById(state, id) {
   return state.ingredients.find((item) => item.id === id);
@@ -16,7 +16,7 @@ export function ingredientName(state, id) {
 export function missingRecipeLines(state, product) {
   return (product?.recipe || []).filter((line) => {
     const ingredient = ingredientById(state, line.ingredientId);
-    return Boolean(!line.ingredientId || !ingredient || ingredient.status === "inactive");
+    return Boolean(!line.ingredientId || !ingredient || isInactiveStatus(ingredient.status));
   });
 }
 
@@ -27,8 +27,8 @@ export function missingModifierOptions(state, modifier) {
     return Boolean(
       !option.ingredientId ||
       !ingredient ||
-      ingredient.status === "inactive" ||
-      (option.action === "replace" && (!option.replacementIngredientId || !replacement || replacement.status === "inactive"))
+      isInactiveStatus(ingredient.status) ||
+      (option.action === "replace" && (!option.replacementIngredientId || !replacement || isInactiveStatus(replacement.status)))
     );
   });
 }
@@ -108,7 +108,7 @@ export function productCogs(state, product) {
 export function productModifiers(state, product) {
   const masterModifiers = Array.isArray(state.modifiers) ? state.modifiers : [];
   const assignedIds = product.modifierIds || [];
-  const assignedMaster = masterModifiers.filter((modifier) => assignedIds.includes(modifier.id) && modifier.status !== "inactive");
+  const assignedMaster = masterModifiers.filter((modifier) => assignedIds.includes(modifier.id) && !isInactiveStatus(modifier.status));
   const legacy = (product.modifiers || []).filter((modifier) => !assignedMaster.some((item) => item.id === modifier.id));
   return [...assignedMaster, ...legacy];
 }
@@ -194,7 +194,7 @@ export function productAvailabilityWithModifiers(state, product, modifierIds = [
     const ingredient = ingredientById(state, line.ingredientId);
     const heldQty = reservations.ingredients.get(line.ingredientId) || 0;
     const availableStock = ingredient ? Math.max(0, Number(ingredient.stock || 0) - heldQty) : 0;
-    return ingredient && ingredient.status !== "inactive" ? Math.floor(availableStock / line.qty) : 0;
+    return ingredient && !isInactiveStatus(ingredient.status) ? Math.floor(availableStock / line.qty) : 0;
   }));
 }
 
@@ -209,7 +209,7 @@ export function productAvailability(state, product) {
       const ingredient = ingredientById(state, line.ingredientId);
       const heldQty = reservations.ingredients.get(line.ingredientId) || 0;
       const availableStock = ingredient ? Math.max(0, Number(ingredient.stock || 0) - heldQty) : 0;
-      return ingredient && ingredient.status !== "inactive" ? Math.floor(availableStock / line.qty) : 0;
+      return ingredient && !isInactiveStatus(ingredient.status) ? Math.floor(availableStock / line.qty) : 0;
     })
   );
 }

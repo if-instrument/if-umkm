@@ -12,7 +12,7 @@ class OrderNotificationService
         try {
             $db = Database::connect();
             $order = $db->table('orders')->where('id', $orderId)->get()->getRowArray();
-            if (! $order || ($order['payment_status'] ?? '') !== 'paid') return false;
+            if (! $order || ! StatusCodeService::isPaid($order['payment_status'] ?? '')) return false;
             return $this->sendOrderReceiptEmail($orderId, 'Receipt pembayaran berhasil');
         } catch (\Throwable) {
             return false;
@@ -62,7 +62,7 @@ class OrderNotificationService
 
         $adminModel = new UserModel();
         if ($db->fieldExists('company_id', 'users')) $adminModel->where('company_id', $companyId);
-        foreach ($adminModel->where('type', 'company_admin')->where('status', 'active')->findAll() as $user) {
+        foreach ($adminModel->where('type', 'company_admin')->whereIn('status', [StatusCodeService::ACTIVE, 'active'])->findAll() as $user) {
             $emails[] = $user['email'] ?? '';
         }
 
@@ -72,7 +72,7 @@ class OrderNotificationService
                 ->join('user_outlets uo', 'uo.user_id = u.id', 'inner')
                 ->join('user_roles ur', 'ur.user_id = u.id', 'left')
                 ->join('roles r', 'r.id = ur.role_id', 'left')
-                ->where('u.status', 'active')
+                ->whereIn('u.status', [StatusCodeService::ACTIVE, 'active'])
                 ->where('uo.outlet_id', $outletId)
                 ->groupStart()
                 ->like('LOWER(r.name)', 'admin')

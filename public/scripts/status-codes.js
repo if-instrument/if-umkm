@@ -13,6 +13,15 @@ export const PAYMENT_STATUS = {
   CANCELLED: "99"
 };
 
+export const ORDER_STATUS = {
+  PENDING_CASHIER: "00",
+  WAITING: "10",
+  PREPARING: "20",
+  READY: "30",
+  COMPLETED: "90",
+  CANCELLED: "99"
+};
+
 export const INVITATION_STATUS = {
   PENDING: "00",
   SENT: "10",
@@ -38,6 +47,22 @@ export const EXPENSE_STATUS = {
   POSTED: "10",
   VOID: "99"
 };
+
+export const orderStatusLabels = {
+  [ORDER_STATUS.PENDING_CASHIER]: "Menunggu Kasir",
+  [ORDER_STATUS.WAITING]: "Pesanan Baru",
+  [ORDER_STATUS.PREPARING]: "Diproses",
+  [ORDER_STATUS.READY]: "Siap Diambil",
+  [ORDER_STATUS.COMPLETED]: "Selesai",
+  [ORDER_STATUS.CANCELLED]: "Dibatalkan"
+};
+
+export const openOrderStatuses = [
+  ORDER_STATUS.PENDING_CASHIER,
+  ORDER_STATUS.WAITING,
+  ORDER_STATUS.PREPARING,
+  ORDER_STATUS.READY
+];
 
 const normalize = (status) => String(status ?? "").trim().toLowerCase();
 const isCode = (status) => /^\d{2}$/.test(String(status ?? ""));
@@ -77,6 +102,18 @@ export function paymentStatusCode(status, fallback = PAYMENT_STATUS.UNPAID) {
     expired: PAYMENT_STATUS.EXPIRED,
     cancelled: PAYMENT_STATUS.CANCELLED,
     canceled: PAYMENT_STATUS.CANCELLED
+  }, fallback);
+}
+
+export function orderStatusCode(status, fallback = ORDER_STATUS.WAITING) {
+  return codeFor(status, {
+    pending_cashier: ORDER_STATUS.PENDING_CASHIER,
+    waiting: ORDER_STATUS.WAITING,
+    preparing: ORDER_STATUS.PREPARING,
+    ready: ORDER_STATUS.READY,
+    completed: ORDER_STATUS.COMPLETED,
+    cancelled: ORDER_STATUS.CANCELLED,
+    canceled: ORDER_STATUS.CANCELLED
   }, fallback);
 }
 
@@ -141,6 +178,23 @@ export function isUnpaidStatus(status) {
   return paymentStatusCode(status) === PAYMENT_STATUS.UNPAID;
 }
 
+export function orderStatusIs(status, code) {
+  return orderStatusCode(status) === code;
+}
+
+export function orderStatusIn(status, codes) {
+  return codes.includes(orderStatusCode(status));
+}
+
+export function orderStatusClass(status) {
+  return `status-${orderStatusCode(status)}`;
+}
+
+export function orderStatusLabel(status) {
+  const code = orderStatusCode(status);
+  return orderStatusLabels[code] || code || "-";
+}
+
 export function statusLabel(status, domain = "common") {
   const labels = {
     common: { "00": "Draft", "10": "Aktif", "90": "Nonaktif", "99": "Dihapus" },
@@ -148,9 +202,11 @@ export function statusLabel(status, domain = "common") {
     connector: { "00": "Belum dikonfigurasi", "10": "Ready", "90": "Nonaktif" },
     invitation: { "00": "Pending", "10": "Terkirim", "20": "Aktif", "30": "Gagal", "90": "Diganti", "99": "Expired" },
     recipe: { "00": "Draft", "10": "Ready" },
-    expense: { "00": "Draft", "10": "Posted", "99": "Void" }
+    expense: { "00": "Draft", "10": "Posted", "99": "Void" },
+    order: orderStatusLabels
   };
   const code = {
+    order: orderStatusCode,
     payment: paymentStatusCode,
     connector: connectorStatusCode,
     invitation: invitationStatusCode,

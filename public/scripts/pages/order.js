@@ -1,4 +1,5 @@
 import { effectiveRecipe, ingredientById, isStockedProduct, modifierPrice, productModifierOptions } from "../inventory.js";
+import { isActiveStatus, isInactiveStatus, statusLabel } from "../status-codes.js";
 
 const rupiah = new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 });
 
@@ -250,7 +251,7 @@ function enabledServices() {
 }
 
 function activePaymentMethods() {
-  return (state.settings.paymentMethods || []).filter((method) => method.status === "active");
+  return (state.settings.paymentMethods || []).filter((method) => isActiveStatus(method.status));
 }
 
 function hasMultipleOutlets() {
@@ -640,7 +641,7 @@ function renderTables() {
     byId("order-table-choices").innerHTML = "";
     return;
   }
-  const tables = (state.settings.diningTables || []).filter((table) => table.status === "active");
+  const tables = (state.settings.diningTables || []).filter((table) => isActiveStatus(table.status));
   if (!state.tableName && tables.length) state.tableName = tables[0].name;
   byId("order-table-choices").innerHTML = tables.length ? tables.map((table) => `
     <button class="public-choice-card ${table.name === state.tableName ? "active" : ""}" data-table-name="${escapeHtml(table.name)}" type="button">
@@ -657,7 +658,7 @@ function serviceDescription(label) {
 }
 
 function renderCategories() {
-  const visibleCategories = state.categories.filter((category) => category.status !== "inactive");
+  const visibleCategories = state.categories.filter((category) => !isInactiveStatus(category.status));
   byId("order-categories").innerHTML = [
     `<button class="${state.categoryId === "all" ? "active" : ""}" data-category-id="all" type="button">Semua</button>`,
     ...visibleCategories.map((category) => `<button class="${state.categoryId === category.id ? "active" : ""}" data-category-id="${category.id}" type="button">${escapeHtml(category.name)}</button>`)
@@ -667,7 +668,7 @@ function renderCategories() {
 function renderProducts() {
   const search = byId("order-search").value.trim().toLowerCase();
   const products = state.products
-    .filter((product) => product.status === "active")
+    .filter((product) => isActiveStatus(product.status))
     .filter((product) => state.categoryId === "all" || product.categoryId === state.categoryId)
     .filter((product) => !search || `${product.name} ${product.description || ""} ${product.category || ""}`.toLowerCase().includes(search));
 
@@ -877,7 +878,7 @@ function renderBill() {
       <div class="public-receipt-meta">
         <div><span>ORDER</span><strong>#${escapeHtml(order.orderNumber || "PREVIEW")}</strong></div>
         <div><span>TANGGAL</span><strong>${escapeHtml(receiptDate(order.createdAt))}</strong></div>
-        <div><span>STATUS</span><strong>${escapeHtml(order.paymentStatus || (result ? "unpaid" : "preview"))}</strong></div>
+        <div><span>STATUS</span><strong>${escapeHtml(order.paymentStatus ? statusLabel(order.paymentStatus, "payment") : (result ? "Belum Bayar" : "Preview"))}</strong></div>
         <div><span>CUSTOMER</span><strong>${escapeHtml(byId("order-customer-name").value.trim() || "-")}</strong></div>
       </div>
       ${billRows(order.total || totals.total, order)}
@@ -1052,7 +1053,7 @@ function calculateTotals() {
 function packagingFeeEstimate() {
   if (!["Take Away", "Delivery"].includes(state.serviceType)) return 0;
   const qty = state.cart.reduce((sum, line) => sum + line.qty, 0);
-  const rule = (state.settings.packagingRules || []).find((item) => item.status !== "inactive" && qty >= item.minQty && qty <= item.maxQty);
+  const rule = (state.settings.packagingRules || []).find((item) => !isInactiveStatus(item.status) && qty >= item.minQty && qty <= item.maxQty);
   return rule ? (rule.items || []).reduce((sum, line) => sum + Number(line.price || 0) * Number(line.qty || 0), 0) : 0;
 }
 
@@ -1225,7 +1226,7 @@ function maxQtyForConfig(product, modifierIds = [], excludeLineId = "") {
   return Math.max(0, Math.min(...recipe.map((line) => {
     const ingredient = ingredientById(state, line.ingredientId);
     const perItemQty = Number(line.qty || 0);
-    if (!ingredient || ingredient.status === "inactive" || perItemQty <= 0) return 0;
+    if (!ingredient || isInactiveStatus(ingredient.status) || perItemQty <= 0) return 0;
     const remaining = Number(ingredient.stock || 0) - (reservations.ingredients.get(line.ingredientId) || 0);
     return Math.floor(remaining / perItemQty);
   })));

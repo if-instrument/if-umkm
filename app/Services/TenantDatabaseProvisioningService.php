@@ -102,7 +102,7 @@ class TenantDatabaseProvisioningService
             'db_username' => $company['db_username'] ?? null,
             'db_password' => $company['db_password'] ?? null,
             'db_port' => $company['db_port'] ?? null,
-            'status' => $company['status'] ?? 'active',
+            'status' => StatusCodeService::common($company['status'] ?? 'active'),
             'updated_at' => $now,
         ];
 
@@ -132,7 +132,7 @@ class TenantDatabaseProvisioningService
             'email' => $email,
             'password_hash' => $admin['password_hash'] ?? password_hash(bin2hex(random_bytes(32)), PASSWORD_DEFAULT),
             'type' => 'company_admin',
-            'status' => $admin['status'] ?? 'invited',
+            'status' => StatusCodeService::common($admin['status'] ?? 'invited', StatusCodeService::DRAFT),
             'created_at' => $now,
             'updated_at' => $now,
         ], $companyId));

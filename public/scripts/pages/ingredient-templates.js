@@ -2,6 +2,7 @@ import { renderLayout } from "../layout.js?v=coffee-v137";
 import { apiDelete, apiGet, apiPost, apiPut, applyPermissionControls, canUsePermission, loadSession, loadState, scopedApiUrl, scopedPayload } from "../store.js?v=coffee-v137";
 import { byId, setText, showAlert } from "../dom.js";
 import { enhanceAllDataTables } from "../datatable.js";
+import { COMMON_STATUS, isInactiveStatus } from "../status-codes.js";
 
 renderLayout();
 
@@ -66,7 +67,7 @@ function deactivateTemplate(id) {
 function renderTemplates() {
   byId("template-table").innerHTML = templates.length
     ? templates.map((template) => {
-      const inactive = template.status === "inactive";
+      const inactive = isInactiveStatus(template.status);
       return `
         <tr>
           <td>${escapeHtml(template.code || template.id)}</td>
@@ -169,10 +170,10 @@ document.addEventListener("click", (event) => {
     const template = templates.find((item) => item.id === toggleButton.dataset.toggleTemplate);
     if (!template) return;
     try {
-      if (template.status === "inactive") saveTemplate(`/api/ingredient-template/${template.id}`, { ...template, status: "active" }, "put");
+      if (isInactiveStatus(template.status)) saveTemplate(`/api/ingredient-template/${template.id}`, { ...template, status: COMMON_STATUS.ACTIVE }, "put");
       else deactivateTemplate(template.id);
       renderTemplates();
-      showAlert(`Template ${template.name} ${template.status === "inactive" ? "diaktifkan" : "dinonaktifkan"}.`);
+      showAlert(`Template ${template.name} ${isInactiveStatus(template.status) ? "diaktifkan" : "dinonaktifkan"}.`);
     } catch (error) {
       setText("template-feedback", error.message);
     }

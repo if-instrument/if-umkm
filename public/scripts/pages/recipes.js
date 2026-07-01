@@ -4,6 +4,7 @@ import { formatQty, money } from "../format.js";
 import { byId, setText, showAlert } from "../dom.js";
 import { ingredientName, missingModifierOptions, missingModifierSummary, missingRecipeLines, missingRecipeSummary, productAvailability, productCogs, productModifiers } from "../inventory.js";
 import { enhanceAllDataTables } from "../datatable.js";
+import { COMMON_STATUS, isInactiveStatus } from "../status-codes.js";
 
 renderLayout();
 
@@ -61,7 +62,7 @@ function createIngredientTemplateFromRecipe() {
     name,
     category,
     unit,
-    status: "active"
+    status: COMMON_STATUS.ACTIVE
   });
   const created = response?.data || response?.template || null;
   const template = created?.id
@@ -91,7 +92,7 @@ function nextIngredientSku() {
 }
 
 function visibleTemplates() {
-  return (state.ingredientTemplates || []).filter((template) => template.status !== "inactive");
+  return (state.ingredientTemplates || []).filter((template) => !isInactiveStatus(template.status));
 }
 
 function templateById(templateId) {
@@ -99,7 +100,7 @@ function templateById(templateId) {
 }
 
 function ingredientForTemplate(templateId) {
-  return visibleIngredients().find((ingredient) => ingredient.templateId === templateId && ingredient.status !== "inactive");
+  return visibleIngredients().find((ingredient) => ingredient.templateId === templateId && !isInactiveStatus(ingredient.status));
 }
 
 function visibleModifiers() {
@@ -180,7 +181,7 @@ function createIngredientTemplateFromModifierOption(prefix, config) {
   if (!name || !category || !unit) {
     throw new Error("Isi nama template, kategori, dan satuan untuk template bahan baru di modifier.");
   }
-  const response = postProductSuite("/api/ingredient-template", { name, category, unit, status: "active" });
+  const response = postProductSuite("/api/ingredient-template", { name, category, unit, status: COMMON_STATUS.ACTIVE });
   const created = response?.data || response?.template || null;
   const template = created?.id
     ? created
@@ -554,7 +555,7 @@ function saveModifierMaterialAndUse(config, prefix) {
       totalCost,
       standardCost: Number(wrapper.querySelector(`[data-option-${prefix}-material-standard]`).value) || fallbackCost,
       minStock: Number(wrapper.querySelector(`[data-option-${prefix}-material-min]`).value) || 0,
-      status: "active"
+      status: COMMON_STATUS.ACTIVE
     });
     const ingredient = ingredientForTemplate(templateId);
     drafts.forEach((draft) => {
@@ -653,8 +654,8 @@ function modifierDescription(modifier) {
 
 function modifierOptionSummary(modifier) {
   return (modifier.options || []).slice(0, 4).map((option) => {
-    const ingredientExists = state.ingredients.some((item) => item.id === option.ingredientId && item.status !== "inactive");
-    const replacementExists = state.ingredients.some((item) => item.id === option.replacementIngredientId && item.status !== "inactive");
+    const ingredientExists = state.ingredients.some((item) => item.id === option.ingredientId && !isInactiveStatus(item.status));
+    const replacementExists = state.ingredients.some((item) => item.id === option.replacementIngredientId && !isInactiveStatus(item.status));
     const ingredient = !ingredientExists
       ? (option.templateName || option.ingredientName || "Bahan outlet belum tersedia")
       : ingredientName(state, option.ingredientId);
@@ -677,7 +678,7 @@ function renderModifiers() {
         <input ${product?.modifierIds?.includes(modifier.id) ? "checked" : ""} data-product-modifier-id="${modifier.id}" type="checkbox" />
         <span>
           <strong>${escapeHtml(modifier.name)}</strong>
-          <small>${modifier.status === "inactive" ? "Nonaktif" : `${(modifier.options || []).length} opsi tersedia · ${modifier.choiceType === "single" ? "Radio" : "Checkbox"} · ${modifier.requiredSelection ? "Wajib" : "Opsional"}`}</small>
+          <small>${isInactiveStatus(modifier.status) ? "Nonaktif" : `${(modifier.options || []).length} opsi tersedia · ${modifier.choiceType === "single" ? "Radio" : "Checkbox"} · ${modifier.requiredSelection ? "Wajib" : "Opsional"}`}</small>
           <ul>${modifierOptionSummary(modifier)}</ul>
         </span>
       </label>
@@ -714,7 +715,7 @@ function renderRecipeList() {
           const ingredient = (line.templateId ? ingredientForTemplate(line.templateId) : null) || state.ingredients.find((item) => item.id === line.ingredientId);
           const unitCost = ingredient?.avgCost || 0;
           const rowKey = line.templateId || line.ingredientId;
-          const ingredientReady = Boolean(ingredient && ingredient.status !== "inactive");
+          const ingredientReady = Boolean(ingredient && !isInactiveStatus(ingredient.status));
           const name = ingredientReady ? ingredientName(state, ingredient.id) : (line.templateName || line.ingredientName || "Bahan belum tersedia di outlet");
           const editAction = canEditRecipe(product)
             ? `<button class="ghost-button compact-button" data-edit-recipe-ingredient="${rowKey}" data-permission="recipes.template:update" type="button">Edit</button>`
@@ -897,7 +898,7 @@ byId("outlet-ingredient-form").addEventListener("submit", (event) => {
       minStock: Number(byId("outlet-ingredient-min").value) || 0,
       manufacturedAt: byId("outlet-ingredient-manufactured-at").value,
       expiredAt: byId("outlet-ingredient-expired-at").value,
-      status: "active"
+      status: COMMON_STATUS.ACTIVE
     });
     renderOptions();
     renderRecipeList();

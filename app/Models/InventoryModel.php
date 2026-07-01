@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\StatusCodeService;
 use CodeIgniter\Model;
 use Config\Database;
 
@@ -39,7 +40,7 @@ class InventoryModel extends Model
         }
 
         if (($filters['status'] ?? '') !== '') {
-            $builder->where('i.status', (string) $filters['status']);
+            $builder->where('i.status', StatusCodeService::common((string) $filters['status']));
         }
         if (($filters['category'] ?? '') !== '') {
             $builder->where('i.category', (string) $filters['category']);

@@ -67,7 +67,7 @@ class InventoryService
         }
 
         if (($filters['status'] ?? '') !== '') {
-            $builder->where('status', (string) $filters['status']);
+            $builder->where('status', StatusCodeService::common((string) $filters['status']));
         }
         if (($filters['search'] ?? '') !== '') {
             $search = (string) $filters['search'];
@@ -100,7 +100,7 @@ class InventoryService
             'name' => trim((string) ($payload['name'] ?? 'Master Bahan')),
             'category' => trim((string) ($payload['category'] ?? 'Raw Material')),
             'unit' => trim((string) ($payload['unit'] ?? 'satuan')),
-            'status' => $payload['status'] ?? 'active',
+            'status' => StatusCodeService::common($payload['status'] ?? 'active'),
         ];
         $data = $this->withCompanyData('ingredient_templates', $data, $companyId);
 
@@ -121,7 +121,7 @@ class InventoryService
             throw new \InvalidArgumentException('Master bahan tidak ditemukan.');
         }
 
-        $this->templates->update($id, ['status' => 'inactive']);
+        $this->templates->update($id, ['status' => StatusCodeService::INACTIVE]);
         return $this->templatePayload($this->templates->find($id));
     }
 
@@ -151,7 +151,7 @@ class InventoryService
         }
 
         $ingredient = $this->ingredients->find($ingredientId);
-        if (! $ingredient || ! $this->rowBelongsToCompany($ingredient, $companyId) || (int) $ingredient['outlet_id'] !== $outletId || ($ingredient['status'] ?? '') === 'inactive') {
+        if (! $ingredient || ! $this->rowBelongsToCompany($ingredient, $companyId) || (int) $ingredient['outlet_id'] !== $outletId || StatusCodeService::isInactive($ingredient['status'] ?? '')) {
             throw new \InvalidArgumentException('Bahan outlet tidak ditemukan atau nonaktif.');
         }
 
@@ -169,7 +169,7 @@ class InventoryService
             'template_id' => $templateId,
             'outlet_ingredient_id' => $ingredientId,
             'note' => trim((string) ($payload['note'] ?? '')),
-            'status' => 'active',
+            'status' => StatusCodeService::ACTIVE,
             'updated_at' => date('Y-m-d H:i:s'),
         ];
         $data = $this->withCompanyData('outlet_ingredient_mappings', $data, $companyId);
@@ -244,7 +244,7 @@ class InventoryService
             throw new \InvalidArgumentException('Bahan hanya bisa dinonaktifkan jika stok sudah habis.');
         }
 
-        $this->ingredients->update($id, ['status' => 'inactive']);
+        $this->ingredients->update($id, ['status' => StatusCodeService::INACTIVE]);
         return $this->ingredientDetail((string) $id, $companyId, $outletId);
     }
 
@@ -396,7 +396,7 @@ class InventoryService
             'minimum_stock' => (float) ($payload['minStock'] ?? $payload['minimum_stock'] ?? 0),
             'average_cost' => $averageCost,
             'standard_cost' => (float) ($payload['standardCost'] ?? $payload['standard_cost'] ?? 0),
-            'status' => 'active',
+            'status' => StatusCodeService::ACTIVE,
         ], $companyId));
         $id = (int) $this->ingredients->getInsertID();
 
@@ -467,7 +467,7 @@ class InventoryService
             'minimum_stock' => (float) ($payload['minStock'] ?? $payload['minimum_stock'] ?? $ingredient['minimum_stock']),
             'average_cost' => $nextAverageCost,
             'standard_cost' => (float) ($payload['standardCost'] ?? $payload['standard_cost'] ?? $ingredient['standard_cost']),
-            'status' => $payload['status'] ?? $ingredient['status'],
+            'status' => StatusCodeService::common($payload['status'] ?? $ingredient['status'] ?? 'active'),
         ]);
 
         if (abs($stockDelta) > 0.0001) {
@@ -530,7 +530,7 @@ class InventoryService
             'avgCost' => (float) $row['average_cost'],
             'standardCost' => (float) $row['standard_cost'],
             'minStock' => (float) $row['minimum_stock'],
-            'status' => $row['status'],
+            'status' => StatusCodeService::common($row['status'] ?? ''),
             'lots' => $this->ingredientLotsPayload((int) $row['id']),
         ];
     }
@@ -550,7 +550,7 @@ class InventoryService
             'expired_at' => $this->dateOrNull($meta['expired_at'] ?? null),
             'reference_type' => $meta['reference_type'] ?? null,
             'reference_id' => $meta['reference_id'] ?? null,
-            'status' => 'active',
+            'status' => StatusCodeService::ACTIVE,
             'created_at' => $now,
             'updated_at' => $now,
         ], $companyId));
@@ -567,7 +567,7 @@ class InventoryService
         $lots = $this->db->table('ingredient_lots')
             ->where('outlet_ingredient_id', $ingredientId)
             ->where('outlet_id', $outletId)
-            ->where('status', 'active')
+            ->whereIn('status', [StatusCodeService::ACTIVE, 'active'])
             ->where('qty_remaining >', 0)
             ->orderBy('expired_at IS NULL', 'ASC', false)
             ->orderBy('expired_at', 'ASC')
@@ -581,7 +581,7 @@ class InventoryService
             $nextQty = (float) $lot['qty_remaining'] - $take;
             $this->db->table('ingredient_lots')->where('id', $lot['id'])->update([
                 'qty_remaining' => $nextQty,
-                'status' => $nextQty <= 0.0001 ? 'depleted' : $lot['status'],
+                'status' => $nextQty <= 0.0001 ? StatusCodeService::INACTIVE : StatusCodeService::common($lot['status'] ?? 'active'),
                 'updated_at' => date('Y-m-d H:i:s'),
             ]);
             $remaining -= $take;
@@ -662,7 +662,7 @@ class InventoryService
             'name' => $row['name'],
             'category' => $row['category'],
             'unit' => $row['unit'],
-            'status' => $row['status'],
+            'status' => StatusCodeService::common($row['status'] ?? ''),
         ];
     }
 
@@ -687,7 +687,7 @@ class InventoryService
             'name' => $name,
             'category' => $category,
             'unit' => $unit,
-            'status' => 'active',
+            'status' => StatusCodeService::ACTIVE,
         ], $companyId));
 
         return (int) $this->templates->getInsertID();

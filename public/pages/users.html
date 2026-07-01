@@ -94,7 +94,7 @@
             <input id="tenant-id" type="hidden" />
             <label>Nama Perusahaan <input id="tenant-name" required type="text" /></label>
             <label>Route Company <input id="tenant-route-slug" pattern="[A-Za-z0-9-]+" placeholder="IFressoCoffee" required type="text" /></label>
-            <label>Status <select id="tenant-status"><option value="active">Aktif</option><option value="inactive">Nonaktif</option></select></label>
+            <label>Status <select id="tenant-status"><option value="10">Aktif</option><option value="90">Nonaktif</option></select></label>
             <label>Nama Admin <input id="tenant-admin-name" required type="text" /></label>
             <label>Email Admin <input id="tenant-admin-email" required type="email" /></label>
             <label class="logo-upload-field">Logo Perusahaan
@@ -118,7 +118,7 @@
             <input id="role-id" type="hidden" />
             <label>Nama Role <input id="role-name" required type="text" /></label>
             <label>Akses Outlet Role <select id="role-outlet-scope"><option value="selected">Selected Outlet</option><option value="all">All Outlet</option></select></label>
-            <label>Status <select id="role-status"><option value="active">Aktif</option><option value="inactive">Nonaktif</option></select></label>
+            <label>Status <select id="role-status"><option value="10">Aktif</option><option value="90">Nonaktif</option></select></label>
             <div class="full-row">
               <div class="field-label">Permission Modul</div>
               <div class="permission-matrix" id="role-permission-matrix"></div>
@@ -139,7 +139,7 @@
             <label>Nama <input id="user-name" required type="text" /></label>
             <label>Email <input id="user-email" required type="email" /></label>
             <label>Role <select id="user-role"></select></label>
-            <label>Status <select id="user-status"><option value="invited">Menunggu Aktivasi</option><option value="active">Aktif</option><option value="inactive">Nonaktif</option></select></label>
+            <label>Status <select id="user-status"><option value="00">Menunggu Aktivasi</option><option value="10">Aktif</option><option value="90">Nonaktif</option></select></label>
             <label class="toggle-row full-row">
               <input id="user-all-outlets" type="checkbox" />
               <span><strong>Akses outlet mengikuti role</strong><small>Jika role All Outlet, user otomatis bisa semua outlet. Jika Selected Outlet, centang outlet tanggung jawab user.</small></span>
@@ -163,7 +163,7 @@
             <label>Kode Outlet <input id="outlet-code" required type="text" /></label>
             <label>Nama Outlet <input id="outlet-name" required type="text" /></label>
             <label>Kota / Area <input id="outlet-city" type="text" /></label>
-            <label>Status <select id="outlet-status"><option value="active">Aktif</option><option value="inactive">Nonaktif</option></select></label>
+            <label>Status <select id="outlet-status"><option value="10">Aktif</option><option value="90">Nonaktif</option></select></label>
             <div class="modal-actions full-row"><button class="ghost-button" data-close-modal type="button">Batal</button><button class="primary-button" type="submit">Simpan Outlet</button></div>
           </form>
         </section>

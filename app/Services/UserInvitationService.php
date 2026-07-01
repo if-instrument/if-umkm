@@ -15,7 +15,7 @@ class UserInvitationService
         if (! $user || $user['type'] === 'super_admin') {
             throw new \InvalidArgumentException('User perusahaan tidak ditemukan.');
         }
-        if ($user['status'] === 'active') {
+        if (StatusCodeService::isActive($user['status'] ?? '')) {
             throw new \InvalidArgumentException('User sudah aktif dan tidak memerlukan undangan baru.');
         }
 
@@ -26,11 +26,11 @@ class UserInvitationService
         }
 
         $invitations = new UserInvitationModel();
-        $db->table('user_invitations')->where('user_id', $userId)->where('status', 'pending')->update([
-            'status' => 'superseded',
+        $db->table('user_invitations')->where('user_id', $userId)->whereIn('status', [StatusCodeService::INVITATION_PENDING, 'pending'])->update([
+            'status' => StatusCodeService::INVITATION_SUPERSEDED,
             'updated_at' => date('Y-m-d H:i:s'),
         ]);
-        (new UserModel())->update($userId, ['status' => 'invited']);
+        (new UserModel())->update($userId, ['status' => StatusCodeService::DRAFT]);
 
         $token = bin2hex(random_bytes(32));
         $now = date('Y-m-d H:i:s');
@@ -41,7 +41,7 @@ class UserInvitationService
             'email' => $user['email'],
             'token_hash' => hash('sha256', $token),
             'expires_at' => $expiresAt,
-            'status' => 'pending',
+            'status' => StatusCodeService::INVITATION_PENDING,
         ], $companyId));
         $centralInvitationId = $this->mirrorInvitationToCentral($db, $user, $company, $token, $expiresAt);
 
@@ -53,17 +53,17 @@ class UserInvitationService
         $email->setMessage($this->message($user, $company, $url, $expiresAt));
 
         if (! $email->send()) {
-            $invitations->update($invitationId, ['status' => 'send_failed']);
+            $invitations->update($invitationId, ['status' => StatusCodeService::INVITATION_FAILED]);
             if ($centralInvitationId) {
                 $this->centralConnection()->table('user_invitations')->where('id', $centralInvitationId)->update([
-                    'status' => 'send_failed',
+                    'status' => StatusCodeService::INVITATION_FAILED,
                     'updated_at' => $now,
                 ]);
             }
             return [
                 'email' => $user['email'],
                 'expiresAt' => $expiresAt,
-                'status' => 'send_failed',
+                'status' => StatusCodeService::INVITATION_FAILED,
                 'message' => 'Akun tersimpan, tetapi email aktivasi gagal dikirim. Periksa SMTP lalu kirim ulang undangan.',
             ];
         }
@@ -72,7 +72,7 @@ class UserInvitationService
         if ($centralInvitationId) {
             $this->centralConnection()->table('user_invitations')->where('id', $centralInvitationId)->update(['sent_at' => $now]);
         }
-        return ['email' => $user['email'], 'expiresAt' => $expiresAt, 'status' => 'sent'];
+        return ['email' => $user['email'], 'expiresAt' => $expiresAt, 'status' => StatusCodeService::INVITATION_SENT];
     }
 
     public function detail(string $token): array
@@ -104,10 +104,10 @@ class UserInvitationService
         $db->transStart();
         (new UserModel())->update((int) $row['user_id'], [
             'password_hash' => password_hash($password, PASSWORD_DEFAULT),
-            'status' => 'active',
+            'status' => StatusCodeService::ACTIVE,
         ]);
         (new UserInvitationModel())->update((int) $row['id'], [
-            'status' => 'accepted',
+            'status' => StatusCodeService::INVITATION_ACCEPTED,
             'accepted_at' => $now,
         ]);
         $db->transComplete();
@@ -118,14 +118,14 @@ class UserInvitationService
                 ->where('email', strtolower((string) $row['email']))
                 ->update([
                     'password_hash' => password_hash($password, PASSWORD_DEFAULT),
-                    'status' => 'active',
+                    'status' => StatusCodeService::ACTIVE,
                     'updated_at' => $now,
                 ]);
             $tenant->table('user_invitations')
                 ->where('email', strtolower((string) $row['email']))
-                ->where('status', 'pending')
+                ->whereIn('status', [StatusCodeService::INVITATION_PENDING, 'pending'])
                 ->update([
-                    'status' => 'accepted',
+                    'status' => StatusCodeService::INVITATION_ACCEPTED,
                     'accepted_at' => $now,
                     'updated_at' => $now,
                 ]);
@@ -148,7 +148,7 @@ class UserInvitationService
             ->join('users u', 'u.id = i.user_id')
             ->join('companies c', 'c.id = i.company_id')
             ->where('i.token_hash', hash('sha256', $token))
-            ->where('i.status', 'pending')
+            ->whereIn('i.status', [StatusCodeService::INVITATION_PENDING, 'pending'])
             ->get()->getRowArray();
 
         if (! $row || strtotime($row['expires_at']) < time()) {
@@ -174,7 +174,7 @@ class UserInvitationService
                 'email' => $email,
                 'password_hash' => $user['password_hash'] ?? password_hash(bin2hex(random_bytes(32)), PASSWORD_DEFAULT),
                 'type' => $user['type'] ?? 'company_user',
-                'status' => 'invited',
+                'status' => StatusCodeService::DRAFT,
                 'created_at' => $now,
                 'updated_at' => $now,
             ]);
@@ -184,16 +184,16 @@ class UserInvitationService
             $central->table('users')->where('id', $centralUserId)->update([
                 'name' => $user['name'] ?? $centralUser['name'],
                 'company_id' => (int) ($user['company_id'] ?? $company['id'] ?? 1),
-                'status' => 'invited',
+                'status' => StatusCodeService::DRAFT,
                 'updated_at' => $now,
             ]);
         }
 
         $central->table('user_invitations')
             ->where('user_id', $centralUserId)
-            ->where('status', 'pending')
+            ->whereIn('status', [StatusCodeService::INVITATION_PENDING, 'pending'])
             ->update([
-                'status' => 'superseded',
+                'status' => StatusCodeService::INVITATION_SUPERSEDED,
                 'updated_at' => $now,
             ]);
         $central->table('user_invitations')->insert([
@@ -202,7 +202,7 @@ class UserInvitationService
             'email' => $email,
             'token_hash' => hash('sha256', $token),
             'expires_at' => $expiresAt,
-            'status' => 'pending',
+            'status' => StatusCodeService::INVITATION_PENDING,
             'created_at' => $now,
             'updated_at' => $now,
         ]);

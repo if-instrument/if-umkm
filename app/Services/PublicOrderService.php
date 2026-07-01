@@ -32,9 +32,9 @@ class PublicOrderService
             'outlets' => $outlets,
             'activeOutletId' => $activeOutletId ? $this->outletCode($activeOutletId) : '',
             'settings' => $settingsData['settings'] ?? [],
-            'categories' => array_values(array_filter($productData['categories'] ?? [], fn ($row) => ($row['status'] ?? '') !== 'inactive')),
-            'products' => array_values(array_map(fn ($product) => $this->productPublicPayload($product, $reservations, $productData['ingredients'] ?? []), array_filter($productData['products'] ?? [], fn ($row) => ($row['status'] ?? '') === 'active'))),
-            'modifiers' => array_values(array_filter($productData['modifiers'] ?? [], fn ($row) => ($row['status'] ?? '') === 'active')),
+            'categories' => array_values(array_filter($productData['categories'] ?? [], fn ($row) => ! StatusCodeService::isInactive($row['status'] ?? ''))),
+            'products' => array_values(array_map(fn ($product) => $this->productPublicPayload($product, $reservations, $productData['ingredients'] ?? []), array_filter($productData['products'] ?? [], fn ($row) => StatusCodeService::isActive($row['status'] ?? '')))),
+            'modifiers' => array_values(array_filter($productData['modifiers'] ?? [], fn ($row) => StatusCodeService::isActive($row['status'] ?? ''))),
             'ingredients' => $productData['ingredients'] ?? [],
         ];
     }
@@ -46,7 +46,7 @@ class PublicOrderService
         }
         $builder = $this->db->table('customer_members')
             ->where('outlet_id', $outletId)
-            ->where('status', 'active');
+            ->whereIn('status', [StatusCodeService::ACTIVE, 'active']);
         if ($this->hasCompanyColumn('customer_members')) {
             $builder->where('company_id', $companyId);
         }
@@ -110,7 +110,7 @@ class PublicOrderService
             'tableName' => $this->tableName($payload, $settings, $serviceType),
             'tableFlow' => $serviceType === 'Dine In' ? ($settings['tableServiceMode'] ?? 'public_order') : 'public_order',
             'initialStatus' => SalesService::STATUS_PENDING_CASHIER,
-            'paymentStatus' => $isCash ? 'unpaid' : 'unpaid',
+            'paymentStatus' => StatusCodeService::PAYMENT_UNPAID,
             'paymentMethod' => $paymentMethod['name'] ?? 'Cash',
             'productRevenue' => $totals['productRevenue'],
             'packagingFee' => $totals['packagingFee'],
@@ -152,7 +152,7 @@ class PublicOrderService
         if (! $this->db->tableExists('outlets')) {
             return [];
         }
-        $builder = $this->db->table('outlets')->where('status', 'active')->orderBy('name', 'ASC');
+        $builder = $this->db->table('outlets')->whereIn('status', [StatusCodeService::ACTIVE, 'active'])->orderBy('name', 'ASC');
         if ($this->hasCompanyColumn('outlets')) {
             $builder->where('company_id', $companyId);
         }
@@ -244,7 +244,7 @@ class PublicOrderService
         $items = [];
         foreach ($lines as $line) {
             $product = $this->findById($products, (string) ($line['productId'] ?? ''));
-            if (! $product || ($product['status'] ?? '') !== 'active') {
+            if (! $product || ! StatusCodeService::isActive($product['status'] ?? '')) {
                 throw new \InvalidArgumentException('Produk tidak tersedia.');
             }
             $qty = max(1, (int) ($line['qty'] ?? 1));
@@ -305,7 +305,7 @@ class PublicOrderService
         }
         $rule = null;
         foreach ($rules as $candidate) {
-            if (($candidate['status'] ?? '') === 'inactive') continue;
+            if (StatusCodeService::isInactive($candidate['status'] ?? '')) continue;
             if ($itemQty >= (int) ($candidate['minQty'] ?? 0) && $itemQty <= (int) ($candidate['maxQty'] ?? 0)) {
                 $rule = $candidate;
                 break;
@@ -368,7 +368,7 @@ class PublicOrderService
     private function paymentMethod(string $id, int $companyId, int $outletId): array
     {
         $methods = (new SettingsService())->paymentMethodPage($companyId, $outletId, ['per_page' => 100])['items'] ?? [];
-        $active = array_values(array_filter($methods, fn ($row) => ($row['status'] ?? '') === 'active'));
+        $active = array_values(array_filter($methods, fn ($row) => StatusCodeService::isActive($row['status'] ?? '')));
         if (! $active) {
             throw new \InvalidArgumentException('Belum ada metode pembayaran aktif.');
         }
@@ -392,7 +392,7 @@ class PublicOrderService
         if ($tableName === '') {
             throw new \InvalidArgumentException('Meja wajib dipilih untuk mode dine in outlet ini.');
         }
-        $available = array_filter($settings['diningTables'] ?? [], fn ($table) => ($table['status'] ?? '') === 'active');
+        $available = array_filter($settings['diningTables'] ?? [], fn ($table) => StatusCodeService::isActive($table['status'] ?? ''));
         $valid = array_filter($available, fn ($table) => (string) ($table['name'] ?? '') === $tableName || (string) ($table['id'] ?? '') === $tableName);
         if (! $valid) {
             throw new \InvalidArgumentException('Meja tidak tersedia.');
@@ -525,7 +525,7 @@ class PublicOrderService
         $assignedIds = $product['modifierIds'] ?? [];
         $options = [];
         foreach ($modifiers as $modifier) {
-            if (($modifier['status'] ?? '') === 'inactive' || ! in_array((string) ($modifier['id'] ?? ''), $assignedIds, true)) {
+            if (StatusCodeService::isInactive($modifier['status'] ?? '') || ! in_array((string) ($modifier['id'] ?? ''), $assignedIds, true)) {
                 continue;
             }
             foreach (($modifier['options'] ?? []) as $option) {

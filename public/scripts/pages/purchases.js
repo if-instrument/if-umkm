@@ -3,6 +3,7 @@ import { apiGet, apiPost, applyPermissionControls, canUsePermission, loadSession
 import { formatQty, money, shortDate } from "../format.js";
 import { byId, setText, showAlert, showFeedback } from "../dom.js";
 import { enhanceAllDataTables } from "../datatable.js";
+import { isInactiveStatus } from "../status-codes.js";
 
 renderLayout();
 
@@ -52,7 +53,7 @@ function closeModal() {
 function renderOptions() {
   byId("purchase-ingredient").innerHTML = state.ingredients
     .filter((item) => visibleForSession(item, state, session))
-    .filter((item) => item.status !== "inactive")
+    .filter((item) => !isInactiveStatus(item.status))
     .map((item) => `<option value="${item.id}">${item.name} (${item.unit})</option>`)
     .join("");
 }
@@ -94,7 +95,7 @@ function renderPurchaseHistory() {
 byId("purchase-form").addEventListener("submit", (event) => {
   event.preventDefault();
   const ingredient = state.ingredients.find((item) => item.id === byId("purchase-ingredient").value);
-  if (!ingredient || ingredient.status === "inactive") {
+  if (!ingredient || isInactiveStatus(ingredient.status)) {
     showFeedback("purchase-feedback", "Pilih bahan outlet aktif terlebih dahulu.");
     return;
   }

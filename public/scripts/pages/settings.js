@@ -4,6 +4,7 @@ import { formatQty, money } from "../format.js";
 import { byId, setText, showAlert, showFeedback } from "../dom.js";
 import { costingMethodLabel, ingredientUnitCost } from "../inventory.js";
 import { enhanceAllDataTables } from "../datatable.js";
+import { COMMON_STATUS, CONNECTOR_STATUS, isActiveStatus, isInactiveStatus, statusLabel } from "../status-codes.js";
 
 renderLayout();
 
@@ -100,9 +101,9 @@ function exists(id) {
 }
 
 function statusPill(status) {
-  return status === "active"
-    ? `<span class="status-pill status-ok">Aktif</span>`
-    : `<span class="status-pill status-empty">Nonaktif</span>`;
+  return isActiveStatus(status)
+    ? `<span class="status-pill status-ok">Aktif <small>${COMMON_STATUS.ACTIVE}</small></span>`
+    : `<span class="status-pill status-empty">Nonaktif <small>${COMMON_STATUS.INACTIVE}</small></span>`;
 }
 
 function slugify(value) {
@@ -115,7 +116,7 @@ function activeCompany() {
 
 function activeOutlets() {
   const companyId = session?.companyId || state.activeCompanyId;
-  return state.outlets.filter((outlet) => outlet.companyId === companyId && outlet.status !== "inactive");
+  return state.outlets.filter((outlet) => outlet.companyId === companyId && !isInactiveStatus(outlet.status));
 }
 
 function logoPreviewMarkup(url, fallback = "IF") {
@@ -218,11 +219,13 @@ function edcConnectorLabel(method) {
   if (method.type !== "card" || method.cardMode === "online") return "";
   const mode = method.edcMode === "integrated" ? "Integrated Terminal" : "Manual EDC";
   const statuses = {
+    [CONNECTOR_STATUS.READY]: "Ready",
+    [CONNECTOR_STATUS.NOT_CONFIGURED]: "Belum dikonfigurasi",
     ready: "Ready",
-    inactive: "Nonaktif",
+    [CONNECTOR_STATUS.INACTIVE]: "Nonaktif",
     not_configured: "Belum dikonfigurasi"
   };
-  return `${mode} · ${statuses[method.connectorStatus] || "Belum dikonfigurasi"}`;
+  return `${mode} · ${statuses[method.connectorStatus] || statusLabel(method.connectorStatus, "connector")}`;
 }
 
 function feePayerLabel(method) {
@@ -239,12 +242,12 @@ function renderDiningTables() {
       <td>${table.area || "-"}</td>
       <td>${formatQty(table.capacity || 1)} pax</td>
       <td>${statusPill(table.status)}</td>
-      <td><div class="row-actions"><button class="ghost-button compact-button" data-edit-dining-table="${table.id}" data-permission="settings.tables:update" type="button">Edit</button><button class="ghost-button compact-button" data-delete-dining-table="${table.id}" data-permission="settings.tables:delete" type="button">${table.status === "active" ? "Nonaktifkan" : "Aktifkan"}</button></div></td>
+      <td><div class="row-actions"><button class="ghost-button compact-button" data-edit-dining-table="${table.id}" data-permission="settings.tables:update" type="button">Edit</button><button class="ghost-button compact-button" data-delete-dining-table="${table.id}" data-permission="settings.tables:delete" type="button">${isActiveStatus(table.status) ? "Nonaktifkan" : "Aktifkan"}</button></div></td>
     </tr>
   `).join("") : `<tr><td colspan="6">Belum ada meja.</td></tr>`;
 
   byId("table-layout-preview").innerHTML = tables.length ? tables.map((table) => `
-    <article class="${table.status === "active" ? "active" : "inactive"}">
+    <article class="${isActiveStatus(table.status) ? "active" : "inactive"}">
       <strong>${table.name}</strong>
       <span>${table.area || "-"} · ${formatQty(table.capacity || 1)} pax</span>
     </article>
@@ -262,7 +265,7 @@ function renderPaymentMethods() {
       <td>${formatQty(Number(method.feeRate || 0))}%<br><small>${feePayerLabel(method)}</small></td>
       <td>${method.account || "-"}</td>
       <td>${statusPill(method.status)}</td>
-      <td><div class="row-actions"><button class="ghost-button compact-button" data-edit-payment-method="${method.id}" data-permission="settings.payment:update" type="button">Edit</button><button class="ghost-button compact-button" data-delete-payment-method="${method.id}" data-permission="settings.payment:delete" type="button">${method.status === "active" ? "Nonaktifkan" : "Aktifkan"}</button></div>${method.isDefault ? `<small>Default outlet</small>` : ""}</td>
+      <td><div class="row-actions"><button class="ghost-button compact-button" data-edit-payment-method="${method.id}" data-permission="settings.payment:update" type="button">Edit</button><button class="ghost-button compact-button" data-delete-payment-method="${method.id}" data-permission="settings.payment:delete" type="button">${isActiveStatus(method.status) ? "Nonaktifkan" : "Aktifkan"}</button></div>${method.isDefault ? `<small>Default outlet</small>` : ""}</td>
     </tr>
   `).join("") : `<tr><td colspan="8">Belum ada metode bayar.</td></tr>`;
 }
@@ -289,7 +292,7 @@ function renderPackagingRules() {
         const ingredient = state.ingredients.find((entry) => entry.id === item.ingredientId);
         return `<span class="packaging-rule-chip">Item ${index + 1}: ${item.qty}x ${ingredient?.name || "Kemasan terhapus"} · Harga ${money(item.price || 0)}</span>`;
       }).join("")}${rule.fallbackItems?.length ? `<br><small>Paket Pengganti: ${rule.fallbackItems.map((item) => `${item.qty}x ${state.ingredients.find((entry) => entry.id === item.ingredientId)?.name || "Kemasan terhapus"} · Harga ${money(item.price || 0)}`).join(", ")}</small>` : ""}</td>
-      <td><div class="row-actions"><button class="ghost-button compact-button" data-edit-packaging-rule="${rule.id}" data-permission="settings.packaging:update" type="button">Edit</button><button class="ghost-button compact-button" data-delete-packaging-rule="${rule.id}" data-permission="settings.packaging:delete" type="button">${rule.status === "inactive" ? "Aktifkan" : "Nonaktifkan"}</button></div></td>
+      <td><div class="row-actions"><button class="ghost-button compact-button" data-edit-packaging-rule="${rule.id}" data-permission="settings.packaging:update" type="button">Edit</button><button class="ghost-button compact-button" data-delete-packaging-rule="${rule.id}" data-permission="settings.packaging:delete" type="button">${isInactiveStatus(rule.status) ? "Aktifkan" : "Nonaktifkan"}</button></div></td>
     </tr>
   `).join("") : `<tr><td colspan="3">Belum ada packaging rule.</td></tr>`;
 }
@@ -306,7 +309,7 @@ function renderCompany() {
 }
 
 function fillPackagingRuleOptions() {
-  const packagingIngredients = state.ingredients.filter((item) => item.status !== "inactive" && String(item.category || item.templateCategory || "").toLowerCase() === "packaging");
+  const packagingIngredients = state.ingredients.filter((item) => !isInactiveStatus(item.status) && String(item.category || item.templateCategory || "").toLowerCase() === "packaging");
   return packagingIngredients;
 }
 
@@ -479,13 +482,13 @@ function savePackagingRule(event) {
     showFeedback("packaging-rule-feedback", error.message);
     return;
   }
-  const overlap = (state.settings.packagingRules || []).some((rule) => rule.status !== "inactive" && rule.id !== id && minQty <= rule.maxQty && maxQty >= rule.minQty);
+  const overlap = (state.settings.packagingRules || []).some((rule) => !isInactiveStatus(rule.status) && rule.id !== id && minQty <= rule.maxQty && maxQty >= rule.minQty);
   if (overlap) {
     showFeedback("packaging-rule-feedback", "Rentang jumlah bertabrakan dengan rule lain.");
     return;
   }
   const existing = state.settings.packagingRules.find((rule) => rule.id === id);
-  const status = existing?.status || "active";
+  const status = existing?.status || COMMON_STATUS.ACTIVE;
   if (!(id ? putSetting(`/api/packaging-rule/${id}`, { minQty, maxQty, items, fallbackItems, status }) : postSetting("/api/packaging-rule", { minQty, maxQty, items, fallbackItems, status }))) {
     showFeedback("packaging-rule-feedback", "Gagal menyimpan packaging rule ke database.");
     return;
@@ -502,7 +505,7 @@ function openDiningTable(table = null) {
   byId("dining-table-area").value = table?.area || "Indoor";
   byId("dining-table-capacity").value = table?.capacity || 2;
   byId("dining-table-sort").value = table?.sort || nextSort;
-  byId("dining-table-status").value = table?.status || "active";
+  byId("dining-table-status").value = table?.status || COMMON_STATUS.ACTIVE;
   setText("dining-table-feedback", "");
   openModal("dining-table-modal");
 }
@@ -552,12 +555,12 @@ function openPaymentMethod(method = null) {
   byId("payment-edc-mode").value = method?.edcMode || "manual";
   byId("payment-merchant-id").value = method?.merchantId || "";
   byId("payment-terminal-serial").value = method?.terminalSerial || "";
-  byId("payment-connector-status").value = method?.connectorStatus || "not_configured";
+  byId("payment-connector-status").value = method?.connectorStatus || CONNECTOR_STATUS.NOT_CONFIGURED;
   byId("payment-method-fee").value = method?.feeRate ?? 0;
   byId("payment-method-fee-payer").value = method?.feePayer || "merchant";
   byId("payment-method-account").value = method?.account || "";
   byId("payment-method-sort").value = method?.sort || nextSort;
-  byId("payment-method-status").value = method?.status || "active";
+  byId("payment-method-status").value = method?.status || COMMON_STATUS.ACTIVE;
   setText("payment-method-feedback", "");
   syncPaymentMethodFields();
   openModal("payment-method-modal");
@@ -589,7 +592,7 @@ function syncPaymentMethodFields() {
     byId("payment-edc-mode").value = "manual";
     byId("payment-merchant-id").value = "";
     byId("payment-terminal-serial").value = "";
-    byId("payment-connector-status").value = "not_configured";
+    byId("payment-connector-status").value = CONNECTOR_STATUS.NOT_CONFIGURED;
   }
 }
 
@@ -795,13 +798,13 @@ document.addEventListener("click", (event) => {
   const deletePackagingRule = event.target.closest("[data-delete-packaging-rule]");
   if (deletePackagingRule && canUsePermission("settings.packaging", "delete", state, session)) {
     const rule = state.settings.packagingRules.find((item) => item.id === deletePackagingRule.dataset.deletePackagingRule);
-    if (rule && rule.status === "inactive") {
-      const overlap = (state.settings.packagingRules || []).some((item) => item.status !== "inactive" && item.id !== rule.id && rule.minQty <= item.maxQty && rule.maxQty >= item.minQty);
+    if (rule && isInactiveStatus(rule.status)) {
+      const overlap = (state.settings.packagingRules || []).some((item) => !isInactiveStatus(item.status) && item.id !== rule.id && rule.minQty <= item.maxQty && rule.maxQty >= item.minQty);
       if (overlap) {
         showFeedback("setting-feedback", "Rule tidak bisa diaktifkan karena rentangnya bertabrakan dengan rule aktif lain.");
         return;
       }
-      if (!putSetting(`/api/packaging-rule/${rule.id}`, { ...rule, status: "active" })) showFeedback("setting-feedback", "Gagal mengaktifkan rule.");
+      if (!putSetting(`/api/packaging-rule/${rule.id}`, { ...rule, status: COMMON_STATUS.ACTIVE })) showFeedback("setting-feedback", "Gagal mengaktifkan rule.");
     } else if (rule && !deleteSetting(`/api/packaging-rule/${rule.id}`, {})) {
       showFeedback("setting-feedback", "Gagal menonaktifkan rule.");
     }
@@ -845,7 +848,7 @@ document.addEventListener("click", (event) => {
   const deleteDiningTable = event.target.closest("[data-delete-dining-table]");
   if (deleteDiningTable && canUsePermission("settings.tables", "delete", state, session)) {
     const table = state.settings.diningTables.find((item) => item.id === deleteDiningTable.dataset.deleteDiningTable);
-    if (table && !(table.status === "inactive" ? putSetting(`/api/dining-table/${table.id}`, { ...table, status: "active" }) : deleteSetting(`/api/dining-table/${table.id}`, {}))) showFeedback("setting-feedback", "Gagal mengubah status meja.");
+    if (table && !(isInactiveStatus(table.status) ? putSetting(`/api/dining-table/${table.id}`, { ...table, status: COMMON_STATUS.ACTIVE }) : deleteSetting(`/api/dining-table/${table.id}`, {}))) showFeedback("setting-feedback", "Gagal mengubah status meja.");
     renderSettings();
   }
 
@@ -855,7 +858,7 @@ document.addEventListener("click", (event) => {
   const deletePaymentMethod = event.target.closest("[data-delete-payment-method]");
   if (deletePaymentMethod && canUsePermission("settings.payment", "delete", state, session)) {
     const method = state.settings.paymentMethods.find((item) => item.id === deletePaymentMethod.dataset.deletePaymentMethod);
-    if (method && !(method.status === "inactive" ? putSetting(`/api/payment-method/${method.id}`, { ...method, status: "active" }) : deleteSetting(`/api/payment-method/${method.id}`, {}))) showFeedback("setting-feedback", "Gagal mengubah status metode bayar.");
+    if (method && !(isInactiveStatus(method.status) ? putSetting(`/api/payment-method/${method.id}`, { ...method, status: COMMON_STATUS.ACTIVE }) : deleteSetting(`/api/payment-method/${method.id}`, {}))) showFeedback("setting-feedback", "Gagal mengubah status metode bayar.");
     renderSettings();
   }
 

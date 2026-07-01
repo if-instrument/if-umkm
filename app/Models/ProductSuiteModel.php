@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\StatusCodeService;
 use CodeIgniter\Model;
 use Config\Database;
 
@@ -33,7 +34,7 @@ class ProductSuiteModel extends Model
         $builder = $this->productBuilder($companyId, $outletId);
 
         if (($filters['status'] ?? '') !== '') {
-            $builder->where('p.status', (string) $filters['status']);
+            $builder->where('p.status', StatusCodeService::common((string) $filters['status']));
         }
         if (($filters['category_id'] ?? '') !== '') {
             $builder->where('poc.category_id', (int) $filters['category_id']);
@@ -99,7 +100,7 @@ class ProductSuiteModel extends Model
         $builder = $db
             ->table('outlet_ingredient_mappings')
             ->where('outlet_id', $outletId)
-            ->where('status', 'active')
+            ->whereIn('status', [StatusCodeService::ACTIVE, 'active'])
         ;
         if ($db->fieldExists('company_id', 'outlet_ingredient_mappings')) {
             $builder->where('company_id', $companyId);

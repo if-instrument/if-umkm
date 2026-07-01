@@ -25,7 +25,7 @@ class DashboardService
         $ingredients = $ingredientsBuilder->get()->getResultArray();
         $products = $outletId > 0
             ? $db->table('products')
-                ->where('status', 'active')
+                ->whereIn('status', [StatusCodeService::ACTIVE, 'active'])
                 ->groupStart()
                 ->where('outlet_id', $outletId)
                 ->orWhere('outlet_id', null)
@@ -38,7 +38,7 @@ class DashboardService
             : [];
         $paymentMethodsBuilder = $db->table('payment_methods')
             ->where('outlet_id', $outletId)
-            ->where('status', 'active')
+            ->whereIn('status', [StatusCodeService::ACTIVE, 'active'])
         ;
         if ($db->fieldExists('company_id', 'payment_methods')) {
             $paymentMethodsBuilder->where('company_id', $companyId);
@@ -54,7 +54,7 @@ class DashboardService
         $paymentTransactions = $paymentTransactionsBuilder->get()->getResultArray();
         $activeTablesBuilder = $db->table('dining_tables')
             ->where('outlet_id', $outletId)
-            ->where('status', 'active')
+            ->whereIn('status', [StatusCodeService::ACTIVE, 'active'])
         ;
         if ($db->fieldExists('company_id', 'dining_tables')) {
             $activeTablesBuilder->where('company_id', $companyId);
@@ -101,10 +101,10 @@ class DashboardService
             ], array_slice($this->sortLowStock($ingredients), 0, 5)),
             'chart' => $last7Days,
             'operations' => [
-                'openTables' => count(array_filter($orders, fn ($row) => ($row['service_type'] ?? '') === 'Dine In' && ($row['payment_status'] ?? '') === 'unpaid')),
+                'openTables' => count(array_filter($orders, fn ($row) => ($row['service_type'] ?? '') === 'Dine In' && StatusCodeService::isUnpaid($row['payment_status'] ?? ''))),
                 'kitchenQueue' => count(array_filter($orders, fn ($row) => in_array($row['status'] ?? '', ['10', '20', '30', 'waiting', 'preparing', 'ready'], true))),
-                'paidOrders' => count(array_filter($orders, fn ($row) => ($row['payment_status'] ?? '') === 'paid')),
-                'paymentPending' => count(array_filter($paymentTransactions, fn ($row) => ($row['status'] ?? '') === 'pending')),
+                'paidOrders' => count(array_filter($orders, fn ($row) => StatusCodeService::isPaid($row['payment_status'] ?? ''))),
+                'paymentPending' => count(array_filter($paymentTransactions, fn ($row) => StatusCodeService::isUnpaid($row['status'] ?? ''))),
                 'activeTables' => $activeTables,
             ],
             'integrations' => [
@@ -119,14 +119,14 @@ class DashboardService
             'riskSignals' => array_values(array_filter([
                 [
                     'label' => 'Payment Pending',
-                    'value' => count(array_filter($paymentTransactions, fn ($row) => ($row['status'] ?? '') === 'pending')),
-                    'severity' => count(array_filter($paymentTransactions, fn ($row) => ($row['status'] ?? '') === 'pending')) ? 'warning' : 'ok',
+                    'value' => count(array_filter($paymentTransactions, fn ($row) => StatusCodeService::isUnpaid($row['status'] ?? ''))),
+                    'severity' => count(array_filter($paymentTransactions, fn ($row) => StatusCodeService::isUnpaid($row['status'] ?? ''))) ? 'warning' : 'ok',
                     'note' => 'Transaksi gateway belum paid',
                 ],
                 [
                     'label' => 'Open Bill',
-                    'value' => count(array_filter($orders, fn ($row) => ($row['payment_status'] ?? '') === 'unpaid')),
-                    'severity' => count(array_filter($orders, fn ($row) => ($row['payment_status'] ?? '') === 'unpaid')) ? 'warning' : 'ok',
+                    'value' => count(array_filter($orders, fn ($row) => StatusCodeService::isUnpaid($row['payment_status'] ?? ''))),
+                    'severity' => count(array_filter($orders, fn ($row) => StatusCodeService::isUnpaid($row['payment_status'] ?? ''))) ? 'warning' : 'ok',
                     'note' => 'Meja/bill belum settlement',
                 ],
                 [

@@ -47,7 +47,7 @@ class CreateCoreSchema extends Migration
             'tagline' => ['type' => 'VARCHAR', 'constraint' => 160, 'null' => true],
             'logo_path' => ['type' => 'VARCHAR', 'constraint' => 255, 'null' => true],
             'theme_color' => ['type' => 'VARCHAR', 'constraint' => 32, 'default' => '#6f3710'],
-            'status' => ['type' => 'VARCHAR', 'constraint' => 24, 'default' => 'active'],
+            'status' => ['type' => 'VARCHAR', 'constraint' => 2, 'default' => '10'],
         ] + $this->baseFields());
         $this->forge->addKey('id', true);
         $this->forge->addUniqueKey('route_slug');
@@ -62,7 +62,7 @@ class CreateCoreSchema extends Migration
             'name' => ['type' => 'VARCHAR', 'constraint' => 160],
             'code' => ['type' => 'VARCHAR', 'constraint' => 32],
             'address' => ['type' => 'TEXT', 'null' => true],
-            'status' => ['type' => 'VARCHAR', 'constraint' => 24, 'default' => 'active'],
+            'status' => ['type' => 'VARCHAR', 'constraint' => 2, 'default' => '10'],
         ] + $this->baseFields());
         $this->forge->addKey('id', true);
         $this->forge->addKey(['company_id', 'code']);
@@ -78,7 +78,7 @@ class CreateCoreSchema extends Migration
             'email' => ['type' => 'VARCHAR', 'constraint' => 160],
             'password_hash' => ['type' => 'VARCHAR', 'constraint' => 255],
             'type' => ['type' => 'VARCHAR', 'constraint' => 32, 'default' => 'company_user'],
-            'status' => ['type' => 'VARCHAR', 'constraint' => 24, 'default' => 'active'],
+            'status' => ['type' => 'VARCHAR', 'constraint' => 2, 'default' => '10'],
         ] + $this->baseFields());
         $this->forge->addKey('id', true);
         $this->forge->addUniqueKey('email');
@@ -90,7 +90,7 @@ class CreateCoreSchema extends Migration
             'name' => ['type' => 'VARCHAR', 'constraint' => 120],
             'scope' => ['type' => 'VARCHAR', 'constraint' => 32, 'default' => 'single_outlet'],
             'permissions' => ['type' => 'JSON'],
-            'status' => ['type' => 'VARCHAR', 'constraint' => 24, 'default' => 'active'],
+            'status' => ['type' => 'VARCHAR', 'constraint' => 2, 'default' => '10'],
         ] + $this->baseFields());
         $this->forge->addKey('id', true);
         $this->forge->createTable('roles');
@@ -119,7 +119,7 @@ class CreateCoreSchema extends Migration
             'name' => ['type' => 'VARCHAR', 'constraint' => 120],
             'description' => ['type' => 'TEXT', 'null' => true],
             'scope' => ['type' => 'VARCHAR', 'constraint' => 24, 'default' => 'company'],
-            'status' => ['type' => 'VARCHAR', 'constraint' => 24, 'default' => 'active'],
+            'status' => ['type' => 'VARCHAR', 'constraint' => 2, 'default' => '10'],
         ] + $this->baseFields());
         $this->forge->addKey('id', true);
         $this->forge->createTable('categories');
@@ -134,8 +134,8 @@ class CreateCoreSchema extends Migration
             'image_path' => ['type' => 'VARCHAR', 'constraint' => 255, 'null' => true],
             'selling_price' => ['type' => 'DECIMAL', 'constraint' => '14,2', 'default' => 0],
             'scope' => ['type' => 'VARCHAR', 'constraint' => 24, 'default' => 'company'],
-            'recipe_status' => ['type' => 'VARCHAR', 'constraint' => 24, 'default' => 'draft'],
-            'status' => ['type' => 'VARCHAR', 'constraint' => 24, 'default' => 'active'],
+            'recipe_status' => ['type' => 'VARCHAR', 'constraint' => 2, 'default' => '00'],
+            'status' => ['type' => 'VARCHAR', 'constraint' => 2, 'default' => '10'],
         ] + $this->baseFields());
         $this->forge->addKey('id', true);
         $this->forge->addKey(['company_id', 'sku']);
@@ -148,7 +148,7 @@ class CreateCoreSchema extends Migration
             'name' => ['type' => 'VARCHAR', 'constraint' => 160],
             'selection_type' => ['type' => 'VARCHAR', 'constraint' => 32, 'default' => 'optional'],
             'scope' => ['type' => 'VARCHAR', 'constraint' => 24, 'default' => 'company'],
-            'status' => ['type' => 'VARCHAR', 'constraint' => 24, 'default' => 'active'],
+            'status' => ['type' => 'VARCHAR', 'constraint' => 2, 'default' => '10'],
         ] + $this->baseFields());
         $this->forge->addKey('id', true);
         $this->forge->createTable('modifiers');
@@ -159,7 +159,7 @@ class CreateCoreSchema extends Migration
             'name' => ['type' => 'VARCHAR', 'constraint' => 160],
             'price_delta' => ['type' => 'DECIMAL', 'constraint' => '14,2', 'default' => 0],
             'ingredient_rules' => ['type' => 'JSON', 'null' => true],
-            'status' => ['type' => 'VARCHAR', 'constraint' => 24, 'default' => 'active'],
+            'status' => ['type' => 'VARCHAR', 'constraint' => 2, 'default' => '10'],
         ] + $this->baseFields());
         $this->forge->addKey('id', true);
         $this->forge->createTable('modifier_options');
@@ -174,7 +174,7 @@ class CreateCoreSchema extends Migration
             'name' => ['type' => 'VARCHAR', 'constraint' => 160],
             'category' => ['type' => 'VARCHAR', 'constraint' => 80, 'null' => true],
             'unit' => ['type' => 'VARCHAR', 'constraint' => 32],
-            'status' => ['type' => 'VARCHAR', 'constraint' => 24, 'default' => 'active'],
+            'status' => ['type' => 'VARCHAR', 'constraint' => 2, 'default' => '10'],
         ] + $this->baseFields());
         $this->forge->addKey('id', true);
         $this->forge->addUniqueKey(['company_id', 'code']);
@@ -193,7 +193,7 @@ class CreateCoreSchema extends Migration
             'minimum_stock' => ['type' => 'DECIMAL', 'constraint' => '14,3', 'default' => 0],
             'average_cost' => ['type' => 'DECIMAL', 'constraint' => '14,2', 'default' => 0],
             'standard_cost' => ['type' => 'DECIMAL', 'constraint' => '14,2', 'default' => 0],
-            'status' => ['type' => 'VARCHAR', 'constraint' => 24, 'default' => 'active'],
+            'status' => ['type' => 'VARCHAR', 'constraint' => 2, 'default' => '10'],
         ] + $this->baseFields());
         $this->forge->addKey('id', true);
         $this->forge->addKey(['company_id', 'outlet_id', 'sku']);
@@ -243,7 +243,7 @@ class CreateCoreSchema extends Migration
             'customer_name' => ['type' => 'VARCHAR', 'constraint' => 160, 'null' => true],
             'table_name' => ['type' => 'VARCHAR', 'constraint' => 80, 'null' => true],
             'status' => ['type' => 'VARCHAR', 'constraint' => 2, 'default' => '10'],
-            'payment_status' => ['type' => 'VARCHAR', 'constraint' => 32, 'default' => 'unpaid'],
+            'payment_status' => ['type' => 'VARCHAR', 'constraint' => 2, 'default' => '00'],
             'subtotal' => ['type' => 'DECIMAL', 'constraint' => '14,2', 'default' => 0],
             'packaging_fee' => ['type' => 'DECIMAL', 'constraint' => '14,2', 'default' => 0],
             'payment_fee' => ['type' => 'DECIMAL', 'constraint' => '14,2', 'default' => 0],

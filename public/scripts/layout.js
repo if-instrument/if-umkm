@@ -1,4 +1,5 @@
-import { apiGet, appPath, applyPermissionControls, canAccessAllOutlets, canUsePermission, clearSession, loadSession, loadState, primaryOutletId, saveSession } from "./store.js?v=coffee-v137";
+import { apiGet, appPath, applyPermissionControls, canAccessAllOutlets, canUsePermission, clearSession, loadSession, loadState, primaryOutletId, saveSession } from "./store.js?v=coffee-v149";
+import { isInactiveStatus } from "./status-codes.js";
 
 const APP_LOGO = "/assets/if-instrument-logo.jpg";
 const APP_NAME = "IF Instrument";
@@ -182,7 +183,7 @@ export function renderLayout() {
   const today = new Intl.DateTimeFormat("id-ID", { day: "numeric", month: "long", year: "numeric" }).format(new Date());
   const companyId = session?.companyId || state.activeCompanyId;
   const accessibleOutlets = (state.outlets || [])
-    .filter((outlet) => outlet.companyId === companyId && outlet.status !== "inactive")
+    .filter((outlet) => outlet.companyId === companyId && !isInactiveStatus(outlet.status))
     .filter((outlet) => canAccessAllOutlets(session) || (session?.outletIds || []).includes(outlet.id));
   const selectedOutletId = primaryOutletId(state, session);
   const selectedOutlet = accessibleOutlets.find((outlet) => outlet.id === selectedOutletId);

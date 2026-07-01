@@ -2,6 +2,7 @@ import { renderLayout } from "../layout.js?v=coffee-v137";
 import { apiGet, legacyCompanyDbId, loadSession, loadState } from "../store.js?v=coffee-v137";
 import { money } from "../format.js";
 import { byId } from "../dom.js";
+import { PAYMENT_STATUS, isPaidStatus, paymentStatusCode, statusLabel } from "../status-codes.js";
 
 renderLayout();
 
@@ -19,14 +20,15 @@ function escapeHtml(value = "") {
 }
 
 function statusPill(status) {
+  const code = paymentStatusCode(status);
   const className = {
-    paid: "status-ok",
-    pending: "status-warning",
-    failed: "status-empty",
-    cancelled: "status-empty",
-    expired: "status-empty"
-  }[status] || "status-warning";
-  return `<span class="status-pill ${className}">${status || "-"}</span>`;
+    [PAYMENT_STATUS.PAID]: "status-ok",
+    [PAYMENT_STATUS.UNPAID]: "status-warning",
+    [PAYMENT_STATUS.FAILED]: "status-empty",
+    [PAYMENT_STATUS.CANCELLED]: "status-empty",
+    [PAYMENT_STATUS.EXPIRED]: "status-empty"
+  }[code] || "status-warning";
+  return `<span class="status-pill ${className}">${statusLabel(code, "payment")} <small>${code}</small></span>`;
 }
 
 function formatDate(value) {
@@ -69,8 +71,8 @@ function loadLogs() {
 
 function renderSummary() {
   const totalAmount = logs.reduce((sum, item) => sum + Number(item.amount || 0), 0);
-  const paid = logs.filter((item) => item.status === "paid").length;
-  const pending = logs.filter((item) => item.status === "pending").length;
+  const paid = logs.filter((item) => isPaidStatus(item.status)).length;
+  const pending = logs.filter((item) => paymentStatusCode(item.status) === PAYMENT_STATUS.UNPAID).length;
   const simulated = logs.filter((item) => item.simulated).length;
   byId("gateway-log-summary").innerHTML = `
     <article><span>Total Log</span><strong>${logs.length}</strong></article>
@@ -101,12 +103,12 @@ function openDetail(id) {
   if (!item) return;
   const detailLogs = item.detailLogs || [];
   byId("gateway-log-title").textContent = `${item.orderNo} · ${item.provider}`;
-  byId("gateway-log-subtitle").textContent = `${item.reference} · ${item.status}`;
+  byId("gateway-log-subtitle").textContent = `${item.reference} · ${statusLabel(item.status, "payment")} (${paymentStatusCode(item.status)})`;
   byId("gateway-log-detail").innerHTML = `
     <div class="gateway-log-detail-grid">
       <article><span>Order</span><strong>${escapeHtml(item.orderNo)}</strong></article>
       <article><span>Provider Ref</span><strong>${escapeHtml(item.reference)}</strong></article>
-      <article><span>Status</span><strong>${escapeHtml(item.status)}</strong></article>
+      <article><span>Status</span><strong>${escapeHtml(statusLabel(item.status, "payment"))} (${paymentStatusCode(item.status)})</strong></article>
       <article><span>Dibuat</span><strong>${formatDate(item.createdAt)}</strong></article>
     </div>
     <section class="gateway-hit-log-section">
@@ -120,7 +122,7 @@ function openDetail(id) {
             </div>
             <div>
               ${log.httpStatus ? `<span class="status-pill status-ok">HTTP ${log.httpStatus}</span>` : `<span class="status-pill status-warning">No HTTP</span>`}
-              ${log.status ? `<span class="status-pill ${log.status === "failed" ? "status-empty" : "status-ok"}">${escapeHtml(log.status)}</span>` : ""}
+              ${log.status ? statusPill(log.status) : ""}
             </div>
           </summary>
           ${log.errorMessage ? `<p class="form-note">${escapeHtml(log.errorMessage)}</p>` : ""}

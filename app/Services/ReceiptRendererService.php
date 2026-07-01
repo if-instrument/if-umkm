@@ -11,7 +11,7 @@ class ReceiptRendererService
         $outletCode = (string) ($outlet['code'] ?? '');
         $outletName = (string) ($outlet['name'] ?? 'Outlet');
         $outletAddress = (string) ($outlet['address'] ?? '');
-        $statusLabel = (string) ($order['payment_status'] ?? 'unpaid');
+        $statusLabel = $this->paymentStatusLabel((string) ($order['payment_status'] ?? 'unpaid'));
         $rows = implode('', array_map(fn ($item) => $this->itemRow($item), $items));
         $subtotal = (float) ($order['product_revenue'] ?? $this->itemsSubtotal($items));
         $packaging = (float) ($order['packaging_fee'] ?? 0);
@@ -57,6 +57,17 @@ class ReceiptRendererService
             . '</table>'
             . '</td></tr></table>'
             . '</div>';
+    }
+
+    private function paymentStatusLabel(string $status): string
+    {
+        return match (StatusCodeService::payment($status)) {
+            StatusCodeService::PAYMENT_PAID => 'PAID',
+            StatusCodeService::PAYMENT_FAILED => 'FAILED',
+            StatusCodeService::PAYMENT_EXPIRED => 'EXPIRED',
+            StatusCodeService::PAYMENT_CANCELLED => 'CANCELLED',
+            default => 'UNPAID',
+        };
     }
 
     private function itemRow(array $item): string

@@ -4,6 +4,7 @@ namespace App\Controllers\Api;
 
 use App\Controllers\BaseController;
 use App\Services\ProductSuiteService;
+use App\Services\StatusCodeService;
 use Config\Database;
 
 class ProductSuiteController extends BaseController
@@ -244,7 +245,7 @@ class ProductSuiteController extends BaseController
         $db = Database::connect();
         $companyOutlet = $db->table('outlets')
             ->where('id', $requestedOutletId)
-            ->where('status !=', 'inactive')
+            ->whereNotIn('status', [StatusCodeService::INACTIVE, 'inactive'])
 ;
         if ($db->fieldExists('company_id', 'outlets')) {
             $companyOutlet->where('company_id', $companyId);
@@ -252,7 +253,7 @@ class ProductSuiteController extends BaseController
         $companyOutlet = $companyOutlet->countAllResults() > 0;
         if (($claims['authType'] ?? '') === 'company_admin') {
             if ($companyOutlet) return $requestedOutletId;
-            $fallback = $db->table('outlets')->select('id')->where('status !=', 'inactive')->orderBy('id');
+            $fallback = $db->table('outlets')->select('id')->whereNotIn('status', [StatusCodeService::INACTIVE, 'inactive'])->orderBy('id');
             if ($db->fieldExists('company_id', 'outlets')) {
                 $fallback->where('company_id', $companyId);
             }
@@ -272,7 +273,7 @@ class ProductSuiteController extends BaseController
             ->select('uo.outlet_id')
             ->join('outlets o', 'o.id = uo.outlet_id', 'inner')
             ->where('uo.user_id', $userId)
-            ->where('o.status !=', 'inactive')
+            ->whereNotIn('o.status', [StatusCodeService::INACTIVE, 'inactive'])
             ->orderBy('uo.outlet_id');
         if ($db->fieldExists('company_id', 'outlets')) {
             $assigned->where('o.company_id', $companyId);

@@ -1,9 +1,10 @@
 import { renderLayout } from "../layout.js?v=coffee-v137";
 import { apiGet, apiPost, apiPut, applyPermissionControls, canUsePermission, loadSession, loadState, primaryOutletId, scopedApiUrl, scopedPayload, visibleForSession } from "../store.js?v=coffee-v137";
+import { applyPageBootstrap, loadPageBootstrap, pageDateValue } from "../page-engine.js";
 import { formatQty, money } from "../format.js";
 import { costingMethod, effectiveRecipe, ingredientCostForQty, ingredientUnitCost, isStockedProduct, modifierPrice, productAvailability, productAvailabilityWithModifiers, productById, productCogs, productCogsWithModifiers, productModifierOptions } from "../inventory.js";
 import { byId, showAlert } from "../dom.js";
-import { ORDER_STATUS, orderStatusCode, orderStatusIn, orderStatusIs } from "../order-status.js";
+import { ORDER_STATUS, PAYMENT_STATUS, isActiveStatus, isInactiveStatus, isPaidStatus, isUnpaidStatus, orderStatusCode, orderStatusIn, orderStatusIs, paymentStatusCode, statusLabel } from "../status-codes.js";
 
 renderLayout();
 
@@ -26,6 +27,18 @@ let pendingPayment = null;
 let paymentIntentContext = null;
 let paymentPollTimer = null;
 let autoCheckoutInProgress = false;
+
+function isPaymentPaid(status) {
+  return isPaidStatus(status);
+}
+
+function isOrderUnpaid(order) {
+  return isUnpaidStatus(order?.paymentStatus);
+}
+
+function isPaymentFailedFinal(status) {
+  return [PAYMENT_STATUS.FAILED, PAYMENT_STATUS.CANCELLED, PAYMENT_STATUS.EXPIRED].includes(paymentStatusCode(status));
+}
 let expandedPosOrderId = "";
 
 function qrImageUrl(payload, size = 320) {
@@ -77,13 +90,15 @@ const serviceChannelOptions = [
 
 function applySalesData(data) {
   if (!data) return;
-  if (data.settings) state.settings = data.settings;
-  if (Array.isArray(data.categories)) state.categories = data.categories;
-  if (Array.isArray(data.products)) state.products = data.products;
-  if (Array.isArray(data.modifiers)) state.modifiers = data.modifiers;
-  if (Array.isArray(data.ingredients)) state.ingredients = data.ingredients;
-  if (Array.isArray(data.stockMovements)) state.stockMovements = data.stockMovements;
-  if (Array.isArray(data.transactions)) state.transactions = data.transactions;
+  applyPageBootstrap(state, data, [
+    "settings",
+    "categories",
+    "products",
+    "modifiers",
+    "ingredients",
+    "stockMovements",
+    "transactions"
+  ]);
 }
 
 function combinePackagingLines(lines) {
@@ -99,25 +114,15 @@ function combinePackagingLines(lines) {
 }
 
 function refreshSales() {
-  const settings = apiGet(scopedApiUrl("/api/setting", state, session));
-  const tables = apiGet(scopedApiUrl("/api/dining-table?per_page=100", state, session));
-  const payments = apiGet(scopedApiUrl("/api/payment-method?per_page=100", state, session));
-  const packaging = apiGet(scopedApiUrl("/api/packaging-rule?per_page=100", state, session));
-  const categories = apiGet(scopedApiUrl("/api/category?per_page=100", state, session));
-  const products = apiGet(scopedApiUrl("/api/product?per_page=100", state, session));
-  const modifiers = apiGet(scopedApiUrl("/api/modifier?per_page=100", state, session));
-  const ingredients = apiGet(scopedApiUrl("/api/ingredient?per_page=100", state, session));
-  const movements = apiGet(scopedApiUrl("/api/stock-movement?per_page=100", state, session));
-  const orders = apiGet(scopedApiUrl("/api/order?per_page=100", state, session));
-  applySalesData({
-    settings: { ...(settings?.data || {}), diningTables: tables?.data?.items || [], paymentMethods: payments?.data?.items || [], packagingRules: packaging?.data?.items || [] },
-    categories: categories?.data?.items || [],
-    products: products?.data?.items || [],
-    modifiers: modifiers?.data?.items || [],
-    ingredients: ingredients?.data?.items || [],
-    stockMovements: movements?.data?.items || [],
-    transactions: orders?.data?.items || []
+  const bootstrap = loadPageBootstrap("pos", state, session, {
+    date: todayDateValue(),
+    per_page: 75
   });
+  if (bootstrap?.ok && bootstrap.data) {
+    applySalesData(bootstrap.data);
+    return;
+  }
+  showAlert(bootstrap?.message || "Data POS belum bisa dimuat dari page controller.", "error");
 }
 
 function activeServiceChannels() {
@@ -168,6 +173,10 @@ function isToday(value) {
   return new Date(value).toDateString() === new Date().toDateString();
 }
 
+function todayDateValue(date = new Date()) {
+  return pageDateValue(date);
+}
+
 function queueElapsed(value) {
   const minutes = Math.max(0, Math.floor((Date.now() - new Date(value).getTime()) / 60000));
   if (minutes < 1) return "Baru saja";
@@ -210,7 +219,7 @@ function renderApprovalCount() {
 }
 
 function canEditOrder(order) {
-  return orderStatusIn(order.status, [ORDER_STATUS.PENDING_CASHIER, ORDER_STATUS.WAITING]) && order.paymentStatus === "unpaid";
+  return orderStatusIn(order.status, [ORDER_STATUS.PENDING_CASHIER, ORDER_STATUS.WAITING]) && isOrderUnpaid(order);
 }
 
 function renderPosQueue() {
@@ -407,7 +416,7 @@ function closePosTables() {
 }
 
 function renderCategories() {
-  const categories = state.categories.filter((category) => visibleForSession(category, state, session) && category.status === "active");
+  const categories = state.categories.filter((category) => visibleForSession(category, state, session) && isActiveStatus(category.status));
   byId("pos-category-tabs").innerHTML = `
     <button class="${productCategory === "all" ? "active" : ""}" data-pos-category="all" type="button">Semua</button>
     ${categories.map((category) => `<button class="${productCategory === category.id ? "active" : ""}" data-pos-category="${category.id}" type="button">${category.name}</button>`).join("")}
@@ -416,13 +425,13 @@ function renderCategories() {
 
 function activeDiningTables() {
   return (state.settings.diningTables || [])
-    .filter((table) => table.status === "active")
+    .filter((table) => isActiveStatus(table.status))
     .sort((a, b) => Number(a.sort || 0) - Number(b.sort || 0) || a.name.localeCompare(b.name));
 }
 
 function activePaymentMethods() {
   return (state.settings.paymentMethods || [])
-    .filter((method) => method.status === "active")
+    .filter((method) => isActiveStatus(method.status))
     .sort((a, b) => Number(a.sort || 0) - Number(b.sort || 0) || a.name.localeCompare(b.name));
 }
 
@@ -522,7 +531,7 @@ function isPackagingIngredient(item) {
 
 function orderLevelPackagingIngredientIds() {
   return new Set((state.settings.packagingRules || [])
-    .filter((rule) => rule.status !== "inactive")
+    .filter((rule) => !isInactiveStatus(rule.status))
     .flatMap((rule) => [...(rule.items || []), ...(rule.fallbackItems || [])])
     .map((item) => item.ingredientId)
     .filter(Boolean));
@@ -541,7 +550,7 @@ function automaticOrderCode() {
 function openTableOrders() {
   return state.transactions
     .filter((order) => visibleForSession(order, state, session))
-    .filter((order) => order.serviceType === "Dine In" && order.paymentStatus === "unpaid")
+    .filter((order) => order.serviceType === "Dine In" && isOrderUnpaid(order))
     .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
 }
 
@@ -658,7 +667,7 @@ function renderBillDetail(order, settlementMode = false, mode = "settle") {
       <article><span>Meja</span><strong>${order.tableName}</strong></article>
       <article><span>Total Item</span><strong>${orderItemCount(order)}</strong></article>
       <article><span>Total Bill</span><strong>${money(order.total)}</strong></article>
-      <article><span>Status</span><strong>${order.paymentStatus === "unpaid" ? "Open" : "Paid"}</strong></article>
+      <article><span>Status</span><strong>${isOrderUnpaid(order) ? "Open" : "Paid"}</strong></article>
     </div>
     <div class="bill-detail-table-wrap">
       <table class="bill-detail-table">
@@ -755,12 +764,12 @@ function paymentMetaForBill(order, mode = "settle") {
       throw new Error(`${selectedPaymentType() === "qris" ? "QRIS" : "Request kartu"} dibuat. Konfirmasi setelah pembayaran sukses.`);
     }
     refreshPendingPaymentStatus();
-    if (isQrisPayment() && pendingPayment.status !== "paid") openQrisPaymentModal(pendingPayment);
-    if (isCardPayment() && pendingPayment.status !== "paid") openCardPaymentModal(pendingPayment);
-    if (["failed", "cancelled", "expired"].includes(pendingPayment.status)) throw new Error(`Payment ${pendingPayment.status}. Buat payment request baru.`);
-    if (["xendit", "midtrans"].includes(pendingPayment.provider) && pendingPayment.status !== "paid") throw new Error(`Menunggu status pembayaran sukses dari ${paymentGatewayLabel(pendingPayment.provider)}.`);
-    const paid = pendingPayment.status === "paid" ? pendingPayment : confirmPendingPayment();
-    if (paid.status !== "paid") throw new Error("Payment belum sukses.");
+    if (isQrisPayment() && !isPaymentPaid(pendingPayment.status)) openQrisPaymentModal(pendingPayment);
+    if (isCardPayment() && !isPaymentPaid(pendingPayment.status)) openCardPaymentModal(pendingPayment);
+    if (isPaymentFailedFinal(pendingPayment.status)) throw new Error(`Payment ${statusLabel(pendingPayment.status, "payment")}. Buat payment request baru.`);
+    if (["xendit", "midtrans"].includes(pendingPayment.provider) && !isPaymentPaid(pendingPayment.status)) throw new Error(`Menunggu status pembayaran sukses dari ${paymentGatewayLabel(pendingPayment.provider)}.`);
+    const paid = isPaymentPaid(pendingPayment.status) ? pendingPayment : confirmPendingPayment();
+    if (!isPaymentPaid(paid.status)) throw new Error("Payment belum sukses.");
     return {
       paymentMethod,
       provider: paid.provider,
@@ -882,7 +891,7 @@ function salesPayload(orderId, orderItems, totals, packaging, serviceCharge, pac
     packagingLoss: packaging.loss || 0,
     tax,
     total,
-    paymentStatus: payLater && !options.forcePaid ? "unpaid" : "paid",
+    paymentStatus: payLater && !options.forcePaid ? PAYMENT_STATUS.UNPAID : PAYMENT_STATUS.PAID,
     paymentMethod: payLater && !options.forcePaid ? "Belum dibayar" : paymentMethod,
     cashTendered: payment.cashTendered || 0,
     changeDue: payment.changeDue || 0,
@@ -1138,7 +1147,7 @@ function automaticPackaging() {
   if (!needsPackaging()) return [];
   const itemCount = cart.reduce((total, line) => total + line.qty, 0);
   if (!itemCount) return [];
-  const rules = (state.settings.packagingRules || []).filter((rule) => rule.status !== "inactive").slice();
+  const rules = (state.settings.packagingRules || []).filter((rule) => !isInactiveStatus(rule.status)).slice();
   const largestRules = rules.slice().sort((a, b) => b.maxQty - a.maxQty);
   const smallestFittingRules = rules.slice().sort((a, b) => a.maxQty - b.maxQty || a.minQty - b.minQty);
   const selectedRules = [];
@@ -1166,7 +1175,7 @@ function automaticPackaging() {
       return map;
     }, new Map());
     return [...requiredByIngredient.entries()].every(([ingredientId, required]) => {
-      const ingredient = state.ingredients.find((entry) => entry.id === ingredientId && entry.status !== "inactive" && isPackagingIngredient(entry));
+      const ingredient = state.ingredients.find((entry) => entry.id === ingredientId && !isInactiveStatus(entry.status) && isPackagingIngredient(entry));
       return ingredient && ingredient.stock >= required;
     });
   };
@@ -1191,7 +1200,7 @@ function automaticPackaging() {
   });
 
   return [...combined.values()].map((item) => {
-    const ingredient = state.ingredients.find((entry) => entry.id === item.ingredientId && entry.status !== "inactive" && isPackagingIngredient(entry));
+    const ingredient = state.ingredients.find((entry) => entry.id === item.ingredientId && !isInactiveStatus(entry.status) && isPackagingIngredient(entry));
     return {
       ingredientId: item.ingredientId,
       name: ingredient?.name || "Kemasan tambahan tidak ditemukan",
@@ -1207,11 +1216,11 @@ function resolvedPackaging() {
   if (!needsPackaging()) return [];
   const automatic = automaticPackaging();
   const manualLines = packagingManualLines.map((line) => {
-    const ingredient = state.ingredients.find((item) => item.id === line.ingredientId && item.status !== "inactive" && isPackagingIngredient(item));
+    const ingredient = state.ingredients.find((item) => item.id === line.ingredientId && !isInactiveStatus(item.status) && isPackagingIngredient(item));
     return ingredient ? { manualId: line.id, ingredientId: ingredient.id, name: ingredient.name, qty: line.qty, price: line.price, cogs: ingredientUnitCost(state, ingredient), lossCost: 0, treatment: line.treatment, reason: line.reason, isManualPackaging: true, isPackaging: true } : null;
   }).filter(Boolean);
   if (packagingOverride) {
-    const ingredient = state.ingredients.find((item) => item.id === packagingOverride.ingredientId && item.status !== "inactive" && isPackagingIngredient(item));
+    const ingredient = state.ingredients.find((item) => item.id === packagingOverride.ingredientId && !isInactiveStatus(item.status) && isPackagingIngredient(item));
     const isLoss = packagingOverride.treatment === "replacement_loss";
     packagingResolution = { source: manualLines.length ? `manual_add_${packagingOverride.treatment}` : packagingOverride.treatment, note: manualLines.length ? `Kemasan otomatis diganti + ${manualLines.length} tambahan manual` : `Kemasan otomatis diganti: ${packagingOverride.reason}` };
     const replacement = ingredient ? [{
@@ -1245,10 +1254,10 @@ function packagingTotals() {
 }
 
 function renderProducts() {
-  const activeCategoryIds = new Set(state.categories.filter((category) => visibleForSession(category, state, session) && category.status === "active").map((category) => category.id));
+  const activeCategoryIds = new Set(state.categories.filter((category) => visibleForSession(category, state, session) && isActiveStatus(category.status)).map((category) => category.id));
   const visibleProducts = state.products
     .filter((product) => visibleForSession(product, state, session))
-    .filter((product) => product.status !== "inactive")
+    .filter((product) => !isInactiveStatus(product.status))
     .filter((product) => !product.categoryId || activeCategoryIds.has(product.categoryId))
     .filter((product) => product.name.toLowerCase().includes(productSearch) && (productCategory === "all" || product.categoryId === productCategory));
   byId("pos-product-result").textContent = `${visibleProducts.length} produk tersedia`;
@@ -1409,7 +1418,7 @@ function receiptRows(order) {
 }
 
 function autoPrintPaidOrder(order) {
-  if (!order || order.paymentStatus !== "paid" || !state.settings?.printerName) return;
+  if (!order || !isPaymentPaid(order.paymentStatus) || !state.settings?.printerName) return;
   const printWindow = window.open("", "_blank", "width=420,height=720");
   if (!printWindow) {
     showAlert("Order paid, tetapi popup print diblokir browser. Izinkan popup untuk auto print struk.", "error");
@@ -1717,7 +1726,7 @@ function confirmStaticQrisPayment() {
   if (!pendingPayment?.id || !isOfflineQrisPayment()) return;
   try {
     const paid = confirmPendingPayment();
-    if (paid.status !== "paid") throw new Error("Pembayaran QRIS belum berhasil dikonfirmasi.");
+    if (!isPaymentPaid(paid.status)) throw new Error("Pembayaran QRIS belum berhasil dikonfirmasi.");
     closeQrisPaymentModal();
     if (paymentIntentContext?.source === "bill") {
       const billOrder = state.transactions.find((order) => order.id === paymentIntentContext.orderId);
@@ -1754,7 +1763,7 @@ function createPaymentRequest(amount, orderNumber, paymentFee = { amount: 0, pay
   if (!response?.ok) throw new Error(response?.message || "Payment request belum berhasil dibuat.");
   pendingPayment = { ...response.data, amount, methodName: method.name };
   if (paymentIntentContext?.source === "bill") pendingPayment.contextOrderId = paymentIntentContext.orderId;
-  if (["failed", "cancelled", "expired"].includes(pendingPayment.status)) {
+  if (isPaymentFailedFinal(pendingPayment.status)) {
     throw new Error(pendingPayment.errorMessage || `Payment ${pendingPayment.status}. Periksa konfigurasi ${selectedPaymentGatewayLabel()}.`);
   }
   if (isQrisPayment()) openQrisPaymentModal(pendingPayment);
@@ -1805,7 +1814,7 @@ function stopPaymentStatusPolling() {
 
 function startPaymentStatusPolling(type = selectedPaymentType()) {
   stopPaymentStatusPolling();
-  if (!pendingPayment?.id || pendingPayment.status === "paid") return;
+  if (!pendingPayment?.id || isPaymentPaid(pendingPayment.status)) return;
   const poll = () => pollPendingPaymentStatus(type);
   window.setTimeout(poll, 3000);
   paymentPollTimer = window.setInterval(poll, 60000);
@@ -1816,7 +1825,7 @@ function pollPendingPaymentStatus(type = selectedPaymentType()) {
   const previousStatus = pendingPayment.status;
   refreshPendingPaymentStatus();
   if (!pendingPayment?.id) return;
-  if (pendingPayment.status === "paid") {
+  if (isPaymentPaid(pendingPayment.status)) {
     autoCheckoutInProgress = true;
     stopPaymentStatusPolling();
     closeQrisPaymentModal();
@@ -1839,7 +1848,7 @@ function pollPendingPaymentStatus(type = selectedPaymentType()) {
     }
     return;
   }
-  if (["failed", "cancelled", "expired"].includes(pendingPayment.status)) {
+  if (isPaymentFailedFinal(pendingPayment.status)) {
     stopPaymentStatusPolling();
     const message = `Payment ${pendingPayment.status}. Buat payment request baru.`;
     if (type === "qris") byId("qris-payment-note").textContent = message;
@@ -1937,16 +1946,16 @@ function paymentMetaForCheckout(total, orderNumber, paymentFee = { amount: 0, pa
       throw new Error(`${selectedPaymentType() === "qris" ? "QRIS dinamis" : "Request kartu"} dibuat. Konfirmasi setelah pembayaran sukses.`);
     }
     refreshPendingPaymentStatus();
-    if (isQrisPayment() && pendingPayment.qrPayload && pendingPayment.status !== "paid") openQrisPaymentModal(pendingPayment);
-    if (isCardPayment() && pendingPayment.status !== "paid") openCardPaymentModal(pendingPayment);
-    if (["failed", "cancelled", "expired"].includes(pendingPayment.status)) {
+    if (isQrisPayment() && pendingPayment.qrPayload && !isPaymentPaid(pendingPayment.status)) openQrisPaymentModal(pendingPayment);
+    if (isCardPayment() && !isPaymentPaid(pendingPayment.status)) openCardPaymentModal(pendingPayment);
+    if (isPaymentFailedFinal(pendingPayment.status)) {
       throw new Error(`Payment ${pendingPayment.status}. Buat payment request baru.`);
     }
-    if (["xendit", "midtrans"].includes(pendingPayment.provider) && pendingPayment.status !== "paid") {
+    if (["xendit", "midtrans"].includes(pendingPayment.provider) && !isPaymentPaid(pendingPayment.status)) {
       throw new Error(`Menunggu status pembayaran sukses dari ${paymentGatewayLabel(pendingPayment.provider)}.`);
     }
-    const paid = pendingPayment.status === "paid" ? pendingPayment : confirmPendingPayment();
-    if (paid.status !== "paid") throw new Error("Payment belum sukses.");
+    const paid = isPaymentPaid(pendingPayment.status) ? pendingPayment : confirmPendingPayment();
+    if (!isPaymentPaid(paid.status)) throw new Error("Payment belum sukses.");
     return {
       provider: paid.provider,
       reference: paid.reference,
@@ -2074,7 +2083,7 @@ function canApplyCartDraft(draft = cart) {
   for (const [ingredientId, qty] of ingredientUsage.entries()) {
     const ingredient = state.ingredients.find((item) => item.id === ingredientId);
     const available = Math.max(0, Number(ingredient?.stock || 0) - pendingIngredientQty(ingredientId) + (releasedIngredients.get(ingredientId) || 0));
-    if (!ingredient || ingredient.status === "inactive" || qty > available) return { ok: false, name: ingredient?.name || "bahan" };
+    if (!ingredient || isInactiveStatus(ingredient.status) || qty > available) return { ok: false, name: ingredient?.name || "bahan" };
   }
   return { ok: true };
 }
@@ -2121,7 +2130,7 @@ function addConfiguredProduct(productId, modifierIds = []) {
     return;
   }
   const product = productById(state, productId);
-  if (!product || product.status === "inactive") return;
+  if (!product || isInactiveStatus(product.status)) return;
   const key = `${productId}:${[...modifierIds].sort().join(",")}`;
   const current = cart.find((item) => item.id === key);
   const draft = draftWithAddedProduct(productId, modifierIds);
@@ -2168,7 +2177,7 @@ function changeCartModifiers(lineId, modifierIds = []) {
 
 function addToCart(productId) {
   const product = productById(state, productId);
-  if (!product || product.status === "inactive") return;
+  if (!product || isInactiveStatus(product.status)) return;
   if (!canAddProductFromCurrentDraft(product)) {
     byId("checkout-note").textContent = `${product.name} sold out.`;
     return;
@@ -2264,7 +2273,7 @@ function packagingPrice(ingredientId) {
 }
 
 function openPackagingOverride(lineId = "") {
-  const packagingIngredients = state.ingredients.filter((item) => item.stock > 0 && item.status !== "inactive" && isOrderLevelPackagingIngredient(item));
+  const packagingIngredients = state.ingredients.filter((item) => item.stock > 0 && !isInactiveStatus(item.status) && isOrderLevelPackagingIngredient(item));
   const editingLine = lineId ? (packagingManualLines.find((line) => line.id === lineId) || (packagingOverride?.id === lineId ? packagingOverride : null)) : null;
   const isEditing = Boolean(editingLine);
   const currentPackagingId = editingLine?.ingredientId || resolvedPackaging()[0]?.ingredientId || packagingIngredients[0]?.id || "";
@@ -2272,7 +2281,7 @@ function openPackagingOverride(lineId = "") {
   byId("packaging-override-title").textContent = isEditing ? "Edit Jumlah Kemasan" : "Tambah Kemasan Tambahan";
   byId("packaging-override-mode").value = editingLine?.treatment === "replacement_loss" ? "replace_damage" : editingLine?.treatment === "replacement_cost" ? "replace_shortage" : "add_chargeable";
   byId("packaging-override-item").innerHTML = state.ingredients
-    .filter((item) => item.stock > 0 && item.status !== "inactive" && isOrderLevelPackagingIngredient(item))
+    .filter((item) => item.stock > 0 && !isInactiveStatus(item.status) && isOrderLevelPackagingIngredient(item))
     .map((item) => `<option value="${item.id}">${item.name} · stok ${item.stock} ${item.unit} · ${money(packagingPrice(item.id))}</option>`)
     .join("") || `<option value="">Belum ada kemasan order-level di Packaging Rule</option>`;
   byId("packaging-override-item").value = currentPackagingId;

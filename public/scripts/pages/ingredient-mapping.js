@@ -3,6 +3,7 @@ import { apiGet, apiPut, appPath, applyPermissionControls, canUsePermission, loa
 import { formatQty } from "../format.js";
 import { byId, setText, showAlert } from "../dom.js";
 import { enhanceAllDataTables } from "../datatable.js";
+import { isInactiveStatus } from "../status-codes.js";
 
 renderLayout();
 
@@ -53,7 +54,7 @@ function visibleModifiers() {
 function visibleIngredients() {
   return state.ingredients
     .filter((ingredient) => visibleForSession(ingredient, state, session))
-    .filter((ingredient) => ingredient.status !== "inactive");
+    .filter((ingredient) => !isInactiveStatus(ingredient.status));
 }
 
 function templateById(templateId) {
@@ -87,13 +88,13 @@ function actionLabel(action) {
 
 function currentMappingLabel(templateId, fallbackIngredientId = "") {
   const ingredient = ingredientById(fallbackIngredientId) || ingredientForTemplate(templateId);
-  if (!ingredient || ingredient.status === "inactive") return `<span class="status-pill status-low">Belum dimapping</span>`;
+  if (!ingredient || isInactiveStatus(ingredient.status)) return `<span class="status-pill status-low">Belum dimapping</span>`;
   return `<strong>${escapeHtml(ingredient.name)}</strong><br><small>${escapeHtml(ingredient.unit)} · stok ${formatQty(ingredient.stock)}</small>`;
 }
 
 function currentMappingId(templateId, fallbackIngredientId = "") {
   const ingredient = ingredientById(fallbackIngredientId) || ingredientForTemplate(templateId);
-  return ingredient && ingredient.status !== "inactive" ? ingredient.id : "";
+  return ingredient && !isInactiveStatus(ingredient.status) ? ingredient.id : "";
 }
 
 function recipeRows() {

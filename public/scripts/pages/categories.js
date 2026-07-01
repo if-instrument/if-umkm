@@ -1,6 +1,7 @@
 import { renderLayout } from "../layout.js?v=coffee-v137";
 import { apiDelete, apiGet, apiPost, apiPut, applyPermissionControls, canManageCompanyMasters, canUsePermission, legacyOutletDbId, loadSession, loadState, primaryOutletId, scopedApiUrl, scopedPayload, stampScopedMaster, visibleForSession } from "../store.js?v=coffee-v137";
 import { byId, showAlert, showFeedback } from "../dom.js";
+import { COMMON_STATUS, isActiveStatus, isInactiveStatus } from "../status-codes.js";
 
 renderLayout();
 
@@ -56,7 +57,7 @@ function availableCategories() {
 
 function allTargetCategories() {
   return state.categories
-    .filter((category) => visibleForSession(category, state, session) && category.status === "active")
+    .filter((category) => visibleForSession(category, state, session) && isActiveStatus(category.status))
     .filter((category) => canGlobal || category.scope === "outlet");
 }
 
@@ -69,7 +70,7 @@ function visibleProducts() {
 function moveOptions(product) {
   const current = state.categories.find((category) => category.id === product.categoryId);
   return [
-    current?.status === "inactive" ? `<option value="${current.id}" selected disabled>${escapeHtml(current.name)} · Nonaktif</option>` : "",
+    isInactiveStatus(current?.status) ? `<option value="${current.id}" selected disabled>${escapeHtml(current.name)} · Nonaktif</option>` : "",
     `<option value="" ${product.categoryId ? "" : "selected"}>Belum dikategorikan</option>`,
     ...allTargetCategories().map((category) => `<option value="${category.id}" ${category.id === product.categoryId ? "selected" : ""}>${escapeHtml(category.name)} · ${category.scope === "company" ? "Global" : "Outlet"}</option>`)
   ].join("");
@@ -89,7 +90,7 @@ function lane(category, products) {
   const id = category?.id || "";
   const title = category?.name || "Belum Dikategorikan";
   const scope = category ? (category.scope === "company" ? "Global" : "Outlet Aktif") : "Tampil di tab Semua pada POS";
-  const active = !category || category.status === "active";
+  const active = !category || isActiveStatus(category.status);
   const editable = !category || canGlobal || (category.scope === "outlet" && legacyOutletDbId(category.outletId) === legacyOutletDbId(primaryOutletId(state, session)));
   return `
     <section class="category-lane ${active ? "" : "category-lane-inactive"}" ${active ? `data-category-drop="${id}"` : ""}>
@@ -179,7 +180,7 @@ document.addEventListener("click", (event) => {
     const category = state.categories.find((item) => item.id === toggle.dataset.toggleCategory);
     if (!category) return;
     try {
-      category.status === "inactive" ? putCategory(`/api/category/${category.id}`, { ...category, status: "active" }) : deleteCategory(`/api/category/${category.id}`);
+      isInactiveStatus(category.status) ? putCategory(`/api/category/${category.id}`, { ...category, status: COMMON_STATUS.ACTIVE }) : deleteCategory(`/api/category/${category.id}`);
       renderAll();
     } catch (error) {
       showAlert(error.message, "error");

@@ -15,6 +15,13 @@ class StatusCodeService
     public const PAYMENT_EXPIRED = '30';
     public const PAYMENT_CANCELLED = '99';
 
+    public const ORDER_PENDING_CASHIER = '00';
+    public const ORDER_WAITING = '10';
+    public const ORDER_PREPARING = '20';
+    public const ORDER_READY = '30';
+    public const ORDER_COMPLETED = '90';
+    public const ORDER_CANCELLED = '99';
+
     public const INVITATION_PENDING = '00';
     public const INVITATION_SENT = '10';
     public const INVITATION_ACCEPTED = '20';
@@ -64,6 +71,19 @@ class StatusCodeService
             'expired' => self::PAYMENT_EXPIRED,
             'cancelled' => self::PAYMENT_CANCELLED,
             'canceled' => self::PAYMENT_CANCELLED,
+        ], $default);
+    }
+
+    public static function order(?string $status, string $default = self::ORDER_WAITING): string
+    {
+        return self::map($status, [
+            'pending_cashier' => self::ORDER_PENDING_CASHIER,
+            'waiting' => self::ORDER_WAITING,
+            'preparing' => self::ORDER_PREPARING,
+            'ready' => self::ORDER_READY,
+            'completed' => self::ORDER_COMPLETED,
+            'cancelled' => self::ORDER_CANCELLED,
+            'canceled' => self::ORDER_CANCELLED,
         ], $default);
     }
 

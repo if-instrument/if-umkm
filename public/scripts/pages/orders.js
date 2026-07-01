@@ -3,7 +3,7 @@ import { apiGet, apiPut, applyPermissionControls, canUsePermission, loadSession,
 import { effectiveRecipe, isStockedProduct, productById, productModifierOptions } from "../inventory.js";
 import { money } from "../format.js";
 import { byId } from "../dom.js";
-import { ORDER_STATUS, orderStatusCode, orderStatusIn, orderStatusIs } from "../order-status.js";
+import { ORDER_STATUS, orderStatusCode, orderStatusIn, orderStatusIs } from "../status-codes.js";
 
 renderLayout();
 let state = loadState();

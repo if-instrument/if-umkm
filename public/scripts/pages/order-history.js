@@ -2,7 +2,7 @@ import { renderLayout } from "../layout.js?v=coffee-v137";
 import { apiGet, appPath, applyPermissionControls, loadSession, loadState, scopedApiUrl, visibleForSession } from "../store.js?v=coffee-v137";
 import { money } from "../format.js";
 import { byId } from "../dom.js";
-import { ORDER_STATUS, openOrderStatuses, orderStatusClass, orderStatusCode, orderStatusIn, orderStatusIs, orderStatusLabel } from "../order-status.js";
+import { ORDER_STATUS, openOrderStatuses, orderStatusClass, orderStatusCode, orderStatusIn, orderStatusIs, orderStatusLabel, statusLabel } from "../status-codes.js";
 
 renderLayout();
 
@@ -157,7 +157,7 @@ function renderTable() {
       <td>${order.serviceType || "-"}</td>
       <td><span class="status-pill ${orderStatusClass(order.status)}">${orderStatusLabel(order.status)} <small>${orderStatusCode(order.status)}</small></span></td>
       <td><div class="completed-order-items">${orderItemsMarkup(order) || "-"}</div></td>
-      <td>${order.paymentMethod || "-"}<span>${order.paymentStatus || "-"}</span></td>
+      <td>${order.paymentMethod || "-"}<span>${statusLabel(order.paymentStatus, "payment")}</span></td>
       <td><strong>${money(order.total || 0)}</strong><span>${itemCount(order)} item</span></td>
       <td>${actionButtons(order)}</td>
     </tr>

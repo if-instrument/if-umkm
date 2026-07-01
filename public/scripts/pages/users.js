@@ -2,6 +2,7 @@ import { renderLayout } from "../layout.js?v=coffee-v137";
 import { apiDelete, apiGet, apiPost, apiPut, apiUpload, applyPermissionControls, canUsePermission, loadSession, loadState } from "../store.js?v=coffee-v137";
 import { byId, setText, showAlert, showFeedback } from "../dom.js";
 import { enhanceAllDataTables } from "../datatable.js";
+import { COMMON_STATUS, INVITATION_STATUS, isActiveStatus, isInactiveStatus, statusLabel } from "../status-codes.js";
 
 renderLayout();
 let state = loadState();
@@ -140,8 +141,8 @@ const permissionModules = [
 ];
 
 function statusPill(status) {
-  if (status === "invited") return `<span class="status-pill status-warning">Diundang</span>`;
-  return `<span class="status-pill ${status === "active" ? "status-ok" : "status-empty"}">${status === "active" ? "Aktif" : "Nonaktif"}</span>`;
+  if (String(status) === INVITATION_STATUS.PENDING || status === "invited") return `<span class="status-pill status-warning">Diundang</span>`;
+  return `<span class="status-pill ${isActiveStatus(status) ? "status-ok" : "status-empty"}">${isActiveStatus(status) ? "Aktif" : statusLabel(status, "common")}</span>`;
 }
 
 function activeCompany() {
@@ -149,11 +150,11 @@ function activeCompany() {
 }
 
 function activeOutlets() {
-  return state.outlets.filter((outlet) => outlet.companyId === state.activeCompanyId && outlet.status !== "inactive");
+  return state.outlets.filter((outlet) => outlet.companyId === state.activeCompanyId && !isInactiveStatus(outlet.status));
 }
 
 function activeRoles() {
-  return state.companyRoles.filter((role) => role.companyId === state.activeCompanyId && role.status !== "inactive");
+  return state.companyRoles.filter((role) => role.companyId === state.activeCompanyId && !isInactiveStatus(role.status));
 }
 
 function roleById(id) {
@@ -281,9 +282,9 @@ function renderCompanies() {
       <td>
         <div class="row-actions">
           <button class="ghost-button compact-button" data-edit-company="${company.id}" data-permission="admin.companies:update" type="button">Edit</button>
-          ${company.adminStatus === "invited" ? `<button class="ghost-button compact-button" data-resend-company-invite="${company.id}" data-permission="admin.companies:update" type="button">Kirim Ulang Undangan</button>` : ""}
+          ${String(company.adminStatus) === INVITATION_STATUS.PENDING || company.adminStatus === "invited" ? `<button class="ghost-button compact-button" data-resend-company-invite="${company.id}" data-permission="admin.companies:update" type="button">Kirim Ulang Undangan</button>` : ""}
           ${isSuperAdmin ? "" : `<button class="ghost-button compact-button" data-select-company="${company.id}" ${company.id === state.activeCompanyId ? "disabled" : ""} type="button">Kelola</button>`}
-          <button class="ghost-button compact-button" data-toggle-company="${company.id}" data-permission="admin.companies:delete" type="button">${company.status === "active" ? "Nonaktif" : "Aktifkan"}</button>
+          <button class="ghost-button compact-button" data-toggle-company="${company.id}" data-permission="admin.companies:delete" type="button">${isActiveStatus(company.status) ? "Nonaktif" : "Aktifkan"}</button>
         </div>
       </td>
     </tr>
@@ -322,7 +323,7 @@ function renderRoles() {
       <td>
         <div class="row-actions">
           <button class="ghost-button compact-button" data-edit-role="${role.id}" data-permission="roles.manage:update" type="button">Edit</button>
-          <button class="ghost-button compact-button" data-toggle-role="${role.id}" data-permission="roles.manage:delete" type="button">${role.status === "active" ? "Nonaktif" : "Aktifkan"}</button>
+          <button class="ghost-button compact-button" data-toggle-role="${role.id}" data-permission="roles.manage:delete" type="button">${isActiveStatus(role.status) ? "Nonaktif" : "Aktifkan"}</button>
         </div>
       </td>
     </tr>
@@ -340,7 +341,7 @@ function renderOutlets() {
       <td>
         <div class="row-actions">
           <button class="ghost-button compact-button" data-edit-outlet="${outlet.id}" data-permission="outlets.manage:update" type="button">Edit</button>
-          <button class="ghost-button compact-button" data-toggle-outlet="${outlet.id}" data-permission="outlets.manage:delete" type="button">${outlet.status === "active" ? "Nonaktif" : "Aktifkan"}</button>
+          <button class="ghost-button compact-button" data-toggle-outlet="${outlet.id}" data-permission="outlets.manage:delete" type="button">${isActiveStatus(outlet.status) ? "Nonaktif" : "Aktifkan"}</button>
         </div>
       </td>
     </tr>
@@ -361,8 +362,8 @@ function renderUsers() {
         <td>
           <div class="row-actions">
             <button class="ghost-button compact-button" data-edit-user="${user.id}" data-permission="users.manage:update" type="button">Edit</button>
-            ${user.status === "invited" ? `<button class="ghost-button compact-button" data-resend-user-invite="${user.id}" data-permission="users.manage:create" type="button">Kirim Ulang Undangan</button>` : ""}
-            <button class="ghost-button compact-button" data-toggle-user="${user.id}" data-permission="users.manage:delete" type="button">${user.status === "active" ? "Nonaktif" : "Aktifkan"}</button>
+            ${String(user.status) === INVITATION_STATUS.PENDING || user.status === "invited" ? `<button class="ghost-button compact-button" data-resend-user-invite="${user.id}" data-permission="users.manage:create" type="button">Kirim Ulang Undangan</button>` : ""}
+            <button class="ghost-button compact-button" data-toggle-user="${user.id}" data-permission="users.manage:delete" type="button">${isActiveStatus(user.status) ? "Nonaktif" : "Aktifkan"}</button>
           </div>
         </td>
       </tr>
@@ -464,7 +465,7 @@ function openCompany(company = null) {
   byId("company-modal-title").textContent = company ? "Edit Perusahaan" : "Tambah Perusahaan";
   byId("tenant-name").value = company?.name || "";
   byId("tenant-route-slug").value = company?.routeSlug || "";
-  byId("tenant-status").value = company?.status || "active";
+  byId("tenant-status").value = company?.status || COMMON_STATUS.ACTIVE;
   byId("tenant-admin-name").value = company?.adminName || "";
   byId("tenant-admin-email").value = company?.adminEmail || "";
   setLogoValue("tenant-logo-url", "tenant-logo-preview", company?.logoUrl || "", (company?.name || "IF").slice(0, 2).toUpperCase());
@@ -479,7 +480,7 @@ function openRole(role = null) {
   byId("role-modal-title").textContent = role ? "Edit Role" : "Tambah Role";
   byId("role-name").value = role?.name || "";
   byId("role-outlet-scope").value = role?.outletScope || "selected";
-  byId("role-status").value = role?.status || "active";
+  byId("role-status").value = role?.status || COMMON_STATUS.ACTIVE;
   byId("role-responsibility").value = role?.responsibility || "";
   renderPermissionMatrix(normalizeMatrix(role?.permissionMatrix, role?.permissions || []));
   openModal("role-modal");
@@ -492,7 +493,7 @@ function openUser(user = null) {
   byId("user-name").value = user?.name || "";
   byId("user-email").value = user?.email || "";
   byId("user-role").value = user?.roleId || activeRoles()[0]?.id || "";
-  byId("user-status").value = user?.status || "active";
+  byId("user-status").value = user?.status || COMMON_STATUS.ACTIVE;
   byId("user-all-outlets").checked = (roleById(byId("user-role").value)?.outletScope || "") === "all";
   const assignedOutlets = new Set(user?.outletIds?.length ? user.outletIds : [activeOutlets()[0]?.id].filter(Boolean));
   document.querySelectorAll("[data-user-outlet]").forEach((input) => { input.checked = assignedOutlets.has(input.value); });
@@ -507,7 +508,7 @@ function openOutlet(outlet = null) {
   byId("outlet-code").value = outlet?.code || `OUT-${String(state.outlets.length + 1).padStart(3, "0")}`;
   byId("outlet-name").value = outlet?.name || "";
   byId("outlet-city").value = outlet?.city || "";
-  byId("outlet-status").value = outlet?.status || "active";
+  byId("outlet-status").value = outlet?.status || COMMON_STATUS.ACTIVE;
   openModal("outlet-modal");
 }
 
@@ -535,7 +536,7 @@ byId("tenant-form").addEventListener("submit", (event) => {
     const invitation = result.data?.invitation;
     showAlert(id
       ? "Perusahaan berhasil diperbarui."
-      : invitation?.status === "sent"
+      : (String(invitation?.status) === INVITATION_STATUS.SENT || invitation?.status === "sent")
         ? "Perusahaan dibuat dan email aktivasi admin telah dikirim."
         : invitation?.message || "Perusahaan dibuat, tetapi email aktivasi perlu dikirim ulang.");
   }
@@ -596,7 +597,7 @@ byId("user-form").addEventListener("submit", (event) => {
     const invitation = result.data?.invitation;
     showAlert(id
       ? `User ${payload.name} diperbarui.`
-      : invitation?.status === "sent"
+      : (String(invitation?.status) === INVITATION_STATUS.SENT || invitation?.status === "sent")
         ? `User ${payload.name} dibuat dan email aktivasi telah dikirim.`
         : invitation?.message || `User ${payload.name} dibuat, tetapi email aktivasi perlu dikirim ulang.`);
   }
@@ -638,12 +639,12 @@ document.addEventListener("click", (event) => {
   const toggleCompany = event.target.closest("[data-toggle-company]");
   if (toggleCompany && canUsePermission("admin.companies", "delete", state, session)) {
     const company = state.companies.find((item) => item.id === toggleCompany.dataset.toggleCompany);
-    if (company && (company.status === "inactive" ? putAccess(`/api/company/${company.id}`, { ...company, status: "active" }) : deleteAccess(`/api/company/${company.id}`))) refreshTables();
+    if (company && (isInactiveStatus(company.status) ? putAccess(`/api/company/${company.id}`, { ...company, status: COMMON_STATUS.ACTIVE }) : deleteAccess(`/api/company/${company.id}`))) refreshTables();
   }
   const resendCompanyInvite = event.target.closest("[data-resend-company-invite]");
   if (resendCompanyInvite && canUsePermission("admin.companies", "update", state, session)) {
     const result = apiPost(`/api/company/${resendCompanyInvite.dataset.resendCompanyInvite}/invite-admin`, {});
-    result?.ok && result.data?.status === "sent"
+    result?.ok && (String(result.data?.status) === INVITATION_STATUS.SENT || result.data?.status === "sent")
       ? showAlert("Email undangan admin perusahaan dikirim ulang.")
       : showFeedback("company-feedback", result?.data?.message || result?.message || "Undangan gagal dikirim ulang.");
   }
@@ -653,7 +654,7 @@ document.addEventListener("click", (event) => {
   const toggleRole = event.target.closest("[data-toggle-role]");
   if (toggleRole && !isSuperAdmin && canUsePermission("roles.manage", "delete", state, session)) {
     const role = state.companyRoles.find((item) => item.id === toggleRole.dataset.toggleRole);
-    if (role && (role.status === "inactive" ? putAccess(`/api/role/${role.id}`, { ...role, status: "active" }) : deleteAccess(`/api/role/${role.id}`))) refreshTables();
+    if (role && (isInactiveStatus(role.status) ? putAccess(`/api/role/${role.id}`, { ...role, status: COMMON_STATUS.ACTIVE }) : deleteAccess(`/api/role/${role.id}`))) refreshTables();
   }
 
   const editUser = event.target.closest("[data-edit-user]");
@@ -661,13 +662,13 @@ document.addEventListener("click", (event) => {
   const toggleUser = event.target.closest("[data-toggle-user]");
   if (toggleUser && !isSuperAdmin && canUsePermission("users.manage", "delete", state, session)) {
     const user = state.users.find((item) => item.id === toggleUser.dataset.toggleUser);
-    if (user && (user.status === "inactive" ? putAccess(`/api/user/${user.id}`, { ...user, status: "active" }) : deleteAccess(`/api/user/${user.id}`))) refreshTables();
+    if (user && (isInactiveStatus(user.status) ? putAccess(`/api/user/${user.id}`, { ...user, status: COMMON_STATUS.ACTIVE }) : deleteAccess(`/api/user/${user.id}`))) refreshTables();
   }
   const resendUserInvite = event.target.closest("[data-resend-user-invite]");
   if (resendUserInvite && !isSuperAdmin && canUsePermission("users.manage", "create", state, session)) {
     const numericCompanyId = state.activeCompanyId === "company-main" ? 1 : String(state.activeCompanyId || "").replace("company-", "");
     const result = apiPost(`/api/user/${resendUserInvite.dataset.resendUserInvite}/invite`, { company_id: Number(numericCompanyId) || 1 });
-    result?.ok && result.data?.status === "sent"
+    result?.ok && (String(result.data?.status) === INVITATION_STATUS.SENT || result.data?.status === "sent")
       ? showAlert("Email undangan user dikirim ulang.")
       : showFeedback("company-feedback", result?.data?.message || result?.message || "Undangan gagal dikirim ulang.");
   }
@@ -677,7 +678,7 @@ document.addEventListener("click", (event) => {
   const toggleOutlet = event.target.closest("[data-toggle-outlet]");
   if (toggleOutlet && !isSuperAdmin && canUsePermission("outlets.manage", "delete", state, session)) {
     const outlet = state.outlets.find((item) => item.id === toggleOutlet.dataset.toggleOutlet);
-    if (outlet && (outlet.status === "inactive" ? putAccess(`/api/outlet/${outlet.id}`, { ...outlet, status: "active" }) : deleteAccess(`/api/outlet/${outlet.id}`))) refreshTables();
+    if (outlet && (isInactiveStatus(outlet.status) ? putAccess(`/api/outlet/${outlet.id}`, { ...outlet, status: COMMON_STATUS.ACTIVE }) : deleteAccess(`/api/outlet/${outlet.id}`))) refreshTables();
   }
 
   if (event.target.closest("[data-close-modal]") || event.target.matches("[data-modal-backdrop]")) closeModal();

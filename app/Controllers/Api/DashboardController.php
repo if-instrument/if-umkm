@@ -4,6 +4,7 @@ namespace App\Controllers\Api;
 
 use App\Controllers\BaseController;
 use App\Services\DashboardService;
+use App\Services\StatusCodeService;
 use Config\Database;
 
 class DashboardController extends BaseController
@@ -33,7 +34,7 @@ class DashboardController extends BaseController
     {
         $db = Database::connect();
         $belongsToCompany = function (int $id) use ($db, $companyId): bool {
-            $builder = $db->table('outlets')->where('id', $id)->where('status !=', 'inactive');
+            $builder = $db->table('outlets')->where('id', $id)->whereNotIn('status', [StatusCodeService::INACTIVE, 'inactive']);
             if ($db->fieldExists('company_id', 'outlets')) {
                 $builder->where('company_id', $companyId);
             }
@@ -41,7 +42,7 @@ class DashboardController extends BaseController
         };
         if (($claims['authType'] ?? '') === 'company_admin') {
             if ($belongsToCompany($requested)) return $requested;
-            $fallback = $db->table('outlets')->select('id')->where('status !=', 'inactive')->orderBy('id');
+            $fallback = $db->table('outlets')->select('id')->whereNotIn('status', [StatusCodeService::INACTIVE, 'inactive'])->orderBy('id');
             if ($db->fieldExists('company_id', 'outlets')) {
                 $fallback->where('company_id', $companyId);
             }
@@ -52,7 +53,7 @@ class DashboardController extends BaseController
         $role = $db->table('user_roles ur')->select('r.scope')->join('roles r', 'r.id = ur.role_id', 'left')->where('ur.user_id', $userId)->get()->getRowArray();
         if (($role['scope'] ?? '') === 'all' && $belongsToCompany($requested)) return $requested;
         $assigned = $db->table('user_outlets uo')->select('uo.outlet_id')->join('outlets o', 'o.id = uo.outlet_id', 'inner')
-            ->where('uo.user_id', $userId)->where('o.status !=', 'inactive')->orderBy('uo.outlet_id');
+            ->where('uo.user_id', $userId)->whereNotIn('o.status', [StatusCodeService::INACTIVE, 'inactive'])->orderBy('uo.outlet_id');
         if ($db->fieldExists('company_id', 'outlets')) {
             $assigned->where('o.company_id', $companyId);
         }

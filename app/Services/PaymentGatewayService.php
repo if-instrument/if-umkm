@@ -34,7 +34,7 @@ class PaymentGatewayService
     {
         $methodId = $this->numericId($payload['paymentMethodId'] ?? $payload['payment_method_id'] ?? '');
         $method = $methodId ? (new PaymentMethodModel())->find($methodId) : null;
-        if (! $method || ! $this->rowBelongsToCompany($method, $companyId) || (int) $method['outlet_id'] !== $outletId || $method['status'] !== 'active') {
+        if (! $method || ! $this->rowBelongsToCompany($method, $companyId) || (int) $method['outlet_id'] !== $outletId || ! StatusCodeService::isActive($method['status'] ?? '')) {
             throw new \InvalidArgumentException('Metode bayar tidak ditemukan atau tidak aktif.');
         }
 
@@ -100,7 +100,7 @@ class PaymentGatewayService
     public function status(string $legacyId, int $companyId, int $outletId): array
     {
         $row = $this->transactionRow($legacyId, $companyId, $outletId);
-        if ($row['provider'] === 'midtrans' && $row['status'] === 'pending') {
+        if ($row['provider'] === 'midtrans' && StatusCodeService::payment($row['status'] ?? '') === StatusCodeService::PAYMENT_UNPAID) {
             $row = $this->syncMidtransTransaction($row);
         }
         return $this->transactionPayload($row);
@@ -121,7 +121,7 @@ class PaymentGatewayService
             $builder->where('provider', $filters['provider']);
         }
         if (! empty($filters['status'])) {
-            $builder->where('status', $filters['status']);
+            $builder->where('status', StatusCodeService::payment((string) $filters['status']));
         }
         if (! empty($filters['q'])) {
             $q = trim((string) $filters['q']);
@@ -201,19 +201,19 @@ class PaymentGatewayService
         $target = self::XENDIT_INVOICE_URL . '/' . rawurlencode($invoiceId);
         $gatewayResponse = $this->getJson($target, 'Basic ' . base64_encode($secret . ':'), (int) ($settings['timeout'] ?? 15));
         $body = $gatewayResponse['body'];
-        $status = $gatewayResponse['ok'] ? $this->xenditInvoiceStatus((string) ($body['status'] ?? '')) : 'pending';
+        $status = $gatewayResponse['ok'] ? $this->xenditInvoiceStatus((string) ($body['status'] ?? '')) : StatusCodeService::PAYMENT_UNPAID;
         $responsePayload['rawSync'] = $body;
         $responsePayload['syncHttpStatus'] = $gatewayResponse['status'];
         $responsePayload['syncError'] = $gatewayResponse['error'];
-        if ($status !== 'pending') {
+        if ($status !== StatusCodeService::PAYMENT_UNPAID) {
             $responsePayload['status'] = $status;
         }
 
         $update = ['response_payload' => json_encode($responsePayload)];
-        if ($status !== 'pending') {
+        if ($status !== StatusCodeService::PAYMENT_UNPAID) {
             $update['status'] = $status;
         }
-        if ($status === 'paid') {
+        if ($status === StatusCodeService::PAYMENT_PAID) {
             $update['paid_at'] = date('Y-m-d H:i:s');
         }
         $this->transactions->update((int) $row['id'], $update);
@@ -225,17 +225,17 @@ class PaymentGatewayService
     public function confirm(string $legacyId, int $companyId, int $outletId): array
     {
         $row = $this->transactionRow($legacyId, $companyId, $outletId);
-        if ($row['status'] !== 'paid') {
+        if (! StatusCodeService::isPaid($row['status'] ?? '')) {
             if (in_array($row['provider'], ['xendit', 'midtrans'], true)) {
                 throw new \InvalidArgumentException('Pembayaran online harus dikonfirmasi oleh status atau webhook gateway.');
             }
             $this->transactions->update((int) $row['id'], [
-                'status' => 'paid',
+                'status' => StatusCodeService::PAYMENT_PAID,
                 'paid_at' => date('Y-m-d H:i:s'),
                 'response_payload' => json_encode([
                     'provider' => $row['provider'],
                     'reference' => $row['provider_reference'],
-                    'status' => 'paid',
+                    'status' => StatusCodeService::PAYMENT_PAID,
                     'confirmedBy' => 'cashier_offline_confirmation',
                 ]),
             ]);
@@ -244,9 +244,9 @@ class PaymentGatewayService
                 'action' => 'confirm_offline_payment',
                 'target' => '/api/payment-transaction/' . $legacyId . '/confirm',
                 'httpMethod' => 'PUT',
-                'status' => 'paid',
+                'status' => StatusCodeService::PAYMENT_PAID,
                 'requestPayload' => ['paymentTransactionId' => $legacyId],
-                'responsePayload' => ['status' => 'paid', 'confirmedBy' => 'cashier_offline_confirmation'],
+                'responsePayload' => ['status' => StatusCodeService::PAYMENT_PAID, 'confirmedBy' => 'cashier_offline_confirmation'],
             ]);
         }
         return $this->transactionPayload($this->transactions->find((int) $row['id']));
@@ -255,16 +255,16 @@ class PaymentGatewayService
     public function cancel(string $legacyId, int $companyId, int $outletId): array
     {
         $row = $this->transactionRow($legacyId, $companyId, $outletId);
-        if ($row['status'] === 'pending') {
-            $this->transactions->update((int) $row['id'], ['status' => 'cancelled']);
+        if (StatusCodeService::payment($row['status'] ?? '') === StatusCodeService::PAYMENT_UNPAID) {
+            $this->transactions->update((int) $row['id'], ['status' => StatusCodeService::PAYMENT_CANCELLED]);
             $this->writeGatewayLog((int) $row['id'], (int) ($row['company_id'] ?? 1), (int) $row['outlet_id'], [
                 'direction' => 'internal',
                 'action' => 'cancel_payment_transaction',
                 'target' => '/api/payment-transaction/' . $legacyId . '/cancel',
                 'httpMethod' => 'PUT',
-                'status' => 'cancelled',
+                'status' => StatusCodeService::PAYMENT_CANCELLED,
                 'requestPayload' => ['paymentTransactionId' => $legacyId],
-                'responsePayload' => ['status' => 'cancelled'],
+                'responsePayload' => ['status' => StatusCodeService::PAYMENT_CANCELLED],
             ]);
         }
         return $this->transactionPayload($this->transactions->find((int) $row['id']));
@@ -294,7 +294,7 @@ class PaymentGatewayService
             'status' => $status,
             'response_payload' => json_encode($response),
         ];
-        if ($status === 'paid') {
+        if ($status === StatusCodeService::PAYMENT_PAID) {
             $captureTime = $data['captures'][0]['capture_timestamp'] ?? null;
             $update['paid_at'] = $captureTime ? date('Y-m-d H:i:s', strtotime((string) $captureTime)) : date('Y-m-d H:i:s');
         }
@@ -345,7 +345,7 @@ class PaymentGatewayService
             'reference' => $row['provider_reference'],
             'amount' => (float) $row['amount'],
             'feeAmount' => (float) $row['fee_amount'],
-            'status' => $row['status'],
+            'status' => StatusCodeService::payment($row['status'] ?? ''),
             'qrPayload' => $qrPayload,
             'qrPayloadValid' => $qrPayloadValid,
             'qrPayloadKind' => $qrPayloadValid ? 'qris-emv' : ($qrPayload ? 'provider-placeholder' : ''),
@@ -386,7 +386,7 @@ class PaymentGatewayService
             'reference' => $row['provider_reference'],
             'amount' => (float) $row['amount'],
             'feeAmount' => (float) $row['fee_amount'],
-            'status' => $row['status'],
+            'status' => StatusCodeService::payment($row['status'] ?? ''),
             'mode' => (string) ($response['mode'] ?? ''),
             'httpStatus' => $response['httpStatus'] ?? '',
             'webhookEvent' => $response['webhookEvent'] ?? '',
@@ -407,7 +407,7 @@ class PaymentGatewayService
             'target' => $row['target'],
             'httpMethod' => $row['http_method'],
             'httpStatus' => $row['http_status'] !== null ? (int) $row['http_status'] : null,
-            'status' => $row['status'] ?? '',
+            'status' => StatusCodeService::payment($row['status'] ?? ''),
             'errorMessage' => $row['error_message'] ?? '',
             'requestPayload' => json_decode($row['request_payload'] ?: '{}', true) ?: [],
             'responsePayload' => json_decode($row['response_payload'] ?: '{}', true) ?: [],
@@ -888,14 +888,14 @@ class PaymentGatewayService
         $target = $base . '/v2/' . rawurlencode($reference) . '/status';
         $gatewayResponse = $this->getJson($target, 'Basic ' . base64_encode($secret . ':'), (int) ($settings['timeout'] ?? 15));
         $body = $gatewayResponse['body'];
-        $status = $gatewayResponse['ok'] ? $this->midtransLocalStatus((string) ($body['transaction_status'] ?? '')) : 'pending';
+        $status = $gatewayResponse['ok'] ? $this->midtransLocalStatus((string) ($body['transaction_status'] ?? '')) : StatusCodeService::PAYMENT_UNPAID;
         $responsePayload = json_decode($row['response_payload'] ?? '{}', true) ?: [];
         $responsePayload['rawSync'] = $body;
         $responsePayload['syncHttpStatus'] = $gatewayResponse['status'];
         $responsePayload['syncError'] = $gatewayResponse['error'];
         $responsePayload['status'] = $status;
         $update = ['status' => $status, 'response_payload' => json_encode($responsePayload)];
-        if ($status === 'paid') $update['paid_at'] = date('Y-m-d H:i:s');
+        if ($status === StatusCodeService::PAYMENT_PAID) $update['paid_at'] = date('Y-m-d H:i:s');
         $this->transactions->update((int) $row['id'], $update);
         $this->writeGatewayLog((int) $row['id'], (int) ($row['company_id'] ?? 1), (int) $row['outlet_id'], $this->httpLog('sync_midtrans_payment_status', $target, ['reference' => $reference], $gatewayResponse, 'GET'));
         return $this->transactions->find((int) $row['id']);
@@ -904,11 +904,11 @@ class PaymentGatewayService
     private function midtransLocalStatus(string $status): string
     {
         return match (strtolower($status)) {
-            'capture', 'settlement' => 'paid',
-            'deny', 'failure' => 'failed',
-            'cancel' => 'cancelled',
-            'expire' => 'expired',
-            default => 'pending',
+            'capture', 'settlement' => StatusCodeService::PAYMENT_PAID,
+            'deny', 'failure' => StatusCodeService::PAYMENT_FAILED,
+            'cancel' => StatusCodeService::PAYMENT_CANCELLED,
+            'expire' => StatusCodeService::PAYMENT_EXPIRED,
+            default => StatusCodeService::PAYMENT_UNPAID,
         };
     }
 
@@ -957,7 +957,7 @@ class PaymentGatewayService
                 'terminalSerial' => $type === 'card' ? $terminalSerial : null,
                 'connectorStatus' => $type === 'card' ? $connectorStatus : null,
                 'reference' => $reference,
-                'status' => 'pending',
+                'status' => StatusCodeService::PAYMENT_UNPAID,
                 'mode' => $settings['mode'] ?? 'sandbox',
             ] + $extra,
             'logs' => [[
@@ -966,7 +966,7 @@ class PaymentGatewayService
                 'target' => 'manual://' . $provider,
                 'httpMethod' => 'MANUAL',
                 'httpStatus' => null,
-                'status' => 'pending',
+                'status' => StatusCodeService::PAYMENT_UNPAID,
                 'requestPayload' => [
                     'provider' => $provider,
                     'channel' => $channel,
@@ -1093,11 +1093,11 @@ class PaymentGatewayService
     private function initialTransactionStatus(string $gatewayStatus): string
     {
         return match ($gatewayStatus) {
-            'paid' => 'paid',
-            'failed' => 'failed',
-            'cancelled' => 'cancelled',
-            'expired' => 'expired',
-            default => 'pending',
+            StatusCodeService::PAYMENT_PAID, 'paid' => StatusCodeService::PAYMENT_PAID,
+            StatusCodeService::PAYMENT_FAILED, 'failed' => StatusCodeService::PAYMENT_FAILED,
+            StatusCodeService::PAYMENT_CANCELLED, 'cancelled' => StatusCodeService::PAYMENT_CANCELLED,
+            StatusCodeService::PAYMENT_EXPIRED, 'expired' => StatusCodeService::PAYMENT_EXPIRED,
+            default => StatusCodeService::PAYMENT_UNPAID,
         };
     }
 
@@ -1113,6 +1113,7 @@ class PaymentGatewayService
         if (! Database::connect()->tableExists('payment_transaction_logs')) {
             return;
         }
+        $logStatus = $this->gatewayLogStatus($log['status'] ?? null);
         $this->transactionLogs->insert($this->withCompanyData('payment_transaction_logs', [
             'payment_transaction_id' => $paymentTransactionId,
             'company_id' => $companyId,
@@ -1122,11 +1123,29 @@ class PaymentGatewayService
             'target' => $log['target'] ?? '',
             'http_method' => $log['httpMethod'] ?? 'POST',
             'http_status' => $log['httpStatus'] ?? null,
-            'status' => $log['status'] ?? null,
+            'status' => $logStatus,
             'request_payload' => json_encode($log['requestPayload'] ?? []),
             'response_payload' => json_encode($log['responsePayload'] ?? []),
             'error_message' => $log['errorMessage'] ?? null,
         ], $companyId));
+    }
+
+    private function gatewayLogStatus($status): ?string
+    {
+        $value = strtolower(trim((string) $status));
+        if ($value === '') {
+            return null;
+        }
+        if (preg_match('/^\d{2}$/', $value)) {
+            return $value;
+        }
+        return match ($value) {
+            'success', 'ok', 'paid', 'succeeded', 'settled' => StatusCodeService::PAYMENT_PAID,
+            'failed', 'failure', 'error', 'configuration_required', 'send_failed' => StatusCodeService::PAYMENT_FAILED,
+            'expired' => StatusCodeService::PAYMENT_EXPIRED,
+            'cancelled', 'canceled' => StatusCodeService::PAYMENT_CANCELLED,
+            default => StatusCodeService::PAYMENT_UNPAID,
+        };
     }
 
     private function gatewayProvider(array $settings, string $type, array $method = []): string
@@ -1289,20 +1308,20 @@ class PaymentGatewayService
     private function xenditLocalStatus(string $status): string
     {
         return match (strtoupper($status)) {
-            'SUCCEEDED' => 'paid',
-            'FAILED' => 'failed',
-            'CANCELED', 'CANCELLED' => 'cancelled',
-            'EXPIRED' => 'expired',
-            default => 'pending',
+            'SUCCEEDED' => StatusCodeService::PAYMENT_PAID,
+            'FAILED' => StatusCodeService::PAYMENT_FAILED,
+            'CANCELED', 'CANCELLED' => StatusCodeService::PAYMENT_CANCELLED,
+            'EXPIRED' => StatusCodeService::PAYMENT_EXPIRED,
+            default => StatusCodeService::PAYMENT_UNPAID,
         };
     }
 
     private function xenditInvoiceStatus(string $status): string
     {
         return match (strtoupper($status)) {
-            'PAID', 'SETTLED' => 'paid',
-            'EXPIRED' => 'expired',
-            default => 'pending',
+            'PAID', 'SETTLED' => StatusCodeService::PAYMENT_PAID,
+            'EXPIRED' => StatusCodeService::PAYMENT_EXPIRED,
+            default => StatusCodeService::PAYMENT_UNPAID,
         };
     }
 
@@ -1310,16 +1329,16 @@ class PaymentGatewayService
     {
         $event = strtolower($event);
         if ($event === 'payment.capture') {
-            return 'paid';
+            return StatusCodeService::PAYMENT_PAID;
         }
         if ($event === 'payment.failure') {
-            return 'failed';
+            return StatusCodeService::PAYMENT_FAILED;
         }
         if (in_array($event, ['invoice.paid', 'invoice.settled'], true)) {
-            return 'paid';
+            return StatusCodeService::PAYMENT_PAID;
         }
         if (in_array($event, ['invoice.expired', 'invoice.failed'], true)) {
-            return $event === 'invoice.expired' ? 'expired' : 'failed';
+            return $event === 'invoice.expired' ? StatusCodeService::PAYMENT_EXPIRED : StatusCodeService::PAYMENT_FAILED;
         }
         return $this->xenditLocalStatus($status);
     }

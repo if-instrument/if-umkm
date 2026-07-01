@@ -240,7 +240,7 @@
             <label>Area <input id="dining-table-area" required type="text" placeholder="Indoor / Outdoor / VIP" /></label>
             <label>Kapasitas <input id="dining-table-capacity" min="1" required type="number" /></label>
             <label>Urutan Tampil <input id="dining-table-sort" min="1" required type="number" /></label>
-            <label>Status <select id="dining-table-status"><option value="active">Aktif</option><option value="inactive">Nonaktif</option></select></label>
+            <label>Status <select id="dining-table-status"><option value="10">Aktif</option><option value="90">Nonaktif</option></select></label>
             <div class="modal-actions full-row"><button class="ghost-button" data-close-modal type="button">Batal</button><button class="primary-button" type="submit">Simpan Meja</button></div>
             <p class="form-feedback full-row" id="dining-table-feedback"></p>
           </form>
@@ -265,12 +265,12 @@
             <label>Terminal ID <input id="payment-method-terminal" type="text" placeholder="ID mesin EDC jika ada" /></label>
             <label id="payment-merchant-id-field" hidden>Merchant ID <input id="payment-merchant-id" type="text" placeholder="MID dari acquirer / connector" /></label>
             <label id="payment-terminal-serial-field" hidden>Serial Mesin <input id="payment-terminal-serial" type="text" placeholder="Serial fisik terminal EDC" /></label>
-            <label id="payment-connector-status-field" hidden>Status Connector <select id="payment-connector-status"><option value="not_configured">Belum dikonfigurasi</option><option value="ready">Ready</option><option value="inactive">Nonaktif</option></select></label>
+            <label id="payment-connector-status-field" hidden>Status Connector <select id="payment-connector-status"><option value="00">Belum dikonfigurasi</option><option value="10">Ready</option><option value="90">Nonaktif</option></select></label>
             <label>MDR / Fee (%) <input id="payment-method-fee" min="0" max="100" step="0.01" type="number" /></label>
             <label>Fee Ditanggung <select id="payment-method-fee-payer"><option value="merchant">Merchant / Usaha</option><option value="customer">Customer</option></select></label>
             <label>Akun Settlement <input id="payment-method-account" type="text" placeholder="Kas Tunai / Bank / Payment Gateway" /></label>
             <label>Urutan Tampil <input id="payment-method-sort" min="1" required type="number" /></label>
-            <label>Status <select id="payment-method-status"><option value="active">Aktif</option><option value="inactive">Nonaktif</option></select></label>
+            <label>Status <select id="payment-method-status"><option value="10">Aktif</option><option value="90">Nonaktif</option></select></label>
             <div class="modal-actions full-row"><button class="ghost-button" data-close-modal type="button">Batal</button><button class="primary-button" type="submit">Simpan Metode</button></div>
             <p class="form-feedback full-row" id="payment-method-feedback"></p>
           </form>

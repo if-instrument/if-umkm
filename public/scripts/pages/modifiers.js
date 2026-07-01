@@ -4,6 +4,7 @@ import { formatQty, money } from "../format.js";
 import { byId, setText, showAlert } from "../dom.js";
 import { ingredientName, missingModifierOptions, missingModifierSummary } from "../inventory.js";
 import { enhanceAllDataTables } from "../datatable.js";
+import { COMMON_STATUS, isInactiveStatus } from "../status-codes.js";
 
 renderLayout();
 
@@ -62,7 +63,7 @@ function visibleIngredients() {
 }
 
 function visibleTemplates() {
-  return (state.ingredientTemplates || []).filter((template) => template.status !== "inactive");
+  return (state.ingredientTemplates || []).filter((template) => !isInactiveStatus(template.status));
 }
 
 function templateById(templateId) {
@@ -70,7 +71,7 @@ function templateById(templateId) {
 }
 
 function ingredientForTemplate(templateId) {
-  return visibleIngredients().find((ingredient) => ingredient.templateId === templateId && ingredient.status !== "inactive");
+  return visibleIngredients().find((ingredient) => ingredient.templateId === templateId && !isInactiveStatus(ingredient.status));
 }
 
 function nextIngredientSku() {
@@ -155,7 +156,7 @@ function createIngredientTemplateFromOption(prefix, config) {
     name,
     category,
     unit,
-    status: "active"
+    status: COMMON_STATUS.ACTIVE
   });
   const created = response?.data || response?.template || null;
   const template = created?.id
@@ -289,7 +290,7 @@ function saveMaterialAndUse(config, prefix) {
       totalCost,
       standardCost: Number(wrapper.querySelector(`[data-option-${prefix}-material-standard]`).value) || fallbackCost,
       minStock: Number(wrapper.querySelector(`[data-option-${prefix}-material-min]`).value) || 0,
-      status: "active"
+      status: COMMON_STATUS.ACTIVE
     });
     const ingredient = ingredientForTemplate(templateId);
     drafts.forEach((draft) => {
@@ -307,8 +308,8 @@ function saveMaterialAndUse(config, prefix) {
 function modifierDescription(modifier) {
   const options = modifier.options || [];
   return options.map((option) => {
-    const ingredientExists = state.ingredients.some((item) => item.id === option.ingredientId && item.status !== "inactive");
-    const replacementExists = state.ingredients.some((item) => item.id === option.replacementIngredientId && item.status !== "inactive");
+    const ingredientExists = state.ingredients.some((item) => item.id === option.ingredientId && !isInactiveStatus(item.status));
+    const replacementExists = state.ingredients.some((item) => item.id === option.replacementIngredientId && !isInactiveStatus(item.status));
     const missingBase = !ingredientExists;
     const missingReplacement = option.action === "replace" && !replacementExists;
     const ingredient = missingBase
@@ -334,9 +335,9 @@ function renderModifiers() {
       const missingOptions = missingModifierOptions(state, modifier);
       return `
       <tr>
-        <td><strong>${escapeHtml(modifier.name)}</strong><br><span class="muted-text">${modifier.scope === "outlet" ? "Khusus outlet aktif" : "Global perusahaan"} · ${modifier.choiceType === "single" ? "Radio" : "Checkbox"} · ${modifier.status === "inactive" ? "Nonaktif" : modifier.requiredSelection ? "Wajib" : "Opsional"}</span>${missingOptions.length ? `<br><small class="muted-text">Perlu mapping bahan outlet: ${escapeHtml(missingModifierSummary(state, modifier))}</small>` : ""}</td>
+        <td><strong>${escapeHtml(modifier.name)}</strong><br><span class="muted-text">${modifier.scope === "outlet" ? "Khusus outlet aktif" : "Global perusahaan"} · ${modifier.choiceType === "single" ? "Radio" : "Checkbox"} · ${isInactiveStatus(modifier.status) ? "Nonaktif" : modifier.requiredSelection ? "Wajib" : "Opsional"}</span>${missingOptions.length ? `<br><small class="muted-text">Perlu mapping bahan outlet: ${escapeHtml(missingModifierSummary(state, modifier))}</small>` : ""}</td>
         <td>${modifierDescription(modifier)}</td>
-        <td><div class="row-actions"><button class="ghost-button compact-button" data-modifier-price="${modifier.id}" data-permission="modifiers.outletPrice:update" type="button">Harga Outlet</button><button class="ghost-button compact-button" ${canEditMaster(modifier) ? "" : "disabled title=\"Selected Outlet hanya bisa edit modifier outlet yang dipilih\""} data-edit-modifier="${modifier.id}" data-permission="modifiers.master:update" type="button">Edit</button><button class="ghost-button compact-button" ${canEditMaster(modifier) ? "" : "disabled title=\"Selected Outlet hanya bisa edit modifier outlet yang dipilih\""} data-toggle-modifier="${modifier.id}" data-permission="modifiers.master:delete" type="button">${modifier.status === "inactive" ? "Aktifkan" : "Nonaktifkan"}</button></div></td>
+        <td><div class="row-actions"><button class="ghost-button compact-button" data-modifier-price="${modifier.id}" data-permission="modifiers.outletPrice:update" type="button">Harga Outlet</button><button class="ghost-button compact-button" ${canEditMaster(modifier) ? "" : "disabled title=\"Selected Outlet hanya bisa edit modifier outlet yang dipilih\""} data-edit-modifier="${modifier.id}" data-permission="modifiers.master:update" type="button">Edit</button><button class="ghost-button compact-button" ${canEditMaster(modifier) ? "" : "disabled title=\"Selected Outlet hanya bisa edit modifier outlet yang dipilih\""} data-toggle-modifier="${modifier.id}" data-permission="modifiers.master:delete" type="button">${isInactiveStatus(modifier.status) ? "Aktifkan" : "Nonaktifkan"}</button></div></td>
       </tr>
     `;
     }).join("")
@@ -672,7 +673,7 @@ byId("modifier-price-form").addEventListener("submit", (event) => {
         optionId: row.dataset.modifierPriceOption,
         priceDelta: Number(row.querySelector("[data-price-option-value]").value) || 0,
         note: row.querySelector("[data-price-option-note]").value.trim(),
-        status: "active"
+        status: COMMON_STATUS.ACTIVE
       });
     });
     closePriceModal();
@@ -736,7 +737,7 @@ document.addEventListener("click", (event) => {
     const modifier = state.modifiers.find((item) => item.id === toggleModifier.dataset.toggleModifier);
     if (!modifier) return;
     try {
-      if (modifier.status === "inactive") putProductSuite(`/api/modifier/${modifier.id}`, { ...modifier, status: "active" });
+      if (isInactiveStatus(modifier.status)) putProductSuite(`/api/modifier/${modifier.id}`, { ...modifier, status: COMMON_STATUS.ACTIVE });
       else deleteProductSuite(`/api/modifier/${modifier.id}`, {});
       renderModifiers();
     } catch (error) {

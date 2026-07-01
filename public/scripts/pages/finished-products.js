@@ -4,6 +4,7 @@ import { formatQty, money } from "../format.js";
 import { byId, setText, showAlert, showFeedback } from "../dom.js";
 import { enhanceAllDataTables } from "../datatable.js";
 import { ingredientById, isStockedProduct } from "../inventory.js";
+import { isInactiveStatus } from "../status-codes.js";
 
 renderLayout();
 
@@ -26,7 +27,7 @@ function stockableProducts(mode = stockModalMode) {
     .filter((product) => visibleForSession(product, state, session))
     .filter((product) => isStockedProduct(product))
     .filter((product) => mode === "purchase" ? isRetailProduct(product) : isProductionProduct(product))
-    .filter((product) => product.status !== "inactive");
+    .filter((product) => !isInactiveStatus(product.status));
 }
 
 function productionReadiness(product) {
@@ -44,7 +45,7 @@ function productionReadiness(product) {
     .map((line) => {
       const ingredient = ingredientById(state, line.ingredientId);
       const label = line.templateName || line.ingredientName || "Bahan recipe";
-      if (!ingredient || ingredient.status === "inactive") {
+      if (!ingredient || isInactiveStatus(ingredient.status)) {
         blockers.push(`${label} belum dimapping ke bahan outlet.`);
         return 0;
       }

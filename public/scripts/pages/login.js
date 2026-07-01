@@ -1,4 +1,4 @@
-import { apiGet, apiPost, appPath, currentCompanySlug, loadSession, saveSession } from "../store.js?v=coffee-v137";
+import { apiGet, apiPost, appPath, currentCompanySlug, loadSession, saveSession } from "../store.js?v=coffee-v149";
 import { byId, setText, showFeedback } from "../dom.js";
 
 const session = loadSession();
@@ -70,7 +70,15 @@ function fillSample(type) {
 
 function login(email, password) {
   const result = apiPost("/api/auth/login", { email, password, companySlug });
-  if (!result?.ok || !result.user) return false;
+  if (!result?.ok || !result.user) {
+    showFeedback("login-feedback", result?.message || "Email atau password tidak sesuai.");
+    if (result?.routeUrl) {
+      window.setTimeout(() => {
+        window.location.href = result.routeUrl;
+      }, 700);
+    }
+    return false;
+  }
   const user = result.user;
   const authType = user.authType || (user.role === "Super Admin" ? "super_admin" : "company_user");
   const companyId = authType === "super_admin" ? "" : user.companyId || "";
