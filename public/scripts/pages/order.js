@@ -27,6 +27,7 @@ let state = {
   paymentMethodId: "",
   paymentProof: null,
   cartConfirmed: false,
+  selectedMemberId: "",
   spread: "cover",
   outletConfirmed: false,
   orderResult: null
@@ -315,11 +316,28 @@ function checkoutStartPage() {
 }
 
 function receiptStartPage() {
-  return checkoutStartPage() + 2 + receiptSpacerPageCount();
+  return checkoutStartPage() + checkoutPageCount() + receiptSpacerPageCount();
 }
 
 function isCheckoutPageNumber(page) {
   return page >= checkoutStartPage() && page < receiptStartPage();
+}
+
+function checkoutPageCount() {
+  return document.querySelectorAll('[data-book-section="checkout"]').length || 1;
+}
+
+function customerPageNumber() {
+  return pageNumberForElement(optionalById("order-customer-page")) || checkoutStartPage() + 1;
+}
+
+function coverStartPage() {
+  const coverPage = document.querySelector(".public-cover-page:not(.public-back-cover-page)");
+  return pageNumberForElement(coverPage) || pageForSpread("cover");
+}
+
+function shouldHideCustomerPageOnMobile() {
+  return isMobileMenu() && !state.cartConfirmed;
 }
 
 function currentBookPage() {
@@ -339,6 +357,11 @@ function canFreeTurnToPage(targetPage) {
 function pageNumberForElement(element) {
   if (!element) return 0;
   return [...byId("order-flipbook").querySelectorAll(".public-book-page")].indexOf(element) + 1;
+}
+
+function forceTurnToElement(selector, fallbackPage) {
+  const element = document.querySelector(selector);
+  turnToPage(pageNumberForElement(element) || fallbackPage, true);
 }
 
 function flipbook() {
@@ -439,7 +462,8 @@ function snapshotBookInputs() {
     customerName: optionalById("order-customer-name")?.value || "",
     customerEmail: optionalById("order-customer-email")?.value || "",
     customerPhone: optionalById("order-customer-phone")?.value || "",
-    registerMember: optionalById("order-register-member")?.checked || false
+    registerMember: optionalById("order-register-member")?.checked || false,
+    selectedMemberId: state.selectedMemberId || ""
   };
 }
 
@@ -451,6 +475,8 @@ function restoreBookInputs(snapshot) {
   if (optionalById("order-customer-email")) byId("order-customer-email").value = snapshot.customerEmail || "";
   if (optionalById("order-customer-phone")) byId("order-customer-phone").value = snapshot.customerPhone || "";
   if (optionalById("order-register-member")) byId("order-register-member").checked = Boolean(snapshot.registerMember);
+  state.selectedMemberId = snapshot.selectedMemberId || state.selectedMemberId || "";
+  syncSelectedMemberFields();
 }
 
 function restoreStaticBookTemplate() {
@@ -465,6 +491,9 @@ function restoreStaticBookTemplate() {
 function syncOptionalBookPages() {
   if (shouldSkipServicePage()) {
     optionalById("order-service-page")?.remove();
+  }
+  if (shouldHideCustomerPageOnMobile()) {
+    optionalById("order-customer-page")?.remove();
   }
 }
 
@@ -550,10 +579,29 @@ function markCartChanged() {
 function renderCustomerGate() {
   const content = optionalById("order-customer-content");
   const page = optionalById("order-customer-page");
-  if (!content || !page) return;
+  if (!content || !page) {
+    syncSelectedMemberFields();
+    return;
+  }
   const visible = Boolean(state.cartConfirmed && state.cart.length);
   content.hidden = !visible;
   page.classList.toggle("is-blank", !visible);
+  syncSelectedMemberFields();
+}
+
+function syncSelectedMemberFields() {
+  const nameInput = optionalById("order-customer-name");
+  const registerLine = optionalById("order-register-member-line");
+  const registerInput = optionalById("order-register-member");
+  const selectedPanel = optionalById("order-selected-member");
+  if (!nameInput || !registerLine || !registerInput || !selectedPanel) return;
+
+  const selected = Boolean(state.selectedMemberId);
+  nameInput.readOnly = selected;
+  nameInput.classList.toggle("is-readonly", selected);
+  registerLine.hidden = selected;
+  if (selected) registerInput.checked = false;
+  selectedPanel.hidden = !selected;
 }
 
 function renderOrderContent() {
@@ -1680,7 +1728,8 @@ async function submitOrder() {
       customerName: byId("order-customer-name").value.trim(),
       customerEmail: byId("order-customer-email").value.trim().toLowerCase(),
       customerPhone: byId("order-customer-phone").value.trim(),
-      registerMember: byId("order-register-member").checked,
+      customerMemberId: state.selectedMemberId || "",
+      registerMember: state.selectedMemberId ? false : byId("order-register-member").checked,
       paymentMethodId: state.paymentMethodId,
       paymentProof: paymentRequiresProof() ? state.paymentProof : null
     };
@@ -1743,13 +1792,15 @@ function resetOrder() {
   state.cart = [];
   state.orderResult = null;
   state.cartConfirmed = false;
+  state.selectedMemberId = "";
   state.categoryId = "all";
-  byId("order-search").value = "";
+  if (optionalById("order-search")) byId("order-search").value = "";
   if (optionalById("order-status-lookup-input")) byId("order-status-lookup-input").value = "";
-  byId("order-customer-form").reset();
+  optionalById("order-customer-form")?.reset();
+  syncSelectedMemberFields();
   state.spread = "cover";
   render();
-  turnToPage(pageForSpread("cover"), true);
+  forceTurnToElement(".public-cover-page:not(.public-back-cover-page)", coverStartPage());
   showFeedback("");
 }
 
@@ -1840,6 +1891,10 @@ function bindDynamicFieldListeners() {
     renderProducts();
   });
   optionalById("order-customer-name")?.addEventListener("input", () => {
+    if (!optionalById("order-customer-name")?.readOnly) {
+      state.selectedMemberId = "";
+      syncSelectedMemberFields();
+    }
     lookupMember();
     renderBill();
     renderSpread(false);
@@ -1953,9 +2008,9 @@ document.addEventListener("click", (event) => {
       return;
     }
     state.cartConfirmed = true;
-    renderCustomerGate();
+    render();
     showFeedback("");
-    turnToPage(checkoutStartPage() + 1, true);
+    turnToPage(customerPageNumber(), true);
     return;
   }
 
@@ -1995,11 +2050,21 @@ document.addEventListener("click", (event) => {
 
   const memberButton = event.target.closest("[data-member-fill]");
   if (memberButton) {
+    state.selectedMemberId = memberButton.dataset.memberFill || "";
     byId("order-customer-name").value = memberButton.dataset.name || "";
     byId("order-customer-email").value = memberButton.dataset.email || "";
     byId("order-customer-phone").value = memberButton.dataset.phone || "";
     byId("order-member-suggestions").hidden = true;
+    syncSelectedMemberFields();
     renderBill();
+    renderSpread(false);
+  }
+
+  if (event.target.closest("[data-clear-selected-member]")) {
+    state.selectedMemberId = "";
+    byId("order-customer-name").readOnly = false;
+    syncSelectedMemberFields();
+    lookupMember();
     renderSpread(false);
   }
 

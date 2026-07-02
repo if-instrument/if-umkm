@@ -45,7 +45,6 @@ class PublicOrderService
             return [];
         }
         $builder = $this->db->table('customer_members')
-            ->where('outlet_id', $outletId)
             ->whereIn('status', [StatusCodeService::ACTIVE, 'active']);
         if ($this->hasCompanyColumn('customer_members')) {
             $builder->where('company_id', $companyId);
@@ -112,9 +111,7 @@ class PublicOrderService
             throw new \InvalidArgumentException('Upload bukti bayar wajib untuk metode pembayaran offline ini.');
         }
         $customer = $this->customerPayload($payload);
-        $memberId = ! empty($payload['registerMember'])
-            ? $this->registerMember($customer, $companyId, $outletId)
-            : $this->existingMemberId($customer['email'], $companyId, $outletId);
+        $memberId = $this->resolveMemberId($payload, $customer, $companyId, $outletId);
 
         $productData = (new ProductSuiteService())->data($companyId, $outletId);
         $reservations = $this->pendingReservations($companyId, $outletId, $productData['products'] ?? []);
@@ -529,6 +526,54 @@ class PublicOrderService
         return (int) $model->getInsertID();
     }
 
+    private function resolveMemberId(array $payload, array $customer, int $companyId, int $outletId): ?int
+    {
+        $selectedMemberId = $this->numericMemberId($payload['customerMemberId'] ?? $payload['memberId'] ?? '');
+        if ($selectedMemberId) {
+            return $this->updateExistingMember($selectedMemberId, $customer, $companyId, $outletId);
+        }
+
+        return ! empty($payload['registerMember'])
+            ? $this->registerMember($customer, $companyId, $outletId)
+            : $this->existingMemberId($customer['email'], $companyId, $outletId);
+    }
+
+    private function updateExistingMember(int $memberId, array $customer, int $companyId, int $outletId): ?int
+    {
+        if (! $this->db->tableExists('customer_members')) {
+            return null;
+        }
+        $builder = $this->db->table('customer_members')
+            ->where('id', $memberId);
+        if ($this->hasCompanyColumn('customer_members')) {
+            $builder->where('company_id', $companyId);
+        }
+        $existing = $builder->get()->getRowArray();
+        if (! $existing) {
+            throw new \InvalidArgumentException('Member customer tidak ditemukan.');
+        }
+
+        $emailOwner = $this->memberByEmail($customer['email'], $companyId, $outletId);
+        if ($emailOwner && (int) $emailOwner['id'] !== $memberId) {
+            throw new \InvalidArgumentException('Email sudah terdaftar untuk member lain.');
+        }
+
+        (new CustomerMemberModel())->update($memberId, [
+            'email' => $customer['email'],
+            'phone' => $customer['phone'],
+            'status' => StatusCodeService::ACTIVE,
+            'last_order_at' => date('Y-m-d H:i:s'),
+        ]);
+
+        return $memberId;
+    }
+
+    private function numericMemberId($value): int
+    {
+        $id = preg_replace('/\D+/', '', (string) $value);
+        return $id === '' ? 0 : (int) $id;
+    }
+
     private function existingMemberId(string $email, int $companyId, int $outletId): ?int
     {
         $existing = $this->memberByEmail($email, $companyId, $outletId);
@@ -543,7 +588,7 @@ class PublicOrderService
         if (! $this->db->tableExists('customer_members')) {
             return null;
         }
-        $builder = $this->db->table('customer_members')->where('outlet_id', $outletId)->where('email', $email);
+        $builder = $this->db->table('customer_members')->where('email', $email);
         if ($this->hasCompanyColumn('customer_members')) {
             $builder->where('company_id', $companyId);
         }

@@ -1,4 +1,4 @@
-import { apiGet, appPath, applyPermissionControls, canAccessAllOutlets, canUsePermission, clearSession, loadSession, loadState, primaryOutletId, saveSession } from "./store.js?v=coffee-v150";
+import { apiGet, appPath, applyPermissionControls, canAccessAllOutlets, canUsePermission, clearSession, loadSession, loadState, primaryOutletId, saveSession } from "./store.js?v=coffee-v151";
 import { isInactiveStatus } from "./status-codes.js";
 
 const APP_LOGO = "/assets/if-instrument-logo.jpg";
@@ -18,6 +18,13 @@ const navGroups = [
       { page: "pos", access: [["pos.transaction", "read"], ["pos.transaction", "create"]], icon: "K", label: "POS Outlet", href: "/pages/pos.html" },
       { page: "orders", access: [["queue.kitchen", "read"], ["queue.cashier", "read"]], icon: "A", label: "Kitchen Display", href: "/pages/orders.html" },
       { page: "order-history", access: [["orders.history", "read"], ["reports.sales", "read"]], icon: "H", label: "Riwayat Order", href: "/pages/order-history.html" }
+    ]
+  },
+  {
+    title: "CRM",
+    items: [
+      { page: "crm-customers", access: [["crm.customers", "read"]], icon: "C", label: "Customer", href: "/pages/crm-customers.html" },
+      { page: "crm-transactions", access: [["crm.transactions", "read"]], icon: "T", label: "Transaksi Customer", href: "/pages/crm-transactions.html" }
     ]
   },
   {

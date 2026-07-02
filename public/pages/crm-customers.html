@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CRM Customer - IF Instrument</title>
+    <link rel="stylesheet" href="../styles.css?v=coffee-v154" />
+  </head>
+  <body data-page="crm-customers" data-title="CRM Customer" data-eyebrow="CRM">
+    <template id="page-content">
+      <section class="content-grid single">
+        <div class="page-command-bar">
+          <div>
+            <span class="hero-kicker">Customer Relationship</span>
+            <h3>Member dan customer outlet aktif</h3>
+            <p>Data customer dari buku menu online tersimpan sebagai member outlet dan bisa dipakai ulang pada order berikutnya.</p>
+          </div>
+          <button class="primary-button" data-open-customer-modal data-permission="crm.customers:create" type="button">+ Tambah Customer</button>
+        </div>
+
+        <div class="summary-cards order-history-summary" id="crm-summary"></div>
+
+        <section class="workspace-panel">
+          <div class="table-toolbar">
+            <div>
+              <h3>Daftar Customer</h3>
+              <p id="crm-table-caption">Memuat data customer...</p>
+            </div>
+            <div class="filter-toolbar compact-filter">
+              <select id="crm-status-filter" aria-label="Filter status">
+                <option value="">Semua Status</option>
+                <option value="10">Aktif</option>
+                <option value="90">Nonaktif</option>
+              </select>
+              <input id="crm-search" type="search" placeholder="Cari nama, email, no HP..." />
+            </div>
+          </div>
+          <div class="completed-orders-table-scroll">
+            <table class="completed-orders-table">
+              <thead>
+                <tr>
+                  <th>Customer</th>
+                  <th>Kontak</th>
+                  <th>Status</th>
+                  <th>Order Terakhir</th>
+                  <th>Aksi</th>
+                </tr>
+              </thead>
+              <tbody id="crm-customer-body"></tbody>
+            </table>
+          </div>
+          <div class="table-pagination" id="crm-pagination"></div>
+        </section>
+      </section>
+
+      <div class="modal-backdrop" data-customer-backdrop hidden>
+        <section class="modal-dialog" id="customer-modal" aria-modal="true" role="dialog" aria-labelledby="customer-modal-title" hidden>
+          <header class="modal-header">
+            <div><span class="hero-kicker">CRM Customer</span><h3 id="customer-modal-title">Tambah Customer</h3><p>Customer dibuat per outlet aktif.</p></div>
+            <button class="icon-button" data-close-customer-modal type="button" aria-label="Tutup modal">x</button>
+          </header>
+          <form class="form-grid input-workflow" id="customer-form">
+            <input id="customer-id" type="hidden" />
+            <label>Nama Customer <input id="customer-name" autocomplete="name" required type="text" /></label>
+            <label>Email <input id="customer-email" autocomplete="email" required type="email" /></label>
+            <label>No HP <input id="customer-phone" autocomplete="tel" required type="tel" /></label>
+            <label>Status
+              <select id="customer-status">
+                <option value="10">Aktif</option>
+                <option value="90">Nonaktif</option>
+              </select>
+            </label>
+            <p class="form-feedback full-row" id="customer-feedback" role="status"></p>
+            <div class="modal-actions">
+              <button class="ghost-button" data-close-customer-modal type="button">Batal</button>
+              <button class="primary-button" type="submit">Simpan Customer</button>
+            </div>
+          </form>
+        </section>
+      </div>
+    </template>
+    <script type="module" src="../scripts/pages/crm-customers.js?v=coffee-v174"></script>
+  </body>
+</html>

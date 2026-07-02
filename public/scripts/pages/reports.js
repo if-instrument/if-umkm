@@ -1,5 +1,5 @@
-import { renderLayout } from "../layout.js?v=coffee-v150";
-import { applyPermissionControls, loadSession, loadState } from "../store.js?v=coffee-v150";
+import { renderLayout } from "../layout.js?v=coffee-v151";
+import { applyPermissionControls, loadSession, loadState } from "../store.js?v=coffee-v151";
 import { formatQty, money, shortDate } from "../format.js";
 import { byId, setText } from "../dom.js";
 import { enhanceAllDataTables } from "../datatable.js";

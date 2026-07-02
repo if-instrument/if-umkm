@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Transaksi Customer - IF Instrument</title>
+    <link rel="stylesheet" href="../styles.css?v=coffee-v154" />
+  </head>
+  <body data-page="crm-transactions" data-title="Transaksi Customer" data-eyebrow="CRM">
+    <template id="page-content">
+      <section class="content-grid single">
+        <div class="page-command-bar">
+          <div>
+            <span class="hero-kicker">CRM Transaction</span>
+            <h3>Riwayat transaksi member customer</h3>
+            <p>Analisa transaksi customer terdaftar berdasarkan outlet aktif.</p>
+          </div>
+        </div>
+
+        <div class="summary-cards order-history-summary" id="crm-transaction-summary"></div>
+
+        <section class="workspace-panel">
+          <div class="table-toolbar">
+            <div>
+              <h3>Transaksi Customer</h3>
+              <p id="crm-transaction-caption">Memuat transaksi customer...</p>
+            </div>
+            <div class="filter-toolbar compact-filter">
+              <input id="crm-transaction-from" type="date" aria-label="Dari tanggal" />
+              <input id="crm-transaction-to" type="date" aria-label="Sampai tanggal" />
+              <input id="crm-transaction-search" type="search" placeholder="Cari order, nama, email..." />
+            </div>
+          </div>
+          <div class="completed-orders-table-scroll">
+            <table class="completed-orders-table">
+              <thead>
+                <tr>
+                  <th>Order</th>
+                  <th>Customer</th>
+                  <th>Layanan</th>
+                  <th>Pembayaran</th>
+                  <th>Status</th>
+                  <th>Total</th>
+                </tr>
+              </thead>
+              <tbody id="crm-transaction-body"></tbody>
+            </table>
+          </div>
+          <div class="table-pagination" id="crm-transaction-pagination"></div>
+        </section>
+      </section>
+    </template>
+    <script type="module" src="../scripts/pages/crm-transactions.js?v=coffee-v175"></script>
+  </body>
+</html>

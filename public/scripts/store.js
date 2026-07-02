@@ -136,6 +136,8 @@ export function canUsePermission(moduleKey, action = "read", state = loadState()
     "pos.payment": "pos",
     "queue.kitchen": "kitchen",
     "queue.cashier": "pos",
+    "crm.customers": "reports",
+    "crm.transactions": "reports",
     "categories.manage": "operations",
     "ingredients.template": "operations",
     "products.catalog": "operations",

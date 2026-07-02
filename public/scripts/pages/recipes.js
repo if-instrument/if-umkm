@@ -1,11 +1,11 @@
-import { renderLayout } from "../layout.js?v=coffee-v150";
-import { apiPost, apiPut, appPath, applyPermissionControls, canAccessAllOutlets, canManageCompanyMasters, canUsePermission, loadSession, loadState, primaryOutletId, scopedPayload, stampScopedMaster, visibleForSession } from "../store.js?v=coffee-v150";
+import { renderLayout } from "../layout.js?v=coffee-v151";
+import { apiPost, apiPut, appPath, applyPermissionControls, canAccessAllOutlets, canManageCompanyMasters, canUsePermission, loadSession, loadState, primaryOutletId, scopedPayload, stampScopedMaster, visibleForSession } from "../store.js?v=coffee-v151";
 import { formatQty, money } from "../format.js";
 import { byId, setText, showAlert } from "../dom.js";
 import { ingredientName, missingModifierOptions, missingModifierSummary, missingRecipeLines, missingRecipeSummary, productAvailability, productCogs, productModifiers } from "../inventory.js";
 import { enhanceAllDataTables } from "../datatable.js";
 import { COMMON_STATUS, isInactiveStatus } from "../status-codes.js";
-import { loadPageBootstrap } from "../page-engine.js?v=coffee-v150";
+import { loadPageBootstrap } from "../page-engine.js?v=coffee-v151";
 
 renderLayout();
 

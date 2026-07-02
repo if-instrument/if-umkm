@@ -147,6 +147,12 @@ $routes->group('api', ['namespace' => 'App\Controllers\Api', 'filter' => 'jwt-au
     $routes->get('payment-transaction/(:segment)', 'SalesController::paymentStatus/$1');
     $routes->put('payment-transaction/(:segment)/confirm', 'SalesController::confirmPayment/$1');
     $routes->put('payment-transaction/(:segment)/cancel', 'SalesController::cancelPayment/$1');
+    $routes->get('customer', 'CrmController::listCustomers');
+    $routes->get('customer/(:segment)', 'CrmController::getCustomer/$1');
+    $routes->post('customer', 'CrmController::customer');
+    $routes->put('customer/(:segment)', 'CrmController::updateCustomer/$1');
+    $routes->delete('customer/(:segment)', 'CrmController::deleteCustomer/$1');
+    $routes->get('customer-transaction', 'CrmController::listTransactions');
 });
 
 $routes->get('(:segment)', 'AppPageController::tenantDashboard/$1');
@@ -172,6 +178,8 @@ $routes->get('(:segment)/pages/reports.html', 'FinancePageController::tenant/$1/
 $routes->get('(:segment)/pages/finance-expenses.html', 'FinancePageController::tenant/$1/expenses');
 $routes->get('(:segment)/pages/finance-settlement.html', 'FinancePageController::tenant/$1/settlement');
 $routes->get('(:segment)/pages/payment-gateway-logs.html', 'FinancePageController::tenant/$1/gateway-logs');
+$routes->get('(:segment)/pages/crm-customers.html', 'AppPageController::tenantPage/$1/crm-customers.html');
+$routes->get('(:segment)/pages/crm-transactions.html', 'AppPageController::tenantPage/$1/crm-transactions.html');
 $routes->get('(:segment)/pages/onboarding.html', 'AppPageController::tenantPage/$1/onboarding.html');
 $routes->get('(:segment)/pages/order-history.html', 'AppPageController::tenantPage/$1/order-history.html');
 $routes->get('pages/pos.html', 'PosController::show');
@@ -192,6 +200,8 @@ $routes->get('pages/reports.html', 'FinancePageController::show/profit-loss');
 $routes->get('pages/finance-expenses.html', 'FinancePageController::show/expenses');
 $routes->get('pages/finance-settlement.html', 'FinancePageController::show/settlement');
 $routes->get('pages/payment-gateway-logs.html', 'FinancePageController::show/gateway-logs');
+$routes->get('pages/crm-customers.html', 'AppPageController::page/crm-customers.html');
+$routes->get('pages/crm-transactions.html', 'AppPageController::page/crm-transactions.html');
 $routes->get('pages/onboarding.html', 'AppPageController::page/onboarding.html');
 $routes->get('pages/order-history.html', 'AppPageController::page/order-history.html');
 $routes->get('(:segment)/pages/(:any)', 'AppPageController::tenantPage/$1/$2');

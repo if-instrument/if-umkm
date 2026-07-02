@@ -1,5 +1,5 @@
-import { renderLayout } from "../layout.js?v=coffee-v150";
-import { loadSession, loadState } from "../store.js?v=coffee-v150";
+import { renderLayout } from "../layout.js?v=coffee-v151";
+import { loadSession, loadState } from "../store.js?v=coffee-v151";
 import { money } from "../format.js";
 import { byId } from "../dom.js";
 import { PAYMENT_STATUS, isPaidStatus, paymentStatusCode, statusLabel } from "../status-codes.js";

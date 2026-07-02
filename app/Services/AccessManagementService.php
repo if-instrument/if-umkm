@@ -591,6 +591,8 @@ class AccessManagementService
             'orders.history' => ['legacy' => 'reports', 'actions' => ['read']],
             'queue.kitchen' => ['legacy' => 'kitchen', 'actions' => ['read', 'update']],
             'queue.cashier' => ['legacy' => 'pos', 'actions' => ['read', 'update']],
+            'crm.customers' => ['legacy' => 'reports', 'actions' => ['create', 'read', 'update', 'delete']],
+            'crm.transactions' => ['legacy' => 'reports', 'actions' => ['read']],
             'categories.manage' => ['legacy' => 'operations', 'actions' => ['create', 'read', 'update', 'delete']],
             'products.catalog' => ['legacy' => 'operations', 'actions' => ['create', 'read', 'update', 'delete']],
             'products.outletPrice' => ['legacy' => 'operations', 'actions' => ['read', 'update']],

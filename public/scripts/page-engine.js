@@ -1,4 +1,4 @@
-import { apiGet, scopedApiUrl } from "./store.js?v=coffee-v150";
+import { apiGet, scopedApiUrl } from "./store.js?v=coffee-v151";
 
 const PAGE_ENDPOINTS = {
   pos: "/api/page/pos/bootstrap",

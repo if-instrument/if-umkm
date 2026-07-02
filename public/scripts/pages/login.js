@@ -1,4 +1,4 @@
-import { apiGet, apiPost, appPath, currentCompanySlug, loadSession, saveSession } from "../store.js?v=coffee-v150";
+import { apiGet, apiPost, appPath, currentCompanySlug, loadSession, saveSession } from "../store.js?v=coffee-v151";
 import { byId, setText, showFeedback } from "../dom.js";
 
 const session = loadSession();

@@ -1,9 +1,9 @@
-import { renderLayout } from "../layout.js?v=coffee-v150";
-import { apiDelete, apiPost, apiPut, apiUpload, applyPermissionControls, canUsePermission, loadSession, loadState } from "../store.js?v=coffee-v150";
+import { renderLayout } from "../layout.js?v=coffee-v151";
+import { apiDelete, apiPost, apiPut, apiUpload, applyPermissionControls, canUsePermission, loadSession, loadState } from "../store.js?v=coffee-v151";
 import { byId, setText, showAlert, showFeedback } from "../dom.js";
 import { enhanceAllDataTables } from "../datatable.js";
 import { COMMON_STATUS, INVITATION_STATUS, isActiveStatus, isInactiveStatus, statusLabel } from "../status-codes.js";
-import { loadPageBootstrap } from "../page-engine.js?v=coffee-v150";
+import { loadPageBootstrap } from "../page-engine.js?v=coffee-v151";
 
 renderLayout();
 let state = loadState();
@@ -103,6 +103,8 @@ const permissionModules = [
   { key: "orders.history", label: "Riwayat Order", group: "Operasional", legacy: "reports", actions: ["read"] },
   { key: "queue.kitchen", label: "Aksi Dapur", group: "Operasional", legacy: "kitchen", actions: ["read", "update"], aliases: ["queue"] },
   { key: "queue.cashier", label: "Aksi Kasir di Antrian", group: "Operasional", legacy: "pos", actions: ["read", "update"] },
+  { key: "crm.customers", label: "CRM Customer", group: "CRM", legacy: "reports", actions: ["create", "read", "update", "delete"], aliases: ["customers"] },
+  { key: "crm.transactions", label: "Transaksi Customer", group: "CRM", legacy: "reports", actions: ["read"], aliases: ["customerTransactions"] },
   { key: "categories.manage", label: "Kategori Produk", group: "Produk", legacy: "operations", actions: ["create", "read", "update", "delete"], aliases: ["categories"] },
   { key: "products.catalog", label: "Kelola Produk", group: "Produk", legacy: "operations", actions: ["create", "read", "update", "delete"], aliases: ["products"] },
   { key: "products.outletPrice", label: "Harga Produk Outlet", group: "Produk", legacy: "operations", actions: ["read", "update"] },

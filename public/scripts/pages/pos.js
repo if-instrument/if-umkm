@@ -1,6 +1,6 @@
-import { renderLayout } from "../layout.js?v=coffee-v150";
-import { apiGet, apiPost, apiPut, applyPermissionControls, canUsePermission, loadSession, loadState, primaryOutletId, scopedApiUrl, scopedPayload, visibleForSession } from "../store.js?v=coffee-v150";
-import { applyPageBootstrap, loadPageBootstrap, pageDateValue } from "../page-engine.js?v=coffee-v150";
+import { renderLayout } from "../layout.js?v=coffee-v151";
+import { apiGet, apiPost, apiPut, applyPermissionControls, canUsePermission, loadSession, loadState, primaryOutletId, scopedApiUrl, scopedPayload, visibleForSession } from "../store.js?v=coffee-v151";
+import { applyPageBootstrap, loadPageBootstrap, pageDateValue } from "../page-engine.js?v=coffee-v151";
 import { formatQty, money } from "../format.js";
 import { costingMethod, effectiveRecipe, ingredientCostForQty, ingredientUnitCost, isStockedProduct, modifierPrice, productAvailability, productAvailabilityWithModifiers, productById, productCogs, productCogsWithModifiers, productModifierOptions } from "../inventory.js";
 import { byId, showAlert } from "../dom.js";

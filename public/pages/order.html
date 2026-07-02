@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Order Online - IF Instrument</title>
     <link rel="stylesheet" href="../styles.css?v=coffee-v154" />
-    <link rel="stylesheet" href="../styles/pages/order.css?v=coffee-v164" />
+    <link rel="stylesheet" href="../styles/pages/order.css?v=coffee-v168" />
   </head>
   <body class="public-order-page">
     <main class="public-order-shell public-order-book-shell">
@@ -125,6 +125,10 @@
                   Nama
                   <input id="order-customer-name" autocomplete="name" required type="text" placeholder="Nama pemesan" />
                 </label>
+                <div class="public-selected-member" id="order-selected-member" hidden>
+                  <span>Member terdaftar dipakai untuk order ini. Email dan No HP bisa diperbarui.</span>
+                  <button class="ghost-button compact-button" data-clear-selected-member type="button">Ganti</button>
+                </div>
                 <div class="public-member-suggestions" id="order-member-suggestions" hidden></div>
                 <label>
                   Email Receipt
@@ -134,7 +138,7 @@
                   No HP
                   <input id="order-customer-phone" autocomplete="tel" required type="tel" placeholder="08xxxxxxxxxx" />
                 </label>
-                <label class="checkbox-line">
+                <label class="checkbox-line" id="order-register-member-line">
                   <input id="order-register-member" type="checkbox" />
                   Daftarkan sebagai member
                 </label>
@@ -210,6 +214,6 @@
 
     <script src="../vendor/turnjs/jquery.js?v=coffee-v152"></script>
     <script src="../vendor/turnjs/turn.js?v=coffee-v152"></script>
-    <script type="module" src="../scripts/pages/order.js?v=coffee-v163"></script>
+    <script type="module" src="../scripts/pages/order.js?v=coffee-v176"></script>
   </body>
 </html>
