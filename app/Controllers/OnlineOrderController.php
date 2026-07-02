@@ -35,6 +35,11 @@ class OnlineOrderController extends BaseController
         return $this->jsonAction(fn () => (new OnlineOrderApiService())->member($this->request->getGet()));
     }
 
+    public function status()
+    {
+        return $this->jsonAction(fn () => (new OnlineOrderApiService())->status($this->request->getGet()));
+    }
+
     public function submit()
     {
         return $this->jsonAction(fn () => (new OnlineOrderApiService())->submit($this->request->getJSON(true) ?: []));

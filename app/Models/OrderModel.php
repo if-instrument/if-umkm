@@ -13,6 +13,6 @@ class OrderModel extends BaseAppModel
         'payment_status', 'payment_method', 'paid_at', 'subtotal', 'packaging_fee',
         'payment_fee', 'payment_fee_payer', 'tax_total', 'grand_total', 'cogs_total', 'gross_profit', 'packaging_source',
         'packaging_note', 'last_order_added_at', 'cash_tendered', 'change_due',
-        'payment_provider', 'payment_reference'
+        'payment_provider', 'payment_reference', 'payment_proof_path', 'payment_proof_note'
     ];
 }

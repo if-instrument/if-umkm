@@ -1,5 +1,5 @@
 import { effectiveRecipe, ingredientById, isStockedProduct, modifierPrice, productModifierOptions } from "../inventory.js";
-import { isActiveStatus, isInactiveStatus, statusLabel } from "../status-codes.js";
+import { ORDER_STATUS, PAYMENT_STATUS, isActiveStatus, isInactiveStatus, orderStatusCode, paymentStatusCode, statusLabel } from "../status-codes.js";
 
 const rupiah = new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 });
 
@@ -25,6 +25,8 @@ let state = {
   menuGridSize: 3,
   menuMobileLimit: 5,
   paymentMethodId: "",
+  paymentProof: null,
+  cartConfirmed: false,
   spread: "cover",
   outletConfirmed: false,
   orderResult: null
@@ -151,6 +153,7 @@ function persistOrderSession() {
     menuMobileLimit: state.menuMobileLimit,
     paymentMethodId: state.paymentMethodId,
     spread: state.spread,
+    cartConfirmed: state.cartConfirmed,
     cart: state.cart
   };
   sessionStorage.setItem(orderSessionKey(), JSON.stringify(payload));
@@ -207,6 +210,7 @@ async function loadOrderData(outletId = "") {
       menuGridSize: Number(saved.menuGridSize || state.menuGridSize),
       menuMobileLimit: Number(saved.menuMobileLimit || state.menuMobileLimit),
       paymentMethodId: saved.paymentMethodId || state.paymentMethodId,
+      cartConfirmed: outletChanged ? false : Boolean(saved.cartConfirmed),
       spread: saved.spread || state.spread,
       cart: outletChanged ? [] : (Array.isArray(saved.cart) ? saved.cart : state.cart),
       orderResult: outletChanged ? null : state.orderResult
@@ -431,6 +435,7 @@ function destroyFlipbook() {
 function snapshotBookInputs() {
   return {
     search: optionalById("order-search")?.value || "",
+    statusLookup: optionalById("order-status-lookup-input")?.value || "",
     customerName: optionalById("order-customer-name")?.value || "",
     customerEmail: optionalById("order-customer-email")?.value || "",
     customerPhone: optionalById("order-customer-phone")?.value || "",
@@ -441,6 +446,7 @@ function snapshotBookInputs() {
 function restoreBookInputs(snapshot) {
   if (!snapshot) return;
   if (optionalById("order-search")) byId("order-search").value = snapshot.search || "";
+  if (optionalById("order-status-lookup-input")) byId("order-status-lookup-input").value = snapshot.statusLookup || "";
   if (optionalById("order-customer-name")) byId("order-customer-name").value = snapshot.customerName || "";
   if (optionalById("order-customer-email")) byId("order-customer-email").value = snapshot.customerEmail || "";
   if (optionalById("order-customer-phone")) byId("order-customer-phone").value = snapshot.customerPhone || "";
@@ -533,7 +539,21 @@ function renderBookStaticContent() {
   renderCategories();
   renderCart();
   renderPayments();
+  renderCustomerGate();
   renderBill();
+}
+
+function markCartChanged() {
+  state.cartConfirmed = false;
+}
+
+function renderCustomerGate() {
+  const content = optionalById("order-customer-content");
+  const page = optionalById("order-customer-page");
+  if (!content || !page) return;
+  const visible = Boolean(state.cartConfirmed && state.cart.length);
+  content.hidden = !visible;
+  page.classList.toggle("is-blank", !visible);
 }
 
 function renderOrderContent() {
@@ -804,6 +824,7 @@ function renderCart() {
   byId("order-cart-count").textContent = `${state.cart.reduce((sum, item) => sum + item.qty, 0)} item`;
   byId("order-action-total").textContent = money(totals.total);
   if (confirmButton) confirmButton.disabled = state.cart.length === 0;
+  if (!state.cart.length) state.cartConfirmed = false;
   byId("order-cart").innerHTML = state.cart.length ? state.cart.map((line) => {
     const product = productById(line.productId);
     const linePrice = lineUnitPrice(product, line);
@@ -844,6 +865,7 @@ function renderCart() {
   byId("order-payment-fee-label").textContent = `Payment Fee (${paymentById(state.paymentMethodId)?.feeRate || 0}%)`;
   byId("order-payment-fee").textContent = money(totals.customerPaymentFee);
   byId("order-total").textContent = money(totals.total);
+  renderCustomerGate();
 }
 
 function renderPayments() {
@@ -855,9 +877,26 @@ function renderPayments() {
     </button>
   `).join("") : `<div class="empty-state compact">Metode pembayaran belum aktif.</div>`;
   const method = paymentById(state.paymentMethodId);
+  renderPaymentProofInput(method);
   byId("order-payment-note").textContent = method?.type === "cash"
     ? "Order akan dibuat dengan status unpaid dan dibayar di kasir."
-    : "Order akan dibuat menunggu pembayaran sesuai konfigurasi outlet.";
+    : paymentRequiresProof(method)
+      ? "Upload bukti bayar agar kasir bisa cek sebelum approve pesanan."
+      : "Order akan dibuat menunggu pembayaran sesuai konfigurasi outlet.";
+}
+
+function paymentRequiresProof(method = paymentById(state.paymentMethodId)) {
+  if (!method) return false;
+  return method.type === "transfer" || (method.type === "qris" && method.qrisMode === "offline");
+}
+
+function renderPaymentProofInput(method = paymentById(state.paymentMethodId)) {
+  const panel = optionalById("order-payment-proof-panel");
+  if (!panel) return;
+  const required = paymentRequiresProof(method);
+  panel.hidden = !required;
+  optionalById("order-payment-proof-file")?.toggleAttribute("required", required);
+  setText("order-payment-proof-name", state.paymentProof?.name || (required ? "Belum ada file dipilih." : ""));
 }
 
 function renderBill() {
@@ -879,7 +918,7 @@ function renderBill() {
         <div><span>ORDER</span><strong>#${escapeHtml(order.orderNumber || "PREVIEW")}</strong></div>
         <div><span>TANGGAL</span><strong>${escapeHtml(receiptDate(order.createdAt))}</strong></div>
         <div><span>STATUS</span><strong>${escapeHtml(order.paymentStatus ? statusLabel(order.paymentStatus, "payment") : (result ? "Belum Bayar" : "Preview"))}</strong></div>
-        <div><span>CUSTOMER</span><strong>${escapeHtml(byId("order-customer-name").value.trim() || "-")}</strong></div>
+        <div><span>CUSTOMER</span><strong>${escapeHtml(order.customerName || byId("order-customer-name").value.trim() || "-")}</strong></div>
       </div>
       ${billRows(order.total || totals.total, order)}
       <div class="public-receipt-foot">
@@ -887,23 +926,210 @@ function renderBill() {
         <span>${escapeHtml(result?.message || "Struk final akan dibuat setelah order dikirim.")}</span>
       </div>
     </div>
+    ${receiptTimeline(order.timeline || [], order)}
   `;
+}
+
+function receiptTimeline(timeline = [], order = {}) {
+  const orderData = order || state.orderResult?.order || {};
+  const rows = orderStatusSteps(orderData, timeline);
+  return `
+    <section class="public-order-status-card" data-order-status-card>
+      <button class="public-order-status-header" data-toggle-order-timeline type="button" aria-expanded="true">
+        <span>Order Status</span>
+        <b aria-hidden="true"></b>
+      </button>
+      <div class="public-order-status-body">
+        <div class="public-order-status-timeline">
+          ${rows.map((row, index) => statusStepMarkup(row, index, rows.length)).join("")}
+        </div>
+      </div>
+    </section>
+  `;
+}
+
+function statusStepMarkup(row, index, totalRows) {
+  return `
+    <article class="${row.state || "pending"}">
+      <i aria-hidden="true">${row.state === "completed" ? "✓" : ""}</i>
+      <strong>${escapeHtml(row.title)}</strong>
+      <span>${escapeHtml(row.createdAt ? receiptShortDateTime(row.createdAt) : "-")}</span>
+      <em>${escapeHtml(row.createdAt ? (row.actorName || actorNameForOrderStatus(row.status)) : "-")}</em>
+      <small>${escapeHtml(row.badge || statusStepBadge(row.state))}</small>
+    </article>
+  `;
+}
+
+function statusStepBadge(stateValue) {
+  if (stateValue === "completed") return "Completed";
+  if (stateValue === "current") return "In progress";
+  return "Pending";
+}
+
+function orderStatusSteps(order = {}, timeline = []) {
+  if (!state.orderResult) {
+    return [{
+      title: "Preview",
+      status: "",
+      actorName: "System",
+      note: "Preview order.",
+      createdAt: new Date().toISOString()
+    }];
+  }
+
+  const rawRows = timeline.length ? timeline : fallbackReceiptTimeline(order);
+  const currentStatus = orderStatusCode(order.status || rawRows.at(-1)?.status || ORDER_STATUS.PENDING_CASHIER);
+  const currentPayment = paymentStatusCode(order.paymentStatus || rawRows.at(-1)?.paymentStatus || PAYMENT_STATUS.UNPAID);
+  const createdAt = order.createdAt || rawRows[0]?.createdAt || new Date().toISOString();
+  const pendingAt = firstTimelineAt(rawRows, ORDER_STATUS.PENDING_CASHIER) || createdAt;
+  const confirmedAt = order.paidAt || firstPaidTimelineAt(rawRows) || firstTimelineAt(rawRows, ORDER_STATUS.WAITING);
+  const preparingAt = firstTimelineAt(rawRows, ORDER_STATUS.PREPARING);
+  const readyAt = firstTimelineAt(rawRows, ORDER_STATUS.READY);
+  const completedAt = firstTimelineAt(rawRows, ORDER_STATUS.COMPLETED);
+  const confirmed = currentPayment === PAYMENT_STATUS.PAID || confirmedAt || [ORDER_STATUS.WAITING, ORDER_STATUS.PREPARING, ORDER_STATUS.READY, ORDER_STATUS.COMPLETED].includes(currentStatus);
+  const currentIndex = currentOrderStepIndex(currentStatus, confirmed);
+  const stepDefinitions = [
+    {
+      title: "Dibuat",
+      status: ORDER_STATUS.PENDING_CASHIER,
+      actorName: order.customerName || "Customer",
+      note: "Order dibuat dari buku menu online.",
+      createdAt
+    },
+    {
+      title: "Menunggu Konfirmasi",
+      status: ORDER_STATUS.PENDING_CASHIER,
+      actorName: "Kasir",
+      note: "Menunggu kasir mengecek pembayaran dan detail order.",
+      createdAt: pendingAt
+    },
+    {
+      title: "Dikonfirmasi",
+      status: ORDER_STATUS.WAITING,
+      actorName: "Kasir",
+      note: "Pembayaran dan order sudah dikonfirmasi.",
+      createdAt: confirmed ? (confirmedAt || order.statusUpdatedAt || createdAt) : ""
+    },
+    {
+      title: "Diproses",
+      status: ORDER_STATUS.PREPARING,
+      actorName: "Kitchen",
+      note: "Pesanan sedang dibuat oleh kitchen.",
+      createdAt: preparingAt || ([ORDER_STATUS.PREPARING, ORDER_STATUS.READY, ORDER_STATUS.COMPLETED].includes(currentStatus) ? (order.statusUpdatedAt || confirmedAt || createdAt) : "")
+    },
+    {
+      title: "Siap Diambil",
+      status: ORDER_STATUS.READY,
+      actorName: "Kasir",
+      note: "Pesanan sudah siap diterima customer.",
+      createdAt: readyAt || ([ORDER_STATUS.READY, ORDER_STATUS.COMPLETED].includes(currentStatus) ? (order.statusUpdatedAt || preparingAt || createdAt) : "")
+    },
+    {
+      title: "Selesai",
+      status: ORDER_STATUS.COMPLETED,
+      actorName: "Kasir",
+      note: "Pesanan selesai.",
+      createdAt: completedAt || (currentStatus === ORDER_STATUS.COMPLETED ? (order.statusUpdatedAt || readyAt || createdAt) : "")
+    }
+  ];
+
+  return stepDefinitions.map((step, index) => ({
+    ...step,
+    state: index < currentIndex ? "completed" : index === currentIndex ? "current" : "pending",
+    badge: index < currentIndex ? "Completed" : index === currentIndex ? (currentStatus === ORDER_STATUS.COMPLETED ? "Completed" : "In progress") : "Pending",
+  }));
+}
+
+function currentOrderStepIndex(currentStatus, confirmed) {
+  if (currentStatus === ORDER_STATUS.COMPLETED) return 5;
+  if (currentStatus === ORDER_STATUS.READY) return 4;
+  if (currentStatus === ORDER_STATUS.PREPARING) return 3;
+  if (currentStatus === ORDER_STATUS.WAITING || confirmed) return 2;
+  return 1;
+}
+
+function firstTimelineAt(rows, status) {
+  const code = orderStatusCode(status);
+  return rows.find((row) => orderStatusCode(row.status) === code)?.createdAt || "";
+}
+
+function firstPaidTimelineAt(rows) {
+  return rows.find((row) => paymentStatusCode(row.paymentStatus) === PAYMENT_STATUS.PAID)?.createdAt || "";
+}
+
+function fallbackReceiptTimeline(order = {}) {
+  if (!state.orderResult) {
+    return [{
+      status: "",
+      paymentStatus: "",
+      actorName: "System",
+      note: "Preview order.",
+      createdAt: new Date().toISOString()
+    }];
+  }
+  const rows = [{
+    status: order.status || "00",
+    paymentStatus: order.paymentStatus || "00",
+    actorName: order.customerName || "Customer",
+    note: "Order dibuat dari buku menu online.",
+    createdAt: order.createdAt || new Date().toISOString()
+  }];
+  if (order.paidAt) {
+    rows.push({
+      status: order.status || "10",
+      paymentStatus: order.paymentStatus || "10",
+      actorName: "Kasir",
+      note: "Pembayaran dikonfirmasi.",
+      createdAt: order.paidAt
+    });
+  }
+  if (order.statusUpdatedAt && order.statusUpdatedAt !== order.createdAt && order.statusUpdatedAt !== order.paidAt) {
+    rows.push({
+      status: order.status || "10",
+      paymentStatus: order.paymentStatus || "",
+      actorName: actorNameForOrderStatus(order.status),
+      note: "Status pesanan diperbarui.",
+      createdAt: order.statusUpdatedAt
+    });
+  }
+  return rows;
+}
+
+function actorNameForOrderStatus(status) {
+  const label = statusLabel(status, "order");
+  if (["Diproses", "Siap Diambil", "Pesanan Baru"].includes(label)) return "Kitchen";
+  if (["Selesai", "Menunggu Kasir"].includes(label)) return "Kasir";
+  return "System";
 }
 
 function billRows(total, order = {}) {
   const totals = calculateTotals();
-  const items = state.cart.map((line) => {
+  const sourceItems = Array.isArray(order.items) && order.items.length
+    ? order.items.map((item) => ({
+        name: item.name,
+        modifiers: item.modifiers || [],
+        qty: Number(item.qty || 0),
+        unitPrice: Number(item.price || 0),
+      }))
+    : state.cart.map((line) => {
     const product = productById(line.productId);
-    const modifiers = modifierNames(product, line.modifierIds || []);
-    const unitPrice = lineUnitPrice(product, line);
+      return {
+        name: product?.name || "Produk",
+        modifiers: modifierNames(product, line.modifierIds || []) ? [modifierNames(product, line.modifierIds || [])] : [],
+        qty: Number(line.qty || 0),
+        unitPrice: lineUnitPrice(product, line),
+      };
+    });
+  const items = sourceItems.map((item) => {
+    const modifiers = (item.modifiers || []).join(", ");
     return `
       <li>
         <div>
-          <strong>${escapeHtml(product?.name || "Produk")}</strong>
+          <strong>${escapeHtml(item.name || "Produk")}</strong>
           ${modifiers ? `<small>${escapeHtml(modifiers)}</small>` : ""}
-          <span>${line.qty} x ${money(unitPrice)}</span>
+          <span>${item.qty} x ${money(item.unitPrice)}</span>
         </div>
-        <b>${money(unitPrice * line.qty)}</b>
+        <b>${money(item.unitPrice * item.qty)}</b>
       </li>
     `;
   }).join("");
@@ -927,6 +1153,27 @@ function receiptDate(value) {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+}
+
+function receiptShortDate(value) {
+  const date = value ? new Date(value) : new Date();
+  if (Number.isNaN(date.getTime())) return "-";
+  return date.toLocaleDateString("id-ID", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric"
+  });
+}
+
+function receiptShortDateTime(value) {
+  const date = value ? new Date(value) : new Date();
+  if (Number.isNaN(date.getTime())) return "-";
+  return date.toLocaleString("id-ID", {
+    day: "2-digit",
+    month: "short",
     hour: "2-digit",
     minute: "2-digit"
   });
@@ -957,7 +1204,7 @@ function renderSpread(syncBook = true) {
 function canContinue(spread) {
   if (spread === "cover") return Boolean(hasSelectedOutlet() && state.serviceType && (!needsTableSelection() || state.tableName));
   if (spread === "menu") return state.cart.length > 0;
-  if (spread === "checkout") return Boolean(resolveOutletId()) && state.cart.length > 0 && Boolean(state.paymentMethodId) && customerFormValid();
+  if (spread === "checkout") return Boolean(resolveOutletId()) && state.cartConfirmed && state.cart.length > 0 && Boolean(state.paymentMethodId) && customerFormValid();
   return true;
 }
 
@@ -1034,7 +1281,7 @@ function validationMessage() {
   if (!resolveOutletId()) return "Pilih outlet terlebih dahulu.";
   if (state.spread === "cover") return hasMultipleOutlets() && !hasSelectedOutlet() ? "Pilih outlet terlebih dahulu." : "Lengkapi pilihan pemesanan terlebih dahulu.";
   if (state.spread === "menu") return "Pilih minimal satu menu terlebih dahulu.";
-  if (state.spread === "checkout") return "Lengkapi data customer dan pilih metode pembayaran.";
+  if (state.spread === "checkout") return state.cartConfirmed ? "Lengkapi data customer dan pilih metode pembayaran." : "Konfirmasi cart terlebih dahulu.";
   return "Lengkapi pilihan sebelum lanjut.";
 }
 
@@ -1143,6 +1390,7 @@ function addConfiguredProduct(productId, modifierIds = [], qty = 1) {
     }
     state.cart.push({ id: key, productId, modifierIds: [...modifierIds], qty: quantity });
   }
+  markCartChanged();
   closeMenuDetail();
   state.spread = "menu";
   renderProducts();
@@ -1166,6 +1414,7 @@ function setConfiguredProductQty(productId, modifierIds = [], qty = 1, options =
   }
   if (current) current.qty = quantity;
   else state.cart.push({ id: key, productId, modifierIds: [...modifierIds], qty: quantity });
+  markCartChanged();
   closeMenuDetail();
   state.spread = options.spread || "menu";
   renderProducts();
@@ -1292,6 +1541,7 @@ function changeQty(lineId, delta) {
     }
     current.qty = next;
   }
+  markCartChanged();
   renderProducts();
   renderCart();
   renderBill();
@@ -1416,6 +1666,9 @@ async function submitOrder() {
   setBusy(true, "Menyimpan order...");
   showFeedback("");
   try {
+    if (paymentRequiresProof() && !state.paymentProof?.dataUrl) {
+      throw new Error("Upload bukti bayar terlebih dahulu.");
+    }
     const outletNumericId = resolveOutletNumericId();
     const payload = {
       companySlug: companySlug(),
@@ -1428,7 +1681,8 @@ async function submitOrder() {
       customerEmail: byId("order-customer-email").value.trim().toLowerCase(),
       customerPhone: byId("order-customer-phone").value.trim(),
       registerMember: byId("order-register-member").checked,
-      paymentMethodId: state.paymentMethodId
+      paymentMethodId: state.paymentMethodId,
+      paymentProof: paymentRequiresProof() ? state.paymentProof : null
     };
     state.orderResult = await requestJson("/api/page/order/submit", { method: "POST", body: JSON.stringify(payload) });
     state.spread = "receipt";
@@ -1441,15 +1695,61 @@ async function submitOrder() {
   }
 }
 
+async function lookupPreviousOrder() {
+  const input = byId("order-status-lookup-input");
+  const orderNumber = input.value.trim();
+  if (!orderNumber) {
+    showFeedback("Masukkan nomor order terlebih dahulu.", true);
+    input.focus();
+    return;
+  }
+  setBusy(true, "Mengecek status order...");
+  showFeedback("");
+  try {
+    const query = new URLSearchParams({ q: orderNumber });
+    if (companySlug()) query.set("company", companySlug());
+    if (resolveOutletId()) query.set("outlet_id", resolveOutletNumericId() || resolveOutletId());
+    state.orderResult = await requestJson(`/api/page/order/status?${query.toString()}`);
+    state.spread = "receipt";
+    render();
+    turnToPage(receiptStartPage(), true);
+    showFeedback("");
+  } catch (error) {
+    showFeedback(error.message, true);
+  } finally {
+    setBusy(false);
+  }
+}
+
+function readProofFile(file) {
+  return new Promise((resolve, reject) => {
+    if (!file) {
+      resolve(null);
+      return;
+    }
+    if (file.size > 3 * 1024 * 1024) {
+      reject(new Error("Ukuran bukti bayar maksimal 3 MB."));
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => resolve({ name: file.name, type: file.type, size: file.size, dataUrl: String(reader.result || "") });
+    reader.onerror = () => reject(new Error("Bukti bayar gagal dibaca."));
+    reader.readAsDataURL(file);
+  });
+}
+
 function resetOrder() {
   sessionStorage.removeItem(orderSessionKey());
   state.cart = [];
   state.orderResult = null;
+  state.cartConfirmed = false;
   state.categoryId = "all";
   byId("order-search").value = "";
+  if (optionalById("order-status-lookup-input")) byId("order-status-lookup-input").value = "";
   byId("order-customer-form").reset();
   state.spread = "cover";
   render();
+  turnToPage(pageForSpread("cover"), true);
   showFeedback("");
 }
 
@@ -1554,7 +1854,23 @@ function bindDynamicFieldListeners() {
       renderSpread(false);
     });
   });
+  optionalById("order-payment-proof-file")?.addEventListener("change", async (event) => {
+    try {
+      state.paymentProof = await readProofFile(event.target.files?.[0] || null);
+      renderPaymentProofInput();
+      renderSpread(false);
+    } catch (error) {
+      state.paymentProof = null;
+      event.target.value = "";
+      renderPaymentProofInput();
+      showFeedback(error.message, true);
+    }
+  });
   optionalById("order-customer-form")?.addEventListener("submit", (event) => event.preventDefault());
+  optionalById("order-status-lookup-form")?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    lookupPreviousOrder();
+  });
   optionalById("order-modifier-form")?.addEventListener("submit", handleModifierSubmit);
   optionalById("order-modifier-form")?.addEventListener("change", (event) => {
     if (event.target.matches(".public-modifier-option input")) {
@@ -1636,6 +1952,8 @@ document.addEventListener("click", (event) => {
       showFeedback("Pilih minimal satu menu terlebih dahulu.", true);
       return;
     }
+    state.cartConfirmed = true;
+    renderCustomerGate();
     showFeedback("");
     turnToPage(checkoutStartPage() + 1, true);
     return;
@@ -1668,6 +1986,8 @@ document.addEventListener("click", (event) => {
   const paymentButton = event.target.closest("[data-payment-id]");
   if (paymentButton) {
     state.paymentMethodId = paymentButton.dataset.paymentId;
+    state.paymentProof = null;
+    if (optionalById("order-payment-proof-file")) byId("order-payment-proof-file").value = "";
     renderPayments();
     renderCart();
     renderSpread();
@@ -1681,6 +2001,14 @@ document.addEventListener("click", (event) => {
     byId("order-member-suggestions").hidden = true;
     renderBill();
     renderSpread(false);
+  }
+
+  const timelineToggle = event.target.closest("[data-toggle-order-timeline]");
+  if (timelineToggle) {
+    const card = timelineToggle.closest("[data-order-status-card]");
+    const isCollapsed = card.classList.toggle("is-collapsed");
+    timelineToggle.setAttribute("aria-expanded", String(!isCollapsed));
+    return;
   }
 
   const jumpButton = event.target.closest("[data-jump-spread]");

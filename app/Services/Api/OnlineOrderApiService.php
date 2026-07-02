@@ -35,6 +35,18 @@ class OnlineOrderApiService
         return (new PublicOrderService())->submit($payload, $companyId);
     }
 
+    public function status(array $filters): array
+    {
+        [$companyId] = $this->activateCompany($filters);
+        $outletId = $this->numericId($filters['outlet_id'] ?? $filters['outletId'] ?? null);
+
+        return (new PublicOrderService())->statusLookup(
+            (string) ($filters['order_no'] ?? $filters['orderNumber'] ?? $filters['q'] ?? ''),
+            $companyId,
+            $outletId ?: null
+        );
+    }
+
     private function activateCompany(array $payload = []): array
     {
         $slug = trim((string) ($payload['companySlug'] ?? $payload['company'] ?? ''));

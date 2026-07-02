@@ -118,6 +118,8 @@ class SalesService
             $data['paid_at'] = $order['paid_at'] ?: date('Y-m-d H:i:s');
         }
         $this->orders->update($orderId, $data);
+        [$actorType, $actorName] = $this->actorForStatus($status);
+        $this->recordStatusLog($orderId, $companyId, $outletId, $status, (string) ($order['payment_status'] ?? ''), $actorType, $actorName, 'Status pesanan diperbarui.');
 
         return $this->orderDetail((string) $orderId, $companyId, $outletId);
     }
@@ -158,6 +160,7 @@ class SalesService
             'status' => self::STATUS_COMPLETED,
             'status_updated_at' => $now,
         ]);
+        $this->recordStatusLog($orderId, $companyId, $outletId, self::STATUS_COMPLETED, StatusCodeService::PAYMENT_PAID, 'cashier', 'Kasir', 'Bill diselesaikan dan dibayar.');
         if (! empty($payment['transactionId'])) {
             $this->payments->attachOrder((string) $payment['transactionId'], $orderId, $companyId, $outletId);
         }
@@ -177,6 +180,9 @@ class SalesService
         if ($this->normalizeStatus((string) ($order['status'] ?? '')) !== self::STATUS_PENDING_CASHIER) {
             throw new \InvalidArgumentException('Hanya pesanan menunggu approve kasir yang bisa di-approve.');
         }
+        if ($this->paymentMethodRequiresProof($paymentMethod, $companyId, $outletId) && empty($order['payment_proof_path'])) {
+            throw new \InvalidArgumentException('Bukti bayar wajib dicek/upload sebelum approve pembayaran offline.');
+        }
 
         $items = $this->orderItemPayloads($this->orderItems->where('order_id', $orderId)->findAll());
         $now = date('Y-m-d H:i:s');
@@ -193,6 +199,7 @@ class SalesService
             'status' => self::STATUS_WAITING,
             'status_updated_at' => $now,
         ]);
+        $this->recordStatusLog($orderId, $companyId, $outletId, self::STATUS_WAITING, StatusCodeService::PAYMENT_PAID, 'cashier', 'Kasir', 'Pesanan online di-approve kasir.');
         if (! empty($payment['transactionId'])) {
             $this->payments->attachOrder((string) $payment['transactionId'], $orderId, $companyId, $outletId);
         }
@@ -244,6 +251,8 @@ class SalesService
             'change_due' => (float) ($payload['changeDue'] ?? 0),
             'payment_provider' => $payload['paymentProvider'] ?? null,
             'payment_reference' => $payload['paymentReference'] ?? null,
+            'payment_proof_path' => $payload['paymentProofPath'] ?? null,
+            'payment_proof_note' => $payload['paymentProofNote'] ?? null,
             'paid_at' => StatusCodeService::isPaid($payload['paymentStatus'] ?? 'paid') ? $now : null,
             'subtotal' => (float) ($payload['productRevenue'] ?? 0),
             'packaging_fee' => (float) ($payload['packagingFee'] ?? 0),
@@ -261,6 +270,16 @@ class SalesService
         if ($initialStatus !== self::STATUS_PENDING_CASHIER) {
             $this->applyUsageDiff([], $items, $companyId, $outletId, $orderId, $payload['orderNumber'] ?? '');
         }
+        $this->recordStatusLog(
+            $orderId,
+            $companyId,
+            $outletId,
+            $initialStatus,
+            StatusCodeService::payment($payload['paymentStatus'] ?? 'paid', StatusCodeService::PAYMENT_PAID),
+            $initialStatus === self::STATUS_PENDING_CASHIER ? 'customer' : 'cashier',
+            $initialStatus === self::STATUS_PENDING_CASHIER ? ($payload['customerName'] ?? 'Customer') : 'Kasir',
+            $initialStatus === self::STATUS_PENDING_CASHIER ? 'Order dibuat dari buku menu online.' : 'Order dibuat dari POS.'
+        );
         if (! empty($payload['paymentTransactionId'])) {
             $this->payments->attachOrder((string) $payload['paymentTransactionId'], $orderId, $companyId, $outletId);
         }
@@ -319,6 +338,7 @@ class SalesService
             'packaging_note' => $payload['packagingNote'] ?? null,
             'last_order_added_at' => $now,
         ]);
+        $this->recordStatusLog($orderId, $companyId, $outletId, $currentStatus, (string) ($order['payment_status'] ?? ''), 'cashier', 'Kasir', 'Pesanan diedit kasir.');
         $this->db->transComplete();
 
         return $this->orderDetail((string) $orderId, $companyId, $outletId);
@@ -637,7 +657,70 @@ class SalesService
             'changeDue' => (float) ($order['change_due'] ?? 0),
             'paymentProvider' => $order['payment_provider'] ?? '',
             'paymentReference' => $order['payment_reference'] ?? '',
+            'paymentProofUrl' => $order['payment_proof_path'] ?? '',
+            'paymentProofNote' => $order['payment_proof_note'] ?? '',
+            'timeline' => $this->statusTimeline((int) $order['id']),
         ];
+    }
+
+    private function recordStatusLog(int $orderId, int $companyId, int $outletId, string $status, string $paymentStatus = '', string $actorType = 'system', string $actorName = 'System', string $note = ''): void
+    {
+        if (! $this->db->tableExists('order_status_logs')) return;
+        $now = date('Y-m-d H:i:s');
+        $data = [
+            'outlet_id' => $outletId,
+            'order_id' => $orderId,
+            'status' => $this->normalizeStatus($status),
+            'payment_status' => $paymentStatus !== '' ? StatusCodeService::payment($paymentStatus) : null,
+            'actor_type' => $actorType,
+            'actor_name' => $actorName,
+            'note' => $note,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ];
+        if ($this->hasCompanyColumn('order_status_logs')) {
+            $data['company_id'] = $companyId;
+        }
+        $this->db->table('order_status_logs')->insert($data);
+    }
+
+    private function statusTimeline(int $orderId): array
+    {
+        if (! $this->db->tableExists('order_status_logs')) return [];
+        return array_map(fn ($row) => [
+            'status' => $this->normalizeStatus((string) ($row['status'] ?? '')),
+            'paymentStatus' => StatusCodeService::payment($row['payment_status'] ?? ''),
+            'actorType' => $row['actor_type'] ?? 'system',
+            'actorName' => $row['actor_name'] ?? 'System',
+            'note' => $row['note'] ?? '',
+            'createdAt' => $this->isoDate($row['created_at'] ?? ''),
+        ], $this->db->table('order_status_logs')->where('order_id', $orderId)->orderBy('created_at', 'ASC')->get()->getResultArray());
+    }
+
+    private function paymentMethodRequiresProof(string $paymentMethod, int $companyId, int $outletId): bool
+    {
+        if (! $this->db->tableExists('payment_methods')) return false;
+        $builder = $this->db->table('payment_methods')
+            ->where('outlet_id', $outletId)
+            ->where('name', $paymentMethod);
+        if ($this->hasCompanyColumn('payment_methods')) {
+            $builder->where('company_id', $companyId);
+        }
+        $row = $builder->get()->getRowArray();
+        if (! $row) return false;
+        return ($row['type'] ?? '') === 'transfer' || (($row['type'] ?? '') === 'qris' && ($row['qris_mode'] ?? 'online') === 'offline');
+    }
+
+    private function actorForStatus(string $status): array
+    {
+        $status = $this->normalizeStatus($status);
+        if (in_array($status, [self::STATUS_WAITING, self::STATUS_PREPARING, self::STATUS_READY], true)) {
+            return ['kitchen', 'Kitchen'];
+        }
+        if (in_array($status, [self::STATUS_PENDING_CASHIER, self::STATUS_COMPLETED, self::STATUS_CANCELLED], true)) {
+            return ['cashier', 'Kasir'];
+        }
+        return ['system', 'System'];
     }
 
     private function normalizeStatus(string $status): string

@@ -67,6 +67,34 @@ class PublicOrderService
         ], $rows);
     }
 
+    public function statusLookup(string $orderNumber, int $companyId, ?int $outletId = null): array
+    {
+        $orderNumber = strtoupper(trim($orderNumber));
+        if ($orderNumber === '') {
+            throw new \InvalidArgumentException('Nomor order wajib diisi.');
+        }
+        if (! $this->db->tableExists('orders')) {
+            throw new \InvalidArgumentException('Data order belum tersedia.');
+        }
+
+        $builder = $this->db->table('orders')->where('UPPER(order_no)', $orderNumber);
+        if ($this->hasCompanyColumn('orders')) {
+            $builder->where('company_id', $companyId);
+        }
+        if ($outletId) {
+            $builder->where('outlet_id', $outletId);
+        }
+        $order = $builder->orderBy('id', 'DESC')->get()->getRowArray();
+        if (! $order) {
+            throw new \InvalidArgumentException('Order tidak ditemukan.');
+        }
+
+        return [
+            'order' => (new SalesService())->orderDetail('ord-' . $order['id'], $companyId, (int) $order['outlet_id']),
+            'message' => 'Status order ditemukan.',
+        ];
+    }
+
     public function submit(array $payload, int $companyId): array
     {
         $outletId = $this->numericId($payload['outletId'] ?? $payload['outlet_id'] ?? '');
@@ -79,6 +107,10 @@ class PublicOrderService
         $this->ensureServiceTypeEnabled($serviceType, $settings['orderChannels'] ?? []);
 
         $paymentMethod = $this->paymentMethod($payload['paymentMethodId'] ?? '', $companyId, $outletId);
+        $paymentProofPath = $this->storePaymentProof($payload['paymentProof'] ?? null, $companyId, $outletId, $this->nextPublicOrderNumber($companyId, $outletId));
+        if ($this->requiresPaymentProof($paymentMethod) && $paymentProofPath === '') {
+            throw new \InvalidArgumentException('Upload bukti bayar wajib untuk metode pembayaran offline ini.');
+        }
         $customer = $this->customerPayload($payload);
         $memberId = ! empty($payload['registerMember'])
             ? $this->registerMember($customer, $companyId, $outletId)
@@ -112,6 +144,8 @@ class PublicOrderService
             'initialStatus' => SalesService::STATUS_PENDING_CASHIER,
             'paymentStatus' => StatusCodeService::PAYMENT_UNPAID,
             'paymentMethod' => $paymentMethod['name'] ?? 'Cash',
+            'paymentProofPath' => $paymentProofPath,
+            'paymentProofNote' => $this->paymentProofNote($paymentMethod),
             'productRevenue' => $totals['productRevenue'],
             'packagingFee' => $totals['packagingFee'],
             'paymentFee' => $totals['paymentFee'],
@@ -134,6 +168,58 @@ class PublicOrderService
                 ? 'Order tersimpan dan menunggu konfirmasi kasir sebelum diproses.'
                 : 'Order tersimpan dan menunggu konfirmasi kasir sebelum diproses.',
         ];
+    }
+
+    private function requiresPaymentProof(array $paymentMethod): bool
+    {
+        $type = (string) ($paymentMethod['type'] ?? '');
+        return $type === 'transfer' || ($type === 'qris' && ($paymentMethod['qrisMode'] ?? 'online') === 'offline');
+    }
+
+    private function paymentProofNote(array $paymentMethod): string
+    {
+        $type = (string) ($paymentMethod['type'] ?? '');
+        if ($type === 'qris' && ($paymentMethod['qrisMode'] ?? 'online') === 'offline') {
+            return 'QRIS offline - bukti bayar dari customer';
+        }
+        if ($type === 'transfer') {
+            return 'Bank transfer - bukti bayar dari customer';
+        }
+        return '';
+    }
+
+    private function storePaymentProof($proof, int $companyId, int $outletId, string $orderNumber): string
+    {
+        if (! is_array($proof)) return '';
+        $dataUrl = (string) ($proof['dataUrl'] ?? '');
+        if ($dataUrl === '') return '';
+        if (! preg_match('#^data:(image/(?:png|jpe?g|webp)|application/pdf);base64,([A-Za-z0-9+/=]+)$#', $dataUrl, $matches)) {
+            throw new \InvalidArgumentException('Format bukti bayar harus gambar atau PDF.');
+        }
+
+        $binary = base64_decode($matches[2], true);
+        if ($binary === false || strlen($binary) <= 0) {
+            throw new \InvalidArgumentException('Bukti bayar tidak valid.');
+        }
+        if (strlen($binary) > 3 * 1024 * 1024) {
+            throw new \InvalidArgumentException('Ukuran bukti bayar maksimal 3 MB.');
+        }
+
+        $extension = match ($matches[1]) {
+            'image/png' => 'png',
+            'image/jpeg', 'image/jpg' => 'jpg',
+            'image/webp' => 'webp',
+            default => 'pdf',
+        };
+        $dir = FCPATH . 'uploads/payment-proofs';
+        if (! is_dir($dir)) {
+            mkdir($dir, 0775, true);
+        }
+        $safeOrder = preg_replace('/[^A-Za-z0-9_-]+/', '-', $orderNumber);
+        $filename = date('YmdHis') . '-c' . $companyId . '-o' . $outletId . '-' . $safeOrder . '.' . $extension;
+        file_put_contents($dir . '/' . $filename, $binary);
+
+        return '/uploads/payment-proofs/' . $filename;
     }
 
     private function sendReceiptNotification(string $legacyOrderId): void

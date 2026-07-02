@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Order Online - IF Instrument</title>
     <link rel="stylesheet" href="../styles.css?v=coffee-v154" />
-    <link rel="stylesheet" href="../styles/pages/order.css?v=coffee-v154" />
+    <link rel="stylesheet" href="../styles/pages/order.css?v=coffee-v164" />
   </head>
   <body class="public-order-page">
     <main class="public-order-shell public-order-book-shell">
@@ -30,6 +30,15 @@
               <span id="order-cover-subtitle">UMKM Solution</span>
               <p id="order-cover-description">Pilih outlet dan mulai pemesanan dari buku menu digital.</p>
             </div>
+            <form class="public-order-lookup" id="order-status-lookup-form">
+              <label>
+                <span>Sudah punya order?</span>
+                <div>
+                  <input id="order-status-lookup-input" autocomplete="off" type="search" placeholder="Cek nomor order" />
+                  <button class="primary-action" type="submit">Cek</button>
+                </div>
+              </label>
+            </form>
             <div class="public-cover-outlets" id="order-cover-outlets-panel">
               <h2 id="order-outlet-title">Pilih Outlet</h2>
               <div class="public-choice-grid" id="order-outlet-choices"></div>
@@ -103,35 +112,42 @@
             <button class="primary-action wide-action public-cart-confirm" id="order-confirm-cart" type="button">Confirm Order</button>
           </article>
 
-          <article class="public-book-page" data-book-section="checkout">
-            <div class="public-step-heading">
-              <div>
-                <h1 id="order-customer-title">Customer & Payment</h1>
-                <p id="order-customer-description">Data receipt dan metode pembayaran.</p>
+          <article class="public-book-page public-customer-page" data-book-section="checkout" id="order-customer-page">
+            <div class="public-customer-content" id="order-customer-content" hidden>
+              <div class="public-step-heading">
+                <div>
+                  <h1 id="order-customer-title">Customer & Payment</h1>
+                  <p id="order-customer-description">Data receipt dan metode pembayaran.</p>
+                </div>
               </div>
+              <form class="public-order-form public-customer-form" id="order-customer-form">
+                <label>
+                  Nama
+                  <input id="order-customer-name" autocomplete="name" required type="text" placeholder="Nama pemesan" />
+                </label>
+                <div class="public-member-suggestions" id="order-member-suggestions" hidden></div>
+                <label>
+                  Email Receipt
+                  <input id="order-customer-email" autocomplete="email" required type="email" placeholder="nama@email.com" />
+                </label>
+                <label>
+                  No HP
+                  <input id="order-customer-phone" autocomplete="tel" required type="tel" placeholder="08xxxxxxxxxx" />
+                </label>
+                <label class="checkbox-line">
+                  <input id="order-register-member" type="checkbox" />
+                  Daftarkan sebagai member
+                </label>
+              </form>
+              <div class="payment-methods public-payment-grid" id="order-payments"></div>
+              <div class="public-payment-note" id="order-payment-note"></div>
+              <label class="public-payment-proof" id="order-payment-proof-panel" hidden>
+                Upload Bukti Bayar
+                <input id="order-payment-proof-file" accept="image/png,image/jpeg,image/webp,application/pdf" type="file" />
+                <span id="order-payment-proof-name">Belum ada file dipilih.</span>
+              </label>
+              <button class="primary-action wide-action" id="order-submit" type="button">Buat Order</button>
             </div>
-            <form class="public-order-form public-customer-form" id="order-customer-form">
-              <label>
-                Nama
-                <input id="order-customer-name" autocomplete="name" required type="text" placeholder="Nama pemesan" />
-              </label>
-              <div class="public-member-suggestions" id="order-member-suggestions" hidden></div>
-              <label>
-                Email Receipt
-                <input id="order-customer-email" autocomplete="email" required type="email" placeholder="nama@email.com" />
-              </label>
-              <label>
-                No HP
-                <input id="order-customer-phone" autocomplete="tel" required type="tel" placeholder="08xxxxxxxxxx" />
-              </label>
-              <label class="checkbox-line">
-                <input id="order-register-member" type="checkbox" />
-                Daftarkan sebagai member
-              </label>
-            </form>
-            <div class="payment-methods public-payment-grid" id="order-payments"></div>
-            <div class="public-payment-note" id="order-payment-note"></div>
-            <button class="primary-action wide-action" id="order-submit" type="button">Buat Order</button>
           </article>
 
           <article class="public-book-page" data-book-section="receipt">
@@ -194,6 +210,6 @@
 
     <script src="../vendor/turnjs/jquery.js?v=coffee-v152"></script>
     <script src="../vendor/turnjs/turn.js?v=coffee-v152"></script>
-    <script type="module" src="../scripts/pages/order.js?v=coffee-v152"></script>
+    <script type="module" src="../scripts/pages/order.js?v=coffee-v163"></script>
   </body>
 </html>

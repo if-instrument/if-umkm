@@ -196,6 +196,37 @@ function formatOrderDateTime(value) {
   });
 }
 
+function orderTimelineMarkup(order) {
+  const rows = Array.isArray(order?.timeline) ? order.timeline : [];
+  if (!rows.length) return "";
+  return `
+    <div class="order-status-timeline">
+      <strong>Timeline Status</strong>
+      ${rows.map((row) => `
+        <div>
+          <span>${formatOrderDateTime(row.createdAt)}</span>
+          <p><b>${statusLabel(row.status, "order")}</b>${row.paymentStatus ? ` · ${statusLabel(row.paymentStatus, "payment")}` : ""}</p>
+          <small>${escapeHtml(row.actorName || "System")}${row.note ? ` - ${escapeHtml(row.note)}` : ""}</small>
+        </div>
+      `).join("")}
+    </div>
+  `;
+}
+
+function paymentProofMarkup(order) {
+  if (!order?.paymentProofUrl) return "";
+  const isImage = /\.(png|jpe?g|webp)$/i.test(order.paymentProofUrl);
+  return `
+    <div class="payment-proof-panel">
+      <div>
+        <span>Bukti Bayar Customer</span>
+        <strong>${escapeHtml(order.paymentProofNote || order.paymentMethod || "Bukti bayar")}</strong>
+      </div>
+      ${isImage ? `<a href="${escapeHtml(order.paymentProofUrl)}" target="_blank" rel="noopener"><img src="${escapeHtml(order.paymentProofUrl)}" alt="Bukti bayar customer" /></a>` : `<a class="ghost-button compact-button" href="${escapeHtml(order.paymentProofUrl)}" target="_blank" rel="noopener">Buka Bukti Bayar</a>`}
+    </div>
+  `;
+}
+
 function queueTime(order) {
   return new Date(order.statusUpdatedAt || order.createdAt).getTime();
 }
@@ -341,6 +372,8 @@ function posOrderDetailMarkup(order) {
         ${order.packagingNote ? `<article><span>Packaging</span><strong>${order.packagingNote}</strong></article>` : ""}
       </div>
       ${orderStatusIs(order.status, ORDER_STATUS.PREPARING) ? `<div class="preparation-note">${canAct ? "Centang setiap produk yang sudah selesai dibuat." : "Checklist produksi hanya bisa dilakukan oleh user Kitchen."}</div>` : ""}
+      ${orderStatusIs(order.status, ORDER_STATUS.PENDING_CASHIER) ? paymentProofMarkup(order) : ""}
+      ${orderTimelineMarkup(order)}
       <div class="preparation-list">${posOrderPreparationItems(order)}</div>
       <div class="modal-actions order-detail-actions">
         <button class="ghost-button" data-pos-order-detail="${order.id}" type="button">Tutup</button>
@@ -669,6 +702,8 @@ function renderBillDetail(order, settlementMode = false, mode = "settle") {
       <article><span>Total Bill</span><strong>${money(order.total)}</strong></article>
       <article><span>Status</span><strong>${isOrderUnpaid(order) ? "Open" : "Paid"}</strong></article>
     </div>
+    ${isApproveMode ? paymentProofMarkup(order) : ""}
+    ${orderTimelineMarkup(order)}
     <div class="bill-detail-table-wrap">
       <table class="bill-detail-table">
         <thead><tr><th>Item</th><th>Qty</th><th>Harga</th><th>Subtotal</th></tr></thead>

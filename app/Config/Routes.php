@@ -32,6 +32,7 @@ $routes->group('api/page', static function ($routes) {
     $routes->post('login/submit', 'LoginController::submit');
     $routes->get('order/bootstrap', 'OnlineOrderController::bootstrap');
     $routes->get('order/member', 'OnlineOrderController::member');
+    $routes->get('order/status', 'OnlineOrderController::status');
     $routes->post('order/submit', 'OnlineOrderController::submit');
 });
 $routes->get('payment/card/(:segment)', 'AppPageController::cardPayment/$1');
