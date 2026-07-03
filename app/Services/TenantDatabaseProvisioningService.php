@@ -3,7 +3,7 @@
 namespace App\Services;
 
 use CodeIgniter\Database\BaseConnection;
-use CodeIgniter\Database\MigrationRunner;
+use App\Database\TenantMigrationRunner;
 use Config\Database as DatabaseConfig;
 use Config\Migrations;
 
@@ -61,7 +61,7 @@ class TenantDatabaseProvisioningService
         $group = 'tenant_' . strtolower(preg_replace('/[^A-Za-z0-9_]+/', '_', $databaseName));
         $databaseConfig = config(DatabaseConfig::class);
         $databaseConfig->{$group} = $this->tenantConnectionParams($databaseName);
-        $runner = new MigrationRunner(config(Migrations::class), $group);
+        $runner = new TenantMigrationRunner(config(Migrations::class), $group, APPPATH . 'Database/TenantMigrations');
         $runner->setNamespace('App');
         if (! $runner->latest($group)) {
             throw new \RuntimeException('Migrasi database tenant gagal dijalankan.');

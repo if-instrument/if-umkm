@@ -185,4 +185,6 @@ echo
 echo "Jalankan built-in server:"
 echo "  scripts/run-server.sh"
 echo
-echo "Untuk production, arahkan web server ke folder public/."
+echo "Generate config web server production:"
+echo "  scripts/webserver-config.sh nginx direct domain-anda.com --project-dir $ROOT_DIR --output if-instrument-nginx.conf"
+echo "  scripts/webserver-config.sh apache proxy domain-anda.com --port 8081 --https --output if-instrument-apache-proxy.conf"
