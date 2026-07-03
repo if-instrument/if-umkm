@@ -23,14 +23,19 @@ Options:
   --project-dir PATH          Default: folder project saat ini.
   --port PORT                 Default: 8081 untuk mode proxy.
   --proxy-host HOST           Default: 127.0.0.1 untuk mode proxy.
+  --proxy-path PATH           Default: /. Contoh: /IF/ hanya proxy request di path itu.
   --php-fpm TARGET            Default: unix:/run/php/php8.3-fpm.sock untuk nginx direct.
   --https                     Set header/proto HTTPS pada mode proxy.
+  --ssl                       Generate final HTTPS config memakai Let's Encrypt path.
+  --cert-path PATH            Default: /etc/letsencrypt/live/DOMAIN/fullchain.pem
+  --key-path PATH             Default: /etc/letsencrypt/live/DOMAIN/privkey.pem
   --output FILE               Simpan config ke file. Jika kosong, config dicetak ke layar.
   -h, --help                  Tampilkan bantuan.
 
 Contoh:
   scripts/webserver-config.sh apache direct app.domain.com --project-dir /var/www/if-instrument --output if-instrument.conf
   scripts/webserver-config.sh nginx proxy app.domain.com --port 8081 --https
+  scripts/webserver-config.sh nginx proxy domain.com --proxy-host 10.10.10.20 --port 8081 --proxy-path /IF/ --ssl
 
 Catatan:
   - Mode direct lebih disarankan untuk production besar.
@@ -56,9 +61,13 @@ fi
 PROJECT_DIR="$ROOT_DIR"
 PORT="8081"
 PROXY_HOST="127.0.0.1"
+PROXY_PATH="/"
 PHP_FPM="unix:/run/php/php8.3-fpm.sock"
 HTTPS=0
+SSL=0
 OUTPUT=""
+CERT_PATH=""
+KEY_PATH=""
 
 if [[ $# -gt 0 && "${1:-}" != --* ]]; then shift || true; fi
 if [[ $# -gt 0 && "${1:-}" != --* ]]; then shift || true; fi
@@ -90,6 +99,10 @@ while [[ $# -gt 0 ]]; do
       PROXY_HOST="${2:-}"
       shift 2
       ;;
+    --proxy-path)
+      PROXY_PATH="${2:-}"
+      shift 2
+      ;;
     --php-fpm)
       PHP_FPM="${2:-}"
       shift 2
@@ -97,6 +110,19 @@ while [[ $# -gt 0 ]]; do
     --https)
       HTTPS=1
       shift
+      ;;
+    --ssl)
+      SSL=1
+      HTTPS=1
+      shift
+      ;;
+    --cert-path)
+      CERT_PATH="${2:-}"
+      shift 2
+      ;;
+    --key-path)
+      KEY_PATH="${2:-}"
+      shift 2
       ;;
     --output)
       OUTPUT="${2:-}"
@@ -137,6 +163,19 @@ fi
 
 PROJECT_DIR="${PROJECT_DIR%/}"
 PUBLIC_DIR="${PROJECT_DIR}/public"
+if [[ -z "$PROXY_PATH" ]]; then
+  PROXY_PATH="/"
+fi
+if [[ "$PROXY_PATH" != /* ]]; then
+  PROXY_PATH="/${PROXY_PATH}"
+fi
+if [[ "$PROXY_PATH" != */ ]]; then
+  PROXY_PATH="${PROXY_PATH}/"
+fi
+PROXY_PATH_NO_TRAILING="${PROXY_PATH%/}"
+if [[ -z "$PROXY_PATH_NO_TRAILING" ]]; then
+  PROXY_PATH_NO_TRAILING="/"
+fi
 PROTO="http"
 FORWARDED_PORT="80"
 if [[ "$HTTPS" -eq 1 ]]; then
@@ -144,7 +183,38 @@ if [[ "$HTTPS" -eq 1 ]]; then
   FORWARDED_PORT="443"
 fi
 
+CERT_PATH="${CERT_PATH:-/etc/letsencrypt/live/${DOMAIN}/fullchain.pem}"
+KEY_PATH="${KEY_PATH:-/etc/letsencrypt/live/${DOMAIN}/privkey.pem}"
+
 render_apache_direct() {
+  if [[ "$SSL" -eq 1 ]]; then
+    cat <<EOF
+<VirtualHost *:80>
+    ServerName ${DOMAIN}
+    Redirect permanent / https://${DOMAIN}/
+</VirtualHost>
+
+<VirtualHost *:443>
+    ServerName ${DOMAIN}
+    DocumentRoot ${PUBLIC_DIR}
+
+    SSLEngine on
+    SSLCertificateFile ${CERT_PATH}
+    SSLCertificateKeyFile ${KEY_PATH}
+
+    <Directory ${PUBLIC_DIR}>
+        Options -Indexes +FollowSymLinks
+        AllowOverride All
+        Require all granted
+    </Directory>
+
+    ErrorLog \${APACHE_LOG_DIR}/if-instrument-ssl-error.log
+    CustomLog \${APACHE_LOG_DIR}/if-instrument-ssl-access.log combined
+</VirtualHost>
+EOF
+    return
+  fi
+
   cat <<EOF
 <VirtualHost *:80>
     ServerName ${DOMAIN}
@@ -163,6 +233,34 @@ EOF
 }
 
 render_apache_proxy() {
+  if [[ "$SSL" -eq 1 ]]; then
+    cat <<EOF
+<VirtualHost *:80>
+    ServerName ${DOMAIN}
+    Redirect permanent / https://${DOMAIN}/
+</VirtualHost>
+
+<VirtualHost *:443>
+    ServerName ${DOMAIN}
+
+    SSLEngine on
+    SSLCertificateFile ${CERT_PATH}
+    SSLCertificateKeyFile ${KEY_PATH}
+
+    ProxyPreserveHost On
+    RequestHeader set X-Forwarded-Proto "https"
+    RequestHeader set X-Forwarded-Port "443"
+
+    ProxyPass ${PROXY_PATH} http://${PROXY_HOST}:${PORT}${PROXY_PATH}
+    ProxyPassReverse ${PROXY_PATH} http://${PROXY_HOST}:${PORT}${PROXY_PATH}
+
+    ErrorLog \${APACHE_LOG_DIR}/if-instrument-proxy-ssl-error.log
+    CustomLog \${APACHE_LOG_DIR}/if-instrument-proxy-ssl-access.log combined
+</VirtualHost>
+EOF
+    return
+  fi
+
   cat <<EOF
 <VirtualHost *:80>
     ServerName ${DOMAIN}
@@ -171,8 +269,8 @@ render_apache_proxy() {
     RequestHeader set X-Forwarded-Proto "${PROTO}"
     RequestHeader set X-Forwarded-Port "${FORWARDED_PORT}"
 
-    ProxyPass / http://${PROXY_HOST}:${PORT}/
-    ProxyPassReverse / http://${PROXY_HOST}:${PORT}/
+    ProxyPass ${PROXY_PATH} http://${PROXY_HOST}:${PORT}${PROXY_PATH}
+    ProxyPassReverse ${PROXY_PATH} http://${PROXY_HOST}:${PORT}${PROXY_PATH}
 
     ErrorLog \${APACHE_LOG_DIR}/if-instrument-proxy-error.log
     CustomLog \${APACHE_LOG_DIR}/if-instrument-proxy-access.log combined
@@ -181,6 +279,44 @@ EOF
 }
 
 render_nginx_direct() {
+  if [[ "$SSL" -eq 1 ]]; then
+    cat <<EOF
+server {
+    listen 80;
+    server_name ${DOMAIN};
+    return 301 https://\$host\$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name ${DOMAIN};
+
+    ssl_certificate ${CERT_PATH};
+    ssl_certificate_key ${KEY_PATH};
+
+    root ${PUBLIC_DIR};
+    index index.php index.html;
+    client_max_body_size 20M;
+
+    location / {
+        try_files \$uri \$uri/ /index.php?\$query_string;
+    }
+
+    location ~ \.php$ {
+        include fastcgi_params;
+        fastcgi_pass ${PHP_FPM};
+        fastcgi_param SCRIPT_FILENAME \$document_root\$fastcgi_script_name;
+        fastcgi_param PATH_INFO \$fastcgi_path_info;
+    }
+
+    location ~ /\.(?!well-known).* {
+        deny all;
+    }
+}
+EOF
+    return
+  fi
+
   cat <<EOF
 server {
     listen 80;
@@ -209,13 +345,61 @@ EOF
 }
 
 render_nginx_proxy() {
+  if [[ "$SSL" -eq 1 ]]; then
+    local exact_redirect=""
+    if [[ "$PROXY_PATH" != "/" ]]; then
+      exact_redirect="
+    location = ${PROXY_PATH_NO_TRAILING} {
+        return 301 https://\$host${PROXY_PATH};
+    }
+"
+    fi
+    cat <<EOF
+server {
+    listen 80;
+    server_name ${DOMAIN};
+    return 301 https://\$host\$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name ${DOMAIN};
+    client_max_body_size 20M;
+
+    ssl_certificate ${CERT_PATH};
+    ssl_certificate_key ${KEY_PATH};
+${exact_redirect}
+
+    location ${PROXY_PATH} {
+        proxy_pass http://${PROXY_HOST}:${PORT};
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Forwarded-Port 443;
+    }
+}
+EOF
+    return
+  fi
+
+  local exact_redirect=""
+  if [[ "$PROXY_PATH" != "/" ]]; then
+    exact_redirect="
+    location = ${PROXY_PATH_NO_TRAILING} {
+        return 301 \$scheme://\$host${PROXY_PATH};
+    }
+"
+  fi
   cat <<EOF
 server {
     listen 80;
     server_name ${DOMAIN};
     client_max_body_size 20M;
+${exact_redirect}
 
-    location / {
+    location ${PROXY_PATH} {
         proxy_pass http://${PROXY_HOST}:${PORT};
         proxy_http_version 1.1;
         proxy_set_header Host \$host;
@@ -255,6 +439,11 @@ if [[ "$SERVER" == "apache" ]]; then
   cat <<'EOF'
   sudo a2enmod rewrite
 EOF
+  if [[ "$SSL" -eq 1 ]]; then
+    cat <<'EOF'
+  sudo a2enmod ssl
+EOF
+  fi
   if [[ "$MODE" == "proxy" ]]; then
     cat <<'EOF'
   sudo a2enmod proxy proxy_http headers
@@ -275,10 +464,21 @@ else
 EOF
 fi
 
+if [[ "$SSL" -eq 1 ]]; then
+  cat <<EOF
+
+Let's Encrypt:
+  sudo certbot certonly --webroot -w ${PUBLIC_DIR} -d ${DOMAIN}
+  # atau jika memakai proxy/service dan port 80 kosong:
+  sudo certbot certonly --standalone -d ${DOMAIN}
+EOF
+fi
+
 if [[ "$MODE" == "proxy" ]]; then
   cat <<EOF
 
 Jalankan app service internal:
   HOST=${PROXY_HOST} PORT=${PORT} scripts/run-server.sh
+  # Public path yang diproxy: https://${DOMAIN}${PROXY_PATH}
 EOF
 fi

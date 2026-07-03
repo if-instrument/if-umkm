@@ -187,6 +187,8 @@ scripts/webserver-config.sh apache direct domain-anda.com --project-dir /var/www
 scripts/webserver-config.sh apache proxy domain-anda.com --port 8081 --https --output if-instrument-apache-proxy.conf
 scripts/webserver-config.sh nginx direct domain-anda.com --project-dir /var/www/if-instrument --output if-instrument-nginx.conf
 scripts/webserver-config.sh nginx proxy domain-anda.com --port 8081 --https --output if-instrument-nginx-proxy.conf
+scripts/webserver-config.sh nginx direct domain-anda.com --ssl --project-dir /var/www/if-instrument --output if-instrument-nginx-ssl.conf
+scripts/webserver-config.sh nginx proxy domain-anda.com --proxy-host 10.10.10.20 --port 8081 --proxy-path /IF/ --ssl --output if-instrument-nginx-if.conf
 ```
 
 Generate config web server Windows PowerShell:
@@ -196,6 +198,8 @@ Generate config web server Windows PowerShell:
 .\scripts\webserver-config.ps1 -Server iis -Mode proxy -Domain domain-anda.com -Port 8081 -Https -Output web.config
 .\scripts\webserver-config.ps1 -Server apache -Mode direct -Domain domain-anda.com -ProjectDir 'C:\apps\if-instrument' -Output if-instrument-apache.conf
 .\scripts\webserver-config.ps1 -Server nginx -Mode proxy -Domain domain-anda.com -Port 8081 -Https -Output if-instrument-nginx.conf
+.\scripts\webserver-config.ps1 -Server nginx -Mode direct -Domain domain-anda.com -ProjectDir 'C:\apps\if-instrument' -Ssl -Output if-instrument-nginx-ssl.conf
+.\scripts\webserver-config.ps1 -Server nginx -Mode proxy -Domain domain-anda.com -ProxyHost 10.10.10.20 -Port 8081 -ProxyPath /IF/ -Ssl -Output if-instrument-nginx-if.conf
 ```
 
 Mode `direct` berarti web server langsung mengarah ke `public/`. Mode `proxy` berarti web server meneruskan request ke service internal, misalnya:
@@ -206,6 +210,28 @@ HOST=127.0.0.1 PORT=8081 scripts/run-server.sh
 
 ```powershell
 .\scripts\run-server.ps1 -HostName 127.0.0.1 -Port 8081
+```
+
+Jika proxy hanya untuk path tertentu, misalnya domain utama tetap `domain.com` dan aplikasi hanya aktif saat URL diawali `/IF/`, gunakan `--proxy-path /IF/` atau `-ProxyPath /IF/`.
+
+Contoh:
+
+```bash
+scripts/webserver-config.sh nginx proxy domain.com --proxy-host 10.10.10.20 --port 8081 --proxy-path /IF/ --ssl --output if-instrument-if.conf
+```
+
+```powershell
+.\scripts\webserver-config.ps1 -Server apache -Mode proxy -Domain domain.com -ProxyHost 10.10.10.20 -Port 8081 -ProxyPath /IF/ -Ssl -Output if-instrument-if.conf
+```
+
+Pada mode ini:
+
+- `https://domain.com/` tetap ditangani web server utama.
+- `https://domain.com/IF/` diteruskan ke backend proxy.
+- Set `.env` public app URL sesuai path:
+
+```text
+app.baseURL = 'https://domain.com/IF/'
 ```
 
 ## Production Web Server
@@ -334,6 +360,25 @@ Contoh Apache ProxyPass:
 </VirtualHost>
 ```
 
+Contoh Apache path-based ProxyPass hanya untuk `/IF/`:
+
+```apache
+<VirtualHost *:443>
+    ServerName domain.com
+
+    SSLEngine on
+    SSLCertificateFile /etc/letsencrypt/live/domain.com/fullchain.pem
+    SSLCertificateKeyFile /etc/letsencrypt/live/domain.com/privkey.pem
+
+    ProxyPreserveHost On
+    RequestHeader set X-Forwarded-Proto "https"
+    RequestHeader set X-Forwarded-Port "443"
+
+    ProxyPass /IF/ http://10.10.10.20:8081/IF/
+    ProxyPassReverse /IF/ http://10.10.10.20:8081/IF/
+</VirtualHost>
+```
+
 Aktifkan modul Apache:
 
 ```bash
@@ -362,6 +407,32 @@ server {
 }
 ```
 
+Contoh Nginx path-based reverse proxy hanya untuk `/IF/`:
+
+```nginx
+server {
+    listen 443 ssl http2;
+    server_name domain.com;
+
+    ssl_certificate /etc/letsencrypt/live/domain.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/domain.com/privkey.pem;
+
+    location = /IF {
+        return 301 https://$host/IF/;
+    }
+
+    location /IF/ {
+        proxy_pass http://10.10.10.20:8081;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Forwarded-Port 443;
+    }
+}
+```
+
 Jika memakai HTTPS di proxy, pastikan `.env` memakai URL publik:
 
 ```text
@@ -369,6 +440,67 @@ app.baseURL = 'https://domain-anda.com/'
 ```
 
 Catatan: untuk production besar, opsi PHP-FPM langsung lebih disarankan daripada `spark serve`. Reverse proxy cocok untuk staging, demo, atau saat service dijalankan melalui supervisor/systemd.
+
+### SSL Let's Encrypt
+
+Untuk Linux dengan Apache/Nginx, gunakan Certbot. Pastikan domain sudah mengarah ke server dan port 80/443 terbuka.
+
+Install Certbot Ubuntu/Debian:
+
+```bash
+sudo apt update
+sudo apt install certbot python3-certbot-nginx python3-certbot-apache
+```
+
+Cara paling mudah jika memakai plugin web server:
+
+```bash
+sudo certbot --nginx -d domain-anda.com
+sudo certbot --apache -d domain-anda.com
+```
+
+Jika ingin memakai config final dari generator aplikasi:
+
+```bash
+sudo certbot certonly --webroot -w /var/www/if-instrument/public -d domain-anda.com
+scripts/webserver-config.sh nginx direct domain-anda.com --ssl --project-dir /var/www/if-instrument --output if-instrument-nginx-ssl.conf
+scripts/webserver-config.sh apache direct domain-anda.com --ssl --project-dir /var/www/if-instrument --output if-instrument-apache-ssl.conf
+```
+
+Untuk proxy mode:
+
+```bash
+sudo certbot certonly --standalone -d domain-anda.com
+scripts/webserver-config.sh nginx proxy domain-anda.com --ssl --port 8081 --output if-instrument-nginx-proxy-ssl.conf
+scripts/webserver-config.sh apache proxy domain-anda.com --ssl --port 8081 --output if-instrument-apache-proxy-ssl.conf
+```
+
+Renewal biasanya otomatis dibuat oleh Certbot. Cek dengan:
+
+```bash
+sudo certbot renew --dry-run
+```
+
+Untuk Windows IIS, gunakan win-acme:
+
+```text
+https://www.win-acme.com/
+```
+
+Flow Windows IIS:
+
+- Buat site IIS ke folder `public` untuk direct mode, atau root site proxy untuk proxy mode.
+- Install IIS URL Rewrite.
+- Untuk proxy mode install Application Request Routing (ARR).
+- Jalankan win-acme untuk membuat dan memasang sertifikat Let's Encrypt ke binding IIS.
+- Gunakan `webserver-config.ps1` untuk membuat `web.config`.
+
+Contoh:
+
+```powershell
+.\scripts\webserver-config.ps1 -Server iis -Mode direct -Domain domain-anda.com -ProjectDir 'C:\apps\if-instrument' -Ssl -Output public\web.config
+.\scripts\webserver-config.ps1 -Server iis -Mode proxy -Domain domain-anda.com -Port 8081 -Ssl -Output web.config
+```
 
 ### Windows IIS
 
