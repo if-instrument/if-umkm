@@ -251,8 +251,8 @@ render_apache_proxy() {
     RequestHeader set X-Forwarded-Proto "https"
     RequestHeader set X-Forwarded-Port "443"
 
-    ProxyPass ${PROXY_PATH} http://${PROXY_HOST}:${PORT}${PROXY_PATH}
-    ProxyPassReverse ${PROXY_PATH} http://${PROXY_HOST}:${PORT}${PROXY_PATH}
+    ProxyPass ${PROXY_PATH} http://${PROXY_HOST}:${PORT}/
+    ProxyPassReverse ${PROXY_PATH} http://${PROXY_HOST}:${PORT}/
 
     ErrorLog \${APACHE_LOG_DIR}/if-instrument-proxy-ssl-error.log
     CustomLog \${APACHE_LOG_DIR}/if-instrument-proxy-ssl-access.log combined
@@ -269,8 +269,8 @@ EOF
     RequestHeader set X-Forwarded-Proto "${PROTO}"
     RequestHeader set X-Forwarded-Port "${FORWARDED_PORT}"
 
-    ProxyPass ${PROXY_PATH} http://${PROXY_HOST}:${PORT}${PROXY_PATH}
-    ProxyPassReverse ${PROXY_PATH} http://${PROXY_HOST}:${PORT}${PROXY_PATH}
+    ProxyPass ${PROXY_PATH} http://${PROXY_HOST}:${PORT}/
+    ProxyPassReverse ${PROXY_PATH} http://${PROXY_HOST}:${PORT}/
 
     ErrorLog \${APACHE_LOG_DIR}/if-instrument-proxy-error.log
     CustomLog \${APACHE_LOG_DIR}/if-instrument-proxy-access.log combined
@@ -371,7 +371,7 @@ server {
 ${exact_redirect}
 
     location ${PROXY_PATH} {
-        proxy_pass http://${PROXY_HOST}:${PORT};
+        proxy_pass http://${PROXY_HOST}:${PORT}/;
         proxy_http_version 1.1;
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
@@ -400,7 +400,7 @@ server {
 ${exact_redirect}
 
     location ${PROXY_PATH} {
-        proxy_pass http://${PROXY_HOST}:${PORT};
+        proxy_pass http://${PROXY_HOST}:${PORT}/;
         proxy_http_version 1.1;
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;

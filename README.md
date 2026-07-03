@@ -227,7 +227,7 @@ scripts/webserver-config.sh nginx proxy domain.com --proxy-host 10.10.10.20 --po
 Pada mode ini:
 
 - `https://domain.com/` tetap ditangani web server utama.
-- `https://domain.com/IF/` diteruskan ke backend proxy.
+- `https://domain.com/IF/` diteruskan ke backend proxy `http://IP:PORT/`.
 - Set `.env` public app URL sesuai path:
 
 ```text
@@ -374,8 +374,8 @@ Contoh Apache path-based ProxyPass hanya untuk `/IF/`:
     RequestHeader set X-Forwarded-Proto "https"
     RequestHeader set X-Forwarded-Port "443"
 
-    ProxyPass /IF/ http://10.10.10.20:8081/IF/
-    ProxyPassReverse /IF/ http://10.10.10.20:8081/IF/
+    ProxyPass /IF/ http://10.10.10.20:8081/
+    ProxyPassReverse /IF/ http://10.10.10.20:8081/
 </VirtualHost>
 ```
 
@@ -422,7 +422,7 @@ server {
     }
 
     location /IF/ {
-        proxy_pass http://10.10.10.20:8081;
+        proxy_pass http://10.10.10.20:8081/;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;

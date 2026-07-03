@@ -110,8 +110,8 @@ if ($Ssl) {
     RequestHeader set X-Forwarded-Proto "https"
     RequestHeader set X-Forwarded-Port "443"
 
-    ProxyPass $ProxyPath http://${ProxyHost}:${Port}${ProxyPath}
-    ProxyPassReverse $ProxyPath http://${ProxyHost}:${Port}${ProxyPath}
+    ProxyPass $ProxyPath http://${ProxyHost}:${Port}/
+    ProxyPassReverse $ProxyPath http://${ProxyHost}:${Port}/
 
     ErrorLog logs/if-instrument-proxy-ssl-error.log
     CustomLog logs/if-instrument-proxy-ssl-access.log combined
@@ -128,8 +128,8 @@ return
     RequestHeader set X-Forwarded-Proto "$Proto"
     RequestHeader set X-Forwarded-Port "$ForwardedPort"
 
-    ProxyPass $ProxyPath http://${ProxyHost}:${Port}${ProxyPath}
-    ProxyPassReverse $ProxyPath http://${ProxyHost}:${Port}${ProxyPath}
+    ProxyPass $ProxyPath http://${ProxyHost}:${Port}/
+    ProxyPassReverse $ProxyPath http://${ProxyHost}:${Port}/
 
     ErrorLog logs/if-instrument-proxy-error.log
     CustomLog logs/if-instrument-proxy-access.log combined
@@ -231,7 +231,7 @@ server {
 $ExactRedirect
 
     location $ProxyPath {
-        proxy_pass http://${ProxyHost}:${Port};
+        proxy_pass http://${ProxyHost}:${Port}/;
         proxy_http_version 1.1;
         proxy_set_header Host `$host;
         proxy_set_header X-Real-IP `$remote_addr;
@@ -261,7 +261,7 @@ server {
 $ExactRedirect
 
     location $ProxyPath {
-        proxy_pass http://${ProxyHost}:${Port};
+        proxy_pass http://${ProxyHost}:${Port}/;
         proxy_http_version 1.1;
         proxy_set_header Host `$host;
         proxy_set_header X-Real-IP `$remote_addr;
@@ -327,7 +327,7 @@ if ($Ssl) {
       <rules>
         <rule name="Reverse Proxy to IF Instrument" stopProcessing="true">
           <match url="^$($ProxyPath.Trim('/'))/(.*)$" />
-          <action type="Rewrite" url="http://${ProxyHost}:${Port}$ProxyPath{R:1}" />
+          <action type="Rewrite" url="http://${ProxyHost}:${Port}/{R:1}" />
           <serverVariables>
             <set name="HTTP_X_FORWARDED_PROTO" value="$Proto" />
             <set name="HTTP_X_FORWARDED_PORT" value="$ForwardedPort" />
