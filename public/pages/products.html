@@ -75,6 +75,16 @@
               </select>
             </label>
             <label>Status <select id="modal-product-status"><option value="10">Aktif</option><option value="90">Nonaktif</option></select></label>
+            <div class="full-row preorder-card">
+              <label class="preorder-toggle" for="modal-product-is-preorder">
+                <input id="modal-product-is-preorder" type="checkbox" />
+                <span>
+                  <strong>Aktifkan preorder</strong>
+                  <small>Produk ini akan tampil sebagai preorder dan memberi informasi jadwal pemesanan ke pelanggan.</small>
+                </span>
+              </label>
+            </div>
+            <label class="full-row">Catatan Preorder <input id="modal-product-preorder-note" autocomplete="off" placeholder="Contoh: Preorder 2 hari sebelum pickup" type="text" /></label>
             <label class="product-upload-field full-row">Foto Produk
               <input id="modal-product-image-url" type="hidden" />
               <span class="product-upload-control">

@@ -1231,6 +1231,45 @@ select {
   transition: border-color 150ms ease, box-shadow 150ms ease, background 150ms ease;
 }
 
+.preorder-card {
+  border: 1px solid #ead4b2;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #fffaf2 0%, #fef5e4 100%);
+  padding: 12px;
+}
+
+.preorder-toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0;
+  cursor: pointer;
+}
+
+.preorder-toggle input {
+  width: 18px;
+  min-height: 18px;
+  margin-top: 2px;
+  accent-color: var(--brand);
+}
+
+.preorder-toggle span {
+  display: grid;
+  gap: 3px;
+}
+
+.preorder-toggle strong {
+  color: #2f2418;
+  font-size: 14px;
+}
+
+.preorder-toggle small {
+  color: #856648;
+  font-size: 12px;
+  line-height: 1.4;
+  font-weight: 600;
+}
+
 input:focus,
 select:focus {
   border-color: var(--brand);

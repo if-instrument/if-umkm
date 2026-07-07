@@ -180,6 +180,8 @@ class ProductSuiteService
                 : 'made_to_order',
             'shelf_life_days' => max(0, (int) ($payload['shelfLifeDays'] ?? $payload['shelf_life_days'] ?? 0)),
             'status' => StatusCodeService::common($payload['status'] ?? 'active'),
+            'is_preorder' => ! empty($payload['isPreorder']) ? 1 : 0,
+            'preorder_note' => trim((string) ($payload['preorderNote'] ?? '')),
         ], $companyId);
 
         if ($id) {
@@ -771,6 +773,8 @@ class ProductSuiteService
             )),
             'inventoryType' => $row['inventory_type'] ?? 'made_to_order',
             'shelfLifeDays' => (int) ($row['shelf_life_days'] ?? 0),
+            'isPreorder' => ! empty($row['is_preorder']) ? true : false,
+            'preorderNote' => $row['preorder_note'] ?? '',
             'finishedStock' => $this->productBatchStock((int) $row['id'], (int) ($row['company_id'] ?? 1), $activeOutletId),
             'finishedUnitCost' => $this->productBatchUnitCost((int) $row['id'], (int) ($row['company_id'] ?? 1), $activeOutletId),
             'batches' => $this->productBatchPayload((int) $row['id'], (int) ($row['company_id'] ?? 1), $activeOutletId),

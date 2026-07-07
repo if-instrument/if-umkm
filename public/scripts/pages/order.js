@@ -757,14 +757,18 @@ function renderProducts() {
 function productCard(product) {
   const soldOut = product.soldOut || Number(product.availableQty || 0) <= 0;
   const inCart = state.cart.filter((line) => line.productId === product.id).reduce((sum, line) => sum + line.qty, 0);
+  const preorderBadge = product.isPreorder ? `<span class="preorder-pill">Preorder</span>` : "";
+  const preorderNote = product.isPreorder ? `<div class="preorder-note">${escapeHtml(product.preorderNote || "Pesanan khusus, diproses sesuai jadwal outlet")}</div>` : "";
   return `
     <article class="public-product-card ${soldOut ? "is-soldout" : ""}" ${soldOut ? `aria-disabled="true"` : `data-product-card="${escapeHtml(product.id)}" role="button" tabindex="0"`}>
       <div class="public-product-photo">${product.imageUrl ? `<img src="${escapeHtml(product.imageUrl)}" alt="${escapeHtml(product.name)}" />` : `<span>${escapeHtml((product.name || "?").slice(0, 1))}</span>`}</div>
       <div class="public-product-info">
         <strong>${escapeHtml(product.name)}</strong>
         <span>${money(product.price)}</span>
+        ${preorderNote}
       </div>
       ${soldOut ? `<span class="soldout-badge">Sold Out</span>` : `<button data-add-product="${product.id}" type="button">${inCart ? inCart : "+"}</button>`}
+      ${preorderBadge}
     </article>
   `;
 }

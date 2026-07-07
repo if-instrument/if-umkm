@@ -98,6 +98,12 @@ function isRetailProduct(product) {
   return (product?.inventoryType || "made_to_order") === "retail";
 }
 
+function syncPreorderFields() {
+  if (!exists("modal-product-is-preorder") || !exists("modal-product-preorder-note")) return;
+  const isPreorder = byId("modal-product-is-preorder").checked;
+  byId("modal-product-preorder-note").closest("label").hidden = !isPreorder;
+}
+
 function productImagePreviewMarkup(url) {
   return url ? `<img src="${url}" alt="Preview foto produk" />` : "Foto";
 }
@@ -179,6 +185,9 @@ function openModal(product = null) {
   byId("modal-product-shelf-life").value = product?.shelfLifeDays || 0;
   syncInventoryTypeFields();
   byId("modal-product-status").value = product?.status || COMMON_STATUS.ACTIVE;
+  byId("modal-product-is-preorder").checked = Boolean(product?.isPreorder);
+  byId("modal-product-preorder-note").value = product?.preorderNote || "";
+  syncPreorderFields();
   syncScopeControl(product);
   byId("modal-product-image-file").value = "";
   setProductImage(product?.imageUrl || "");
@@ -246,7 +255,9 @@ if (exists("product-modal-form")) byId("product-modal-form").addEventListener("s
     scope: byId("modal-product-scope").value,
     status: byId("modal-product-status").value,
     imageUrl: byId("modal-product-image-url").value.trim(),
-    description: byId("modal-product-description").value.trim()
+    description: byId("modal-product-description").value.trim(),
+    isPreorder: byId("modal-product-is-preorder").checked,
+    preorderNote: byId("modal-product-preorder-note").value.trim()
   }, state, session);
   if (existing && !canEditMaster(existing)) {
     showFeedback("modal-product-feedback", "User Selected Outlet hanya bisa edit produk outlet yang dipilih.");
@@ -321,6 +332,7 @@ document.addEventListener("keydown", (event) => {
   if (exists(id)) byId(id).addEventListener("input", updatePreview);
 });
 if (exists("modal-product-inventory-type")) byId("modal-product-inventory-type").addEventListener("change", syncInventoryTypeFields);
+if (exists("modal-product-is-preorder")) byId("modal-product-is-preorder").addEventListener("change", syncPreorderFields);
 if (exists("price-product-outlet")) byId("price-product-outlet").addEventListener("input", () => {
   const product = state.products.find((item) => item.id === byId("price-product-id").value);
   byId("price-product-preview").textContent = `${product?.name || "Produk"} akan dijual di outlet aktif dengan harga ${money(Number(byId("price-product-outlet").value) || 0)}.`;

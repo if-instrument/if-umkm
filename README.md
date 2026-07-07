@@ -102,6 +102,16 @@ Setelah login sebagai Super Admin:
 https://domain-anda.com/IFressoCoffee/login
 ```
 
+## Migrasi Tenant yang Sudah Ada
+
+Jika Anda perlu menjalankan migrasi untuk tenant yang sudah ada dan terdaftar di database pusat, cukup jalankan:
+
+```bash
+php spark tenant:run-migrations
+```
+
+Command ini akan membaca daftar tenant dari tabel `companies` di database pusat, mengambil `db_name`, lalu menjalankan migrasi tenant secara otomatis untuk semua tenant dedicated yang terdaftar.
+
 ## Menjalankan Dengan Built-In Server
 
 Untuk development atau test cepat:

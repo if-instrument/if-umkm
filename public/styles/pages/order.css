@@ -200,11 +200,12 @@
   display: grid;
   grid-template-rows: minmax(0, 1fr) auto;
   gap: 10px;
-  min-height: 236px;
+  min-height: 244px;
   padding: 10px;
   border: 1px solid #eadbcc;
-  border-radius: 10px;
-  background: #fffaf5;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #fffdf8 0%, #fff5e8 100%);
+  box-shadow: 0 8px 16px rgba(73, 43, 20, 0.05);
 }
 
 .public-product-card[data-product-card] {
@@ -226,8 +227,8 @@
   min-height: 0;
   aspect-ratio: 1.18;
   overflow: hidden;
-  border-radius: 8px;
-  background: #efe0d1;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #f4e0cb 0%, #e7caa4 100%);
   color: var(--order-accent);
   font-size: 30px;
   font-weight: 800;
@@ -241,9 +242,9 @@
 
 .public-product-info {
   min-width: 0;
-  border-radius: 8px;
-  background: rgba(255, 250, 243, 0.94);
-  padding: 8px 40px 8px 8px;
+  border-radius: 10px;
+  background: rgba(255, 250, 243, 0.96);
+  padding: 8px 44px 8px 8px;
 }
 
 .public-product-info strong {
@@ -252,6 +253,21 @@
   color: #2c2018;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-size: 14px;
+}
+
+.public-product-info span {
+  display: block;
+  margin-top: 3px;
+  font-size: 12px;
+}
+
+.preorder-note {
+  margin-top: 5px;
+  color: #8b5e34;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.35;
 }
 
 .public-product-card p {
@@ -296,15 +312,27 @@
   opacity: 0.58;
 }
 
-.soldout-badge {
+.soldout-badge,
+.preorder-pill {
   position: absolute;
   right: 10px;
-  bottom: 12px;
+  bottom: 10px;
   padding: 6px 9px;
   border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.soldout-badge {
   background: #fff0ed;
   color: #b23a2e !important;
-  font-size: 11px;
+}
+
+.preorder-pill {
+  background: #fff4de;
+  color: #9a5b00 !important;
+  box-shadow: 0 4px 10px rgba(154, 91, 0, 0.12);
 }
 
 .public-order-form {
