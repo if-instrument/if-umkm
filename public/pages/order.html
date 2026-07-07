@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Order Online - IF Instrument</title>
     <link rel="stylesheet" href="../styles.css?v=coffee-v154" />
-    <link rel="stylesheet" href="../styles/pages/order.css?v=coffee-v168" />
+    <link rel="stylesheet" href="../styles/pages/order.css?v=coffee-v169" />
   </head>
   <body class="public-order-page">
     <main class="public-order-shell public-order-book-shell">
@@ -72,19 +72,12 @@
               </div>
             </div>
             <div class="public-menu-toolbar">
-              <label>
-                Cari menu
-                <input id="order-search" autocomplete="off" type="search" placeholder="Cari produk..." />
-              </label>
-              <label class="public-grid-size-picker">
-                <span id="order-grid-size-label">Grid</span>
-                <select id="order-grid-size-select">
-                  <option value="2">2x2</option>
-                  <option value="3" selected>3x3</option>
-                  <option value="4">4x4</option>
-                </select>
-              </label>
-              <div class="public-order-tabs" id="order-categories"></div>
+              <div class="public-menu-toolbar-row">
+                <label class="public-search-picker">
+                  <input id="order-search" autocomplete="off" type="search" placeholder="Cari produk..." />
+                </label>
+                <div class="public-order-tabs" id="order-categories"></div>
+              </div>
             </div>
             <div class="public-menu-category-heading">
               <h2 id="order-menu-category-title">Semua Menu</h2>

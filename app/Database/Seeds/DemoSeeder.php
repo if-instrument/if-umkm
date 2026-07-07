@@ -2,6 +2,7 @@
 
 namespace App\Database\Seeds;
 
+use App\Services\StatusCodeService;
 use CodeIgniter\Database\Seeder;
 
 class DemoSeeder extends Seeder
@@ -71,7 +72,7 @@ class DemoSeeder extends Seeder
             'email' => 'superadmin@app.test',
             'password_hash' => password_hash('super123', PASSWORD_DEFAULT),
             'type' => 'super_admin',
-            'status' => 'active',
+            'status' => StatusCodeService::ACTIVE,
             'created_at' => $now,
             'updated_at' => $now,
         ]);

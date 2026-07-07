@@ -97,7 +97,7 @@ function openModal(template = null) {
   ensureCategoryOption(template?.category || "Raw Material");
   byId("template-category").value = template?.category || "Raw Material";
   byId("template-unit").value = template?.unit || "";
-  byId("template-status").value = template?.status || "active";
+  byId("template-status").value = template?.status || COMMON_STATUS.ACTIVE;
   byId("template-modal-title").textContent = template ? "Edit Template" : "Tambah Template";
   setText("template-feedback", "");
   setText("template-preview", template

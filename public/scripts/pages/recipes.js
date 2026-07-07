@@ -569,7 +569,7 @@ function openModifierModal(modifier = null) {
   byId("modifier-name").value = modifier?.name || "";
   syncModifierScopeControl(modifier);
   byId("modifier-choice-type").value = modifier?.choiceType || (modifier?.requiredSelection ? "single" : "multiple");
-  byId("modifier-status").value = modifier?.status || "active";
+  byId("modifier-status").value = modifier?.status || COMMON_STATUS.ACTIVE;
   byId("modifier-required-selection").checked = Boolean(modifier?.requiredSelection);
   renderModifierOptions(modifier?.options?.length ? modifier.options.map((option) => ({ ...option })) : [emptyModifierOption()]);
   byId("modifier-modal-title").textContent = modifier ? "Edit Modifier" : "Tambah Modifier";

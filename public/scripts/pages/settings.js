@@ -283,7 +283,7 @@ function renderPackagingRules() {
   const rules = (state.settings.packagingRules || []).slice().sort((a, b) => a.minQty - b.minQty);
   byId("packaging-rule-table").innerHTML = rules.length ? rules.map((rule) => `
     <tr>
-      <td><strong>${rule.minQty === rule.maxQty ? rule.minQty : `${rule.minQty} - ${rule.maxQty}`} item pesanan</strong><br>${statusPill(rule.status || "active")}</td>
+      <td><strong>${rule.minQty === rule.maxQty ? rule.minQty : `${rule.minQty} - ${rule.maxQty}`} item pesanan</strong><br>${statusPill(rule.status || COMMON_STATUS.ACTIVE)}</td>
       <td>${rule.items.map((item, index) => {
         const ingredient = state.ingredients.find((entry) => entry.id === item.ingredientId);
         return `<span class="packaging-rule-chip">Item ${index + 1}: ${item.qty}x ${ingredient?.name || "Kemasan terhapus"} · Harga ${money(item.price || 0)}</span>`;

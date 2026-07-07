@@ -725,12 +725,23 @@ function serviceDescription(label) {
   return "Ambil pesanan di outlet.";
 }
 
+function normalizeCategoryLabel(name) {
+  const normalized = String(name || "").trim();
+  const legacyLabels = ["", "Tanpa Kategori", "Tidak ada kategori", "Uncategorized", "uncategorized", "Belum dikategorikan"];
+  return legacyLabels.includes(normalized) ? "Lain-lain" : normalized || "Lain-lain";
+}
+
 function renderCategories() {
   const visibleCategories = state.categories.filter((category) => !isInactiveStatus(category.status));
-  byId("order-categories").innerHTML = [
-    `<button class="${state.categoryId === "all" ? "active" : ""}" data-category-id="all" type="button">Semua</button>`,
-    ...visibleCategories.map((category) => `<button class="${state.categoryId === category.id ? "active" : ""}" data-category-id="${category.id}" type="button">${escapeHtml(category.name)}</button>`)
-  ].join("");
+  const selectedValue = state.categoryId || "all";
+  byId("order-categories").innerHTML = `
+    <label class="public-category-picker">
+      <select id="order-category-select" aria-label="Kategori">
+        <option value="all" ${selectedValue === "all" ? "selected" : ""}>Semua</option>
+        ${visibleCategories.map((category) => `<option value="${escapeHtml(category.id)}" ${selectedValue === category.id ? "selected" : ""}>${escapeHtml(normalizeCategoryLabel(category.name))}</option>`).join("")}
+      </select>
+    </label>
+  `;
 }
 
 function renderProducts() {
@@ -740,29 +751,7 @@ function renderProducts() {
     .filter((product) => state.categoryId === "all" || product.categoryId === state.categoryId)
     .filter((product) => !search || `${product.name} ${product.description || ""} ${product.category || ""}`.toLowerCase().includes(search));
 
-  renderGridSizePicker();
   renderProductBookPages(products);
-}
-
-function renderGridSizePicker() {
-  const select = optionalById("order-grid-size-select");
-  if (!select) return;
-  const mobile = isMobileMenu();
-  setText("order-grid-size-label", mobile ? "List" : "Grid");
-  const options = mobile
-    ? [
-        { value: "5", label: "List 5" },
-        { value: "10", label: "List 10" },
-        { value: "15", label: "List 15" }
-      ]
-    : [
-        { value: "2", label: "2x2" },
-        { value: "3", label: "3x3" },
-        { value: "4", label: "4x4" }
-      ];
-  const currentValue = String(mobile ? state.menuMobileLimit : state.menuGridSize);
-  select.innerHTML = options.map((option) => `<option value="${option.value}">${option.label}</option>`).join("");
-  select.value = currentValue;
 }
 
 function productCard(product) {
@@ -773,7 +762,6 @@ function productCard(product) {
       <div class="public-product-photo">${product.imageUrl ? `<img src="${escapeHtml(product.imageUrl)}" alt="${escapeHtml(product.name)}" />` : `<span>${escapeHtml((product.name || "?").slice(0, 1))}</span>`}</div>
       <div class="public-product-info">
         <strong>${escapeHtml(product.name)}</strong>
-        <p>${escapeHtml(product.description || product.category || "Produk tersedia")}</p>
         <span>${money(product.price)}</span>
       </div>
       ${soldOut ? `<span class="soldout-badge">Sold Out</span>` : `<button data-add-product="${product.id}" type="button">${inCart ? inCart : "+"}</button>`}
@@ -782,8 +770,9 @@ function productCard(product) {
 }
 
 function categoryName(categoryId) {
-  if (!categoryId) return "Tanpa Kategori";
-  return state.categories.find((category) => category.id === categoryId)?.name || "Tanpa Kategori";
+  if (!categoryId) return "Lain-lain";
+  const category = state.categories.find((category) => category.id === categoryId);
+  return normalizeCategoryLabel(category?.name || "");
 }
 
 function selectedCategoryName() {
@@ -794,7 +783,9 @@ function groupedProducts(products) {
   const groups = new Map();
   products.forEach((product) => {
     const key = product.categoryId || "uncategorized";
-    if (!groups.has(key)) groups.set(key, { id: key, name: product.category || categoryName(product.categoryId), products: [] });
+    const groupName = normalizeCategoryLabel(product.category || categoryName(product.categoryId));
+    const finalGroupName = groupName === "Lain-lain" ? "Lain-lain" : groupName;
+    if (!groups.has(key)) groups.set(key, { id: key, name: groupName, products: [] });
     groups.get(key).products.push(product);
   });
   return [...groups.values()].sort((a, b) => a.name.localeCompare(b.name, "id"));
@@ -832,7 +823,7 @@ function renderProductBookPages(products) {
         firstGrid.className = `public-order-grid public-order-grid-book ${layoutClass} public-menu-first-grid`;
         firstGrid.innerHTML = chunk.map(productCard).join("");
         if (firstCategoryTitle) firstCategoryTitle.textContent = group.name;
-        byId("order-menu-summary").textContent = `${group.name} · ${products.length} produk · ${menuLayoutLabel()}`;
+        byId("order-menu-summary").textContent = `${products.length} produk`;
         continue;
       }
       pages.push(`
@@ -840,7 +831,6 @@ function renderProductBookPages(products) {
           <div class="public-step-heading compact-heading">
             <div>
               <h1>${escapeHtml(group.name)}</h1>
-              <p>${chunk.length} menu · halaman ${pageNumber}/${totalPages}</p>
             </div>
           </div>
           <div class="public-order-grid public-order-grid-book ${layoutClass}">
@@ -861,7 +851,7 @@ function renderProductBookPages(products) {
   checkoutPage.insertAdjacentHTML("beforebegin", pages.join(""));
   syncReceiptBookPages();
   if (firstChunkRendered) {
-    byId("order-menu-summary").textContent += ` · ${pages.length + 1} halaman menu`;
+    byId("order-menu-summary").textContent += "";
   }
   rebuildFlipbook(Math.min(currentPage, receiptStartPage() + 1));
 }
@@ -1882,12 +1872,8 @@ window.addEventListener("resize", resizeFlipbook);
 
 function bindDynamicFieldListeners() {
   optionalById("order-search")?.addEventListener("input", renderProducts);
-  optionalById("order-grid-size-select")?.addEventListener("change", (event) => {
-    if (isMobileMenu()) {
-      state.menuMobileLimit = Number(event.target.value || 5);
-    } else {
-      state.menuGridSize = Number(event.target.value || 3);
-    }
+  optionalById("order-category-select")?.addEventListener("change", (event) => {
+    state.categoryId = event.target.value || "all";
     renderProducts();
   });
   optionalById("order-customer-name")?.addEventListener("input", () => {

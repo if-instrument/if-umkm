@@ -178,7 +178,7 @@ function openModal(product = null) {
   byId("modal-product-inventory-type").value = product?.inventoryType || "made_to_order";
   byId("modal-product-shelf-life").value = product?.shelfLifeDays || 0;
   syncInventoryTypeFields();
-  byId("modal-product-status").value = product?.status || "active";
+  byId("modal-product-status").value = product?.status || COMMON_STATUS.ACTIVE;
   syncScopeControl(product);
   byId("modal-product-image-file").value = "";
   setProductImage(product?.imageUrl || "");

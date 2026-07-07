@@ -141,7 +141,7 @@ function renderFinishedProducts() {
           return `
             <tr>
               <td><strong>${product.name}</strong><br><small>${product.sku || "-"} · ${product.category || "Tanpa kategori"}</small></td>
-              <td><strong>${batch.batchNo}</strong><br><small>${batch.status || "active"}</small></td>
+              <td><strong>${batch.batchNo}</strong><br><small>${batch.status || COMMON_STATUS.ACTIVE}</small></td>
               <td>${formatQty(batch.qty)} unit</td>
               <td>${money(batch.unitCost || 0)}</td>
               <td>${money(Number(batch.qty || 0) * Number(batch.unitCost || 0))}</td>
