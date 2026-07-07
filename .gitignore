@@ -39,3 +39,6 @@ Thumbs.db
 *.tmp
 *.temp
 *.log
+
+# Generated config files
+if-instrument*.conf
