@@ -951,6 +951,7 @@ function renderBill() {
   const order = result?.order || {};
   const outlet = activeOutlet();
   const logoUrl = state.company?.logoUrl || state.settings?.companyLogoUrl || "/assets/if-instrument-logo.jpg";
+  const customerName = optionalById("order-customer-name")?.value?.trim() || "";
   byId("order-final-bill").innerHTML = `
     <div class="public-receipt-paper">
       <div class="public-receipt-head">
@@ -964,7 +965,7 @@ function renderBill() {
         <div><span>ORDER</span><strong>#${escapeHtml(order.orderNumber || "PREVIEW")}</strong></div>
         <div><span>TANGGAL</span><strong>${escapeHtml(receiptDate(order.createdAt))}</strong></div>
         <div><span>STATUS</span><strong>${escapeHtml(order.paymentStatus ? statusLabel(order.paymentStatus, "payment") : (result ? "Belum Bayar" : "Preview"))}</strong></div>
-        <div><span>CUSTOMER</span><strong>${escapeHtml(order.customerName || byId("order-customer-name").value.trim() || "-")}</strong></div>
+        <div><span>CUSTOMER</span><strong>${escapeHtml(order.customerName || customerName || "-")}</strong></div>
       </div>
       ${billRows(order.total || totals.total, order)}
       <div class="public-receipt-foot">
@@ -1547,6 +1548,16 @@ function stockNote(product, modifierIds = [], maxQty = 0) {
   return maxQty > 0 ? `Tersedia ${maxQty} item untuk pilihan ini.` : "Maaf, pilihan ini sedang tidak tersedia.";
 }
 
+function openCustomerDetailPage() {
+  state.spread = "checkout";
+  render();
+  showFeedback("");
+  renderCustomerGate();
+  requestAnimationFrame(() => {
+    forceTurnToElement("#order-customer-page", customerPageNumber());
+  });
+}
+
 function updateDetailQty(delta = 0) {
   const input = byId("order-detail-qty");
   const product = productById(byId("order-modifier-product-id").value);
@@ -2017,10 +2028,7 @@ document.addEventListener("click", (event) => {
       return;
     }
     state.cartConfirmed = true;
-    render();
-    showFeedback("");
-    renderCustomerGate();
-    forceTurnToElement("#order-customer-page", customerPageNumber());
+    openCustomerDetailPage();
     return;
   }
 
