@@ -22,8 +22,6 @@ let state = {
   serviceType: "Take Away",
   tableName: "",
   categoryId: "all",
-  menuGridSize: 3,
-  menuMobileLimit: 5,
   paymentMethodId: "",
   paymentProof: null,
   cartConfirmed: false,
@@ -150,8 +148,6 @@ function persistOrderSession() {
     serviceType: state.serviceType,
     tableName: state.tableName,
     categoryId: state.categoryId,
-    menuGridSize: state.menuGridSize,
-    menuMobileLimit: state.menuMobileLimit,
     paymentMethodId: state.paymentMethodId,
     spread: state.spread,
     cartConfirmed: state.cartConfirmed,
@@ -208,8 +204,6 @@ async function loadOrderData(outletId = "") {
       serviceType: saved.serviceType || state.serviceType,
       tableName: outletChanged ? "" : (saved.tableName || state.tableName),
       categoryId: saved.categoryId || state.categoryId,
-      menuGridSize: Number(saved.menuGridSize || state.menuGridSize),
-      menuMobileLimit: Number(saved.menuMobileLimit || state.menuMobileLimit),
       paymentMethodId: saved.paymentMethodId || state.paymentMethodId,
       cartConfirmed: outletChanged ? false : Boolean(saved.cartConfirmed),
       spread: saved.spread || state.spread,
@@ -386,15 +380,15 @@ function isMobileMenu() {
 }
 
 function menuLayoutClass() {
-  return isMobileMenu() ? `list-${state.menuMobileLimit}` : `grid-${state.menuGridSize}`;
+  return isMobileMenu() ? "list-5" : "grid-3";
 }
 
 function menuPageCapacity() {
-  return isMobileMenu() ? state.menuMobileLimit : state.menuGridSize * state.menuGridSize;
+  return isMobileMenu() ? 5 : 9;
 }
 
 function menuLayoutLabel() {
-  return isMobileMenu() ? `list ${state.menuMobileLimit}/halaman` : `grid ${state.menuGridSize}x${state.menuGridSize}`;
+  return isMobileMenu() ? "list 5/halaman" : "grid 3x3";
 }
 
 function initFlipbook() {
@@ -814,7 +808,6 @@ function renderProductBookPages(products) {
   if (pristineBookTemplate && (flipbookReady || book.querySelector(".public-generated-menu-page") || book.querySelector(".page-wrapper"))) {
     restoreStaticBookTemplate();
     renderBookStaticContent();
-    renderGridSizePicker();
   }
   syncOptionalBookPages();
   const checkoutPage = book.querySelector('[data-book-section="checkout"]');
