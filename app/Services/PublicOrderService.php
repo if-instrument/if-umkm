@@ -277,9 +277,10 @@ class PublicOrderService
                 return $line;
             }, $product['recipe'] ?? []);
         }
+        $availableQty = $this->availableQty($product);
         return array_merge($product, [
-            'availableQty' => $this->availableQty($product),
-            'soldOut' => $this->availableQty($product) <= 0,
+            'availableQty' => $availableQty,
+            'soldOut' => $availableQty <= 0 && ! $this->isPreorderStockedProduct($product),
         ]);
     }
 
@@ -334,7 +335,7 @@ class PublicOrderService
             $modifierIds = array_values(array_filter($line['modifierIds'] ?? [], fn ($id) => is_string($id) && $id !== ''));
             $this->validateModifierSelection($product, $modifiers, $modifierIds);
             $selectedModifiers = $this->selectedModifierOptions($product, $modifiers, $modifierIds);
-            if ($this->availableQty($product, $selectedModifiers, $ingredients) < $qty) {
+            if (! $this->isPreorderStockedProduct($product) && $this->availableQty($product, $selectedModifiers, $ingredients) < $qty) {
                 throw new \InvalidArgumentException($product['name'] . ' tidak memiliki stok cukup.');
             }
             $recipeUsage = $this->recipeUsage($product, $qty, $selectedModifiers);
@@ -349,9 +350,15 @@ class PublicOrderService
                 'recipeUsage' => $recipeUsage,
                 'modifierIds' => $modifierIds,
                 'modifiers' => array_map(fn ($option) => ($option['groupName'] ?? 'Modifier') . ': ' . ($option['name'] ?? 'Opsi'), $selectedModifiers),
+                'isPreorder' => $this->isPreorderStockedProduct($product),
             ];
         }
         return $items;
+    }
+
+    private function isPreorderStockedProduct(array $product): bool
+    {
+        return ! empty($product['isPreorder']) && in_array($product['inventoryType'] ?? 'made_to_order', ['finished_good', 'retail'], true);
     }
 
     private function recipeUsage(array $product, int $qty, array $selectedModifiers = []): array

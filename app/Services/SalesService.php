@@ -12,6 +12,7 @@ class SalesService
 {
     public const STATUS_PENDING_CASHIER = StatusCodeService::ORDER_PENDING_CASHIER;
     public const STATUS_WAITING = StatusCodeService::ORDER_WAITING;
+    public const STATUS_FULFILLMENT = StatusCodeService::ORDER_FULFILLMENT;
     public const STATUS_PREPARING = StatusCodeService::ORDER_PREPARING;
     public const STATUS_READY = StatusCodeService::ORDER_READY;
     public const STATUS_COMPLETED = StatusCodeService::ORDER_COMPLETED;
@@ -107,8 +108,12 @@ class SalesService
 
         $previousStatus = $this->normalizeStatus((string) ($order['status'] ?? ''));
         $status = $this->normalizeStatus($status);
-        if ($previousStatus === self::STATUS_PENDING_CASHIER && $status === self::STATUS_WAITING) {
+        if ($previousStatus === self::STATUS_PENDING_CASHIER && in_array($status, [self::STATUS_WAITING, self::STATUS_FULFILLMENT], true)) {
             throw new \InvalidArgumentException('Approve pesanan online wajib melalui proses pembayaran kasir.');
+        }
+        if ($previousStatus === self::STATUS_FULFILLMENT && $status === self::STATUS_WAITING) {
+            $items = $this->orderItemPayloads($this->orderItems->where('order_id', $orderId)->findAll());
+            $this->consumePreorderProductItems($items, $companyId, $outletId, $orderId, $order['order_no']);
         }
         $data = [
             'status' => $status,
@@ -118,7 +123,9 @@ class SalesService
             $data['paid_at'] = $order['paid_at'] ?: date('Y-m-d H:i:s');
         }
         $this->orders->update($orderId, $data);
-        [$actorType, $actorName] = $this->actorForStatus($status);
+        [$actorType, $actorName] = $previousStatus === self::STATUS_FULFILLMENT && $status === self::STATUS_WAITING
+            ? ['inventory', 'Inventory']
+            : $this->actorForStatus($status);
         $this->recordStatusLog($orderId, $companyId, $outletId, $status, (string) ($order['payment_status'] ?? ''), $actorType, $actorName, 'Status pesanan diperbarui.');
 
         return $this->orderDetail((string) $orderId, $companyId, $outletId);
@@ -188,6 +195,7 @@ class SalesService
         $now = date('Y-m-d H:i:s');
         $this->db->transStart();
         $this->applyUsageDiff([], $items, $companyId, $outletId, $orderId, $order['order_no']);
+        $nextStatus = $this->hasPreorderItems($items) ? self::STATUS_FULFILLMENT : self::STATUS_WAITING;
         $this->orders->update($orderId, [
             'payment_status' => StatusCodeService::PAYMENT_PAID,
             'payment_method' => $paymentMethod ?: 'Cash',
@@ -196,10 +204,21 @@ class SalesService
             'payment_provider' => $payment['provider'] ?? null,
             'payment_reference' => $payment['reference'] ?? null,
             'paid_at' => $now,
-            'status' => self::STATUS_WAITING,
+            'status' => $nextStatus,
             'status_updated_at' => $now,
         ]);
-        $this->recordStatusLog($orderId, $companyId, $outletId, self::STATUS_WAITING, StatusCodeService::PAYMENT_PAID, 'cashier', 'Kasir', 'Pesanan online di-approve kasir.');
+        $this->recordStatusLog(
+            $orderId,
+            $companyId,
+            $outletId,
+            $nextStatus,
+            StatusCodeService::PAYMENT_PAID,
+            'cashier',
+            'Kasir',
+            $nextStatus === self::STATUS_FULFILLMENT
+                ? 'Pesanan di-approve kasir dan dibuat request pemenuhan stok preorder.'
+                : 'Pesanan online di-approve kasir.'
+        );
         if (! empty($payment['transactionId'])) {
             $this->payments->attachOrder((string) $payment['transactionId'], $orderId, $companyId, $outletId);
         }
@@ -458,9 +477,37 @@ class SalesService
             if (! empty($item['isPackaging'])) continue;
             $productId = $this->productId($item['productId'] ?? null);
             if (! $productId || ! $this->isStockedProduct($productId, $companyId, $outletId)) continue;
+            if (! empty($item['isPreorder']) || $this->isPreorderProduct($productId, $companyId, $outletId)) continue;
             $usage[$productId] = ($usage[$productId] ?? 0) + (float) ($item['qty'] ?? 0);
         }
         return $usage;
+    }
+
+    private function preorderProductUsageMap(array $items, int $companyId, int $outletId): array
+    {
+        $usage = [];
+        foreach ($items as $item) {
+            if (empty($item['isPreorder']) || ! empty($item['isPackaging'])) continue;
+            $productId = $this->productId($item['productId'] ?? null);
+            if (! $productId || ! $this->isStockedProduct($productId, $companyId, $outletId)) continue;
+            $usage[$productId] = ($usage[$productId] ?? 0) + (float) ($item['qty'] ?? 0);
+        }
+        return $usage;
+    }
+
+    private function hasPreorderItems(array $items): bool
+    {
+        foreach ($items as $item) {
+            if (! empty($item['isPreorder']) && empty($item['isPackaging'])) return true;
+        }
+        return false;
+    }
+
+    private function consumePreorderProductItems(array $items, int $companyId, int $outletId, int $orderId, string $orderNo): void
+    {
+        foreach ($this->preorderProductUsageMap($items, $companyId, $outletId) as $productId => $qty) {
+            $this->consumeProductBatches((int) $productId, $companyId, $outletId, (float) $qty, $orderId, $orderNo);
+        }
     }
 
     private function isStockedProduct(int $productId, int $companyId, int $outletId): bool
@@ -477,6 +524,21 @@ class SalesService
         }
         $row = $builder->get()->getRowArray();
         return in_array(($row['inventory_type'] ?? 'made_to_order'), ['finished_good', 'retail'], true);
+    }
+
+    private function isPreorderProduct(int $productId, int $companyId, int $outletId): bool
+    {
+        $builder = $this->db->table('products')
+            ->where('id', $productId)
+            ->groupStart()
+                ->where('outlet_id', $outletId)
+                ->orWhere('outlet_id', null)
+            ->groupEnd();
+        if ($this->hasCompanyColumn('products')) {
+            $builder->where('company_id', $companyId);
+        }
+        $row = $builder->get()->getRowArray();
+        return ! empty($row['is_preorder']) && in_array(($row['inventory_type'] ?? 'made_to_order'), ['finished_good', 'retail'], true);
     }
 
     private function consumeProductBatches(int $productId, int $companyId, int $outletId, float $qty, int $orderId, string $orderNo): void
@@ -714,6 +776,9 @@ class SalesService
     private function actorForStatus(string $status): array
     {
         $status = $this->normalizeStatus($status);
+        if ($status === self::STATUS_FULFILLMENT) {
+            return ['inventory', 'Inventory'];
+        }
         if (in_array($status, [self::STATUS_WAITING, self::STATUS_PREPARING, self::STATUS_READY], true)) {
             return ['kitchen', 'Kitchen'];
         }
@@ -741,6 +806,7 @@ class SalesService
                 'cogs' => (float) $item['qty'] > 0 ? (float) $item['cogs_total'] / (float) $item['qty'] : 0,
                 'modifierIds' => $snapshot['modifierIds'] ?? [],
                 'modifiers' => $snapshot['modifiers'] ?? [],
+                'isPreorder' => ! empty($snapshot['isPreorder']),
                 'isPackaging' => $isPackaging,
                 'ingredientId' => $snapshot['ingredientId'] ?? '',
                 'treatment' => $snapshot['treatment'] ?? '',

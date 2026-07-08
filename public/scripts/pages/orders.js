@@ -12,6 +12,7 @@ let queueFilter = "active";
 const focusOrderId = new URLSearchParams(window.location.search).get("order") || "";
 
 const statusConfig = {
+  [ORDER_STATUS.FULFILLMENT]: { label: "Menunggu Pemenuhan", owner: "Inventory", next: ORDER_STATUS.WAITING, nextLabel: "Stok Sudah Siap" },
   [ORDER_STATUS.WAITING]: { label: "Pesanan Baru", owner: "Kitchen", next: ORDER_STATUS.PREPARING, nextLabel: "Mulai Proses" },
   [ORDER_STATUS.PREPARING]: { label: "Sedang Diproses", owner: "Kitchen", next: ORDER_STATUS.READY, nextLabel: "Tandai Siap" },
   [ORDER_STATUS.READY]: { label: "Siap Diambil", owner: "Kasir", next: ORDER_STATUS.COMPLETED, nextLabel: "Pesanan Diambil" },
@@ -57,6 +58,7 @@ function postSales(url, payload) {
 function canActOnOrderStatus(status) {
   const code = orderStatusCode(status);
   if (code === ORDER_STATUS.PENDING_CASHIER) return false;
+  if (code === ORDER_STATUS.FULFILLMENT) return canUsePermission("queue.cashier", "update", state, session) || canUsePermission("queue.kitchen", "update", state, session);
   if ([ORDER_STATUS.WAITING, ORDER_STATUS.PREPARING].includes(code)) return canUsePermission("queue.kitchen", "update", state, session);
   if (code === ORDER_STATUS.READY) return canUsePermission("queue.cashier", "update", state, session);
   return false;
@@ -131,7 +133,7 @@ function renderSummary(orders) {
     `;
     return;
   }
-  byId("queue-summary").innerHTML = [ORDER_STATUS.WAITING, ORDER_STATUS.PREPARING, ORDER_STATUS.READY].map((status) => `
+  byId("queue-summary").innerHTML = [ORDER_STATUS.FULFILLMENT, ORDER_STATUS.WAITING, ORDER_STATUS.PREPARING, ORDER_STATUS.READY].map((status) => `
     <article class="pos-queue-summary-${status}"><span>${statusConfig[status].label}</span><strong>${orders.filter((order) => orderStatusIs(order.status, status)).length}</strong></article>
   `).join("");
 }
@@ -197,13 +199,13 @@ function completedTable(orders) {
 function renderBoard() {
   refreshSales();
   const todayOrders = state.transactions.filter((order) => visibleForSession(order, state, session) && isToday(order.createdAt));
-  const activeOrders = state.transactions.filter((order) => visibleForSession(order, state, session) && orderStatusIn(order.status, [ORDER_STATUS.WAITING, ORDER_STATUS.PREPARING, ORDER_STATUS.READY]));
+  const activeOrders = state.transactions.filter((order) => visibleForSession(order, state, session) && orderStatusIn(order.status, [ORDER_STATUS.FULFILLMENT, ORDER_STATUS.WAITING, ORDER_STATUS.PREPARING, ORDER_STATUS.READY]));
   const boardOrders = queueFilter === "completed" ? todayOrders : activeOrders;
   renderSummary(boardOrders);
   byId("order-board").classList.toggle("completed-only", queueFilter === "completed");
   byId("order-board").innerHTML = queueFilter === "completed"
     ? completedTable(todayOrders)
-    : [ORDER_STATUS.WAITING, ORDER_STATUS.PREPARING, ORDER_STATUS.READY].map((status) => queueColumn(status, activeOrders)).join("");
+    : [ORDER_STATUS.FULFILLMENT, ORDER_STATUS.WAITING, ORDER_STATUS.PREPARING, ORDER_STATUS.READY].map((status) => queueColumn(status, activeOrders)).join("");
   applyPermissionControls(document, state, session);
 }
 
@@ -272,7 +274,8 @@ document.addEventListener("click", (event) => {
       postSales(`/api/order/${order.id}/status`, { status: status.dataset.nextStatus });
       closeDetail();
       renderBoard();
-    } catch {
+    } catch (error) {
+      alert(error?.message || "Aksi pesanan belum berhasil disimpan.");
       closeDetail();
       renderBoard();
     }

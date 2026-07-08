@@ -100,6 +100,17 @@ function isRetailProduct(product) {
 
 function syncPreorderFields() {
   if (!exists("modal-product-is-preorder") || !exists("modal-product-preorder-note")) return;
+  const canPreorder = byId("modal-product-inventory-type").value !== "made_to_order";
+  const card = document.querySelector(".preorder-card");
+  byId("modal-product-is-preorder").disabled = !canPreorder;
+  if (!canPreorder) byId("modal-product-is-preorder").checked = false;
+  if (card) {
+    card.classList.toggle("is-disabled", !canPreorder);
+    const hint = card.querySelector("small");
+    if (hint) hint.textContent = canPreorder
+      ? "Produk ini akan tampil sebagai preorder dan tetap bisa dipesan saat stok kosong."
+      : "Preorder hanya tersedia untuk Produk Jadi / Batch dan Retail / Barang Dagang.";
+  }
   const isPreorder = byId("modal-product-is-preorder").checked;
   byId("modal-product-preorder-note").closest("label").hidden = !isPreorder;
 }
@@ -150,7 +161,7 @@ function renderProducts() {
       <tr>
         <td>${product.imageUrl ? `<img class="table-product-photo product-photo-image" src="${product.imageUrl}" alt="${product.name}" />` : `<span class="table-product-photo"></span>`}</td>
         <td><strong>${product.sku}</strong></td>
-        <td><strong>${product.name}</strong><br><small>${product.scope === "outlet" ? "Menu khusus outlet" : "Menu perusahaan"}</small>${recipeNote}</td>
+        <td><strong>${product.name}</strong>${product.isPreorder ? ` <span class="status-pill status-low">Preorder</span>` : ""}<br><small>${product.scope === "outlet" ? "Menu khusus outlet" : "Menu perusahaan"}</small>${recipeNote}</td>
         <td>${categoryName(product)}</td>
         <td><strong>${money(product.price)}</strong><br><small>${product.priceSource === "outlet" ? "Harga outlet aktif" : "Default produk"}${product.priceSource === "outlet" ? ` · default ${money(product.basePrice || 0)}` : ""}</small></td>
         <td>${money(cogs)}</td>
@@ -256,8 +267,8 @@ if (exists("product-modal-form")) byId("product-modal-form").addEventListener("s
     status: byId("modal-product-status").value,
     imageUrl: byId("modal-product-image-url").value.trim(),
     description: byId("modal-product-description").value.trim(),
-    isPreorder: byId("modal-product-is-preorder").checked,
-    preorderNote: byId("modal-product-preorder-note").value.trim()
+    isPreorder: byId("modal-product-inventory-type").value !== "made_to_order" && byId("modal-product-is-preorder").checked,
+    preorderNote: byId("modal-product-inventory-type").value !== "made_to_order" ? byId("modal-product-preorder-note").value.trim() : ""
   }, state, session);
   if (existing && !canEditMaster(existing)) {
     showFeedback("modal-product-feedback", "User Selected Outlet hanya bisa edit produk outlet yang dipilih.");
@@ -331,7 +342,10 @@ document.addEventListener("keydown", (event) => {
 ["modal-product-name", "modal-product-price"].forEach((id) => {
   if (exists(id)) byId(id).addEventListener("input", updatePreview);
 });
-if (exists("modal-product-inventory-type")) byId("modal-product-inventory-type").addEventListener("change", syncInventoryTypeFields);
+if (exists("modal-product-inventory-type")) byId("modal-product-inventory-type").addEventListener("change", () => {
+  syncInventoryTypeFields();
+  syncPreorderFields();
+});
 if (exists("modal-product-is-preorder")) byId("modal-product-is-preorder").addEventListener("change", syncPreorderFields);
 if (exists("price-product-outlet")) byId("price-product-outlet").addEventListener("input", () => {
   const product = state.products.find((item) => item.id === byId("price-product-id").value);

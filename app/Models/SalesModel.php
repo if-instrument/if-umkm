@@ -30,10 +30,14 @@ class SalesModel extends Model
                 ->orWhereIn('status', [
                     StatusCodeService::ORDER_PENDING_CASHIER,
                     StatusCodeService::ORDER_WAITING,
+                    StatusCodeService::ORDER_FULFILLMENT,
                     StatusCodeService::ORDER_PREPARING,
                     StatusCodeService::ORDER_READY,
                     'pending_cashier',
                     'waiting',
+                    'fulfillment',
+                    'waiting_fulfillment',
+                    'preorder_fulfillment',
                     'preparing',
                     'ready',
                 ])
@@ -47,10 +51,14 @@ class SalesModel extends Model
                 ->whereIn('status', [
                     StatusCodeService::ORDER_PENDING_CASHIER,
                     StatusCodeService::ORDER_WAITING,
+                    StatusCodeService::ORDER_FULFILLMENT,
                     StatusCodeService::ORDER_PREPARING,
                     StatusCodeService::ORDER_READY,
                     'pending_cashier',
                     'waiting',
+                    'fulfillment',
+                    'waiting_fulfillment',
+                    'preorder_fulfillment',
                     'preparing',
                     'ready',
                 ])

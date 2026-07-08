@@ -115,18 +115,20 @@ function orderItemsMarkup(order) {
 
 function followUpLabel(order) {
   if (orderStatusIs(order.status, ORDER_STATUS.PENDING_CASHIER)) return "Approve di POS";
+  if (orderStatusIs(order.status, ORDER_STATUS.FULFILLMENT)) return "Cek Pemenuhan";
   if (orderStatusIn(order.status, [ORDER_STATUS.WAITING, ORDER_STATUS.PREPARING, ORDER_STATUS.READY])) return "Lanjutkan";
   return "";
 }
 
 function followUpHref(order) {
   if (orderStatusIs(order.status, ORDER_STATUS.PENDING_CASHIER)) return `${appPath("/pages/pos.html")}?order=${encodeURIComponent(order.id)}`;
-  if (orderStatusIn(order.status, [ORDER_STATUS.WAITING, ORDER_STATUS.PREPARING, ORDER_STATUS.READY])) return `${appPath("/pages/orders.html")}?order=${encodeURIComponent(order.id)}`;
+  if (orderStatusIn(order.status, [ORDER_STATUS.FULFILLMENT, ORDER_STATUS.WAITING, ORDER_STATUS.PREPARING, ORDER_STATUS.READY])) return `${appPath("/pages/orders.html")}?order=${encodeURIComponent(order.id)}`;
   return "";
 }
 
 function followUpMessage(order) {
   if (orderStatusIs(order.status, ORDER_STATUS.PENDING_CASHIER)) return "Pesanan masih menunggu approve kasir. Lanjutkan di POS untuk cek detail, terima pembayaran, approve, atau reject.";
+  if (orderStatusIs(order.status, ORDER_STATUS.FULFILLMENT)) return "Pesanan preorder menunggu stok diproduksi atau dipenuhi dari vendor. Tandai stok siap setelah produk tersedia.";
   if (orderStatusIs(order.status, ORDER_STATUS.WAITING)) return "Pesanan sudah masuk antrian kitchen. Lanjutkan di Kitchen Display untuk mulai proses.";
   if (orderStatusIs(order.status, ORDER_STATUS.PREPARING)) return "Pesanan sedang diproses. Kitchen perlu checklist item ready sebelum ditandai siap diambil.";
   if (orderStatusIs(order.status, ORDER_STATUS.READY)) return "Pesanan sudah siap. Kasir perlu konfirmasi pesanan sudah diambil customer.";

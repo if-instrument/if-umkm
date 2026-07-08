@@ -165,6 +165,11 @@ class ProductSuiteService
                 throw new \InvalidArgumentException('Kategori global hanya dapat dipilih user All Outlet.');
             }
         }
+        $inventoryType = in_array($payload['inventoryType'] ?? $payload['inventory_type'] ?? '', ['finished_good', 'made_to_stock', 'retail'], true)
+            ? (($payload['inventoryType'] ?? $payload['inventory_type']) === 'retail' ? 'retail' : 'finished_good')
+            : 'made_to_order';
+        $isPreorder = $inventoryType !== 'made_to_order' && ! empty($payload['isPreorder']);
+
         $data = $this->withCompanyData('products', [
             'company_id' => $companyId,
             'outlet_id' => $scope === 'outlet' ? $outletId : null,
@@ -175,13 +180,11 @@ class ProductSuiteService
             'selling_price' => (float) ($payload['price'] ?? $payload['selling_price'] ?? 0),
             'scope' => $scope === 'outlet' ? 'outlet' : 'company',
             'recipe_status' => StatusCodeService::RECIPE_DRAFT,
-            'inventory_type' => in_array($payload['inventoryType'] ?? $payload['inventory_type'] ?? '', ['finished_good', 'made_to_stock', 'retail'], true)
-                ? (($payload['inventoryType'] ?? $payload['inventory_type']) === 'retail' ? 'retail' : 'finished_good')
-                : 'made_to_order',
+            'inventory_type' => $inventoryType,
             'shelf_life_days' => max(0, (int) ($payload['shelfLifeDays'] ?? $payload['shelf_life_days'] ?? 0)),
             'status' => StatusCodeService::common($payload['status'] ?? 'active'),
-            'is_preorder' => ! empty($payload['isPreorder']) ? 1 : 0,
-            'preorder_note' => trim((string) ($payload['preorderNote'] ?? '')),
+            'is_preorder' => $isPreorder ? 1 : 0,
+            'preorder_note' => $isPreorder ? trim((string) ($payload['preorderNote'] ?? '')) : '',
         ], $companyId);
 
         if ($id) {
@@ -773,7 +776,7 @@ class ProductSuiteService
             )),
             'inventoryType' => $row['inventory_type'] ?? 'made_to_order',
             'shelfLifeDays' => (int) ($row['shelf_life_days'] ?? 0),
-            'isPreorder' => ! empty($row['is_preorder']) ? true : false,
+            'isPreorder' => ($row['inventory_type'] ?? 'made_to_order') !== 'made_to_order' && ! empty($row['is_preorder']) ? true : false,
             'preorderNote' => $row['preorder_note'] ?? '',
             'finishedStock' => $this->productBatchStock((int) $row['id'], (int) ($row['company_id'] ?? 1), $activeOutletId),
             'finishedUnitCost' => $this->productBatchUnitCost((int) $row['id'], (int) ($row['company_id'] ?? 1), $activeOutletId),

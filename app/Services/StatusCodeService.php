@@ -17,6 +17,7 @@ class StatusCodeService
 
     public const ORDER_PENDING_CASHIER = '00';
     public const ORDER_WAITING = '10';
+    public const ORDER_FULFILLMENT = '15';
     public const ORDER_PREPARING = '20';
     public const ORDER_READY = '30';
     public const ORDER_COMPLETED = '90';
@@ -79,6 +80,9 @@ class StatusCodeService
         return self::map($status, [
             'pending_cashier' => self::ORDER_PENDING_CASHIER,
             'waiting' => self::ORDER_WAITING,
+            'fulfillment' => self::ORDER_FULFILLMENT,
+            'waiting_fulfillment' => self::ORDER_FULFILLMENT,
+            'preorder_fulfillment' => self::ORDER_FULFILLMENT,
             'preparing' => self::ORDER_PREPARING,
             'ready' => self::ORDER_READY,
             'completed' => self::ORDER_COMPLETED,

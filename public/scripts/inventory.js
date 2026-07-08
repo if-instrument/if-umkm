@@ -98,6 +98,10 @@ export function isStockedProduct(product) {
   return ["finished_good", "retail"].includes(product?.inventoryType || "made_to_order");
 }
 
+export function isPreorderStockedProduct(product) {
+  return Boolean(product?.isPreorder) && isStockedProduct(product);
+}
+
 export function productCogs(state, product) {
   if (isStockedProduct(product)) {
     return Number(product.finishedUnitCost || 0) || recipeCogs(state, product);
@@ -186,6 +190,7 @@ export function productCogsWithModifiers(state, product, modifierIds = []) {
 export function productAvailabilityWithModifiers(state, product, modifierIds = []) {
   const reservations = pendingStockReservations(state);
   if (isStockedProduct(product)) {
+    if (isPreorderStockedProduct(product)) return 999999;
     return Math.max(0, Math.floor(Number(product.finishedStock || 0) - (reservations.products.get(product.id) || 0)));
   }
   const recipe = effectiveRecipe(product, modifierIds, state);
@@ -201,6 +206,7 @@ export function productAvailabilityWithModifiers(state, product, modifierIds = [
 export function productAvailability(state, product) {
   const reservations = pendingStockReservations(state);
   if (isStockedProduct(product)) {
+    if (isPreorderStockedProduct(product)) return 999999;
     return Math.max(0, Math.floor(Number(product.finishedStock || 0) - (reservations.products.get(product.id) || 0)));
   }
   if (!product.recipe.length) return 0;
@@ -229,6 +235,7 @@ function pendingStockReservations(state) {
         const product = productById(state, item.productId);
         if (!product) return;
         if (isStockedProduct(product)) {
+          if (isPreorderStockedProduct(product) || item.isPreorder) return;
           addReservation(reservations.products, product.id, qty);
           return;
         }

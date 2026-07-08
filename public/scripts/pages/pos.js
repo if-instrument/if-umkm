@@ -2,7 +2,7 @@ import { renderLayout } from "../layout.js?v=coffee-v151";
 import { apiGet, apiPost, apiPut, applyPermissionControls, canUsePermission, loadSession, loadState, primaryOutletId, scopedApiUrl, scopedPayload, visibleForSession } from "../store.js?v=coffee-v151";
 import { applyPageBootstrap, loadPageBootstrap, pageDateValue } from "../page-engine.js?v=coffee-v151";
 import { formatQty, money } from "../format.js";
-import { costingMethod, effectiveRecipe, ingredientCostForQty, ingredientUnitCost, isStockedProduct, modifierPrice, productAvailability, productAvailabilityWithModifiers, productById, productCogs, productCogsWithModifiers, productModifierOptions } from "../inventory.js";
+import { costingMethod, effectiveRecipe, ingredientCostForQty, ingredientUnitCost, isPreorderStockedProduct, isStockedProduct, modifierPrice, productAvailability, productAvailabilityWithModifiers, productById, productCogs, productCogsWithModifiers, productModifierOptions } from "../inventory.js";
 import { byId, showAlert } from "../dom.js";
 import { ORDER_STATUS, PAYMENT_STATUS, isActiveStatus, isInactiveStatus, isPaidStatus, isUnpaidStatus, orderStatusCode, orderStatusIn, orderStatusIs, paymentStatusCode, statusLabel } from "../status-codes.js";
 
@@ -75,6 +75,7 @@ function activeCompanyLogo() {
 }
 
 const queueStatuses = {
+  [ORDER_STATUS.FULFILLMENT]: { label: "Menunggu Pemenuhan", owner: "Inventory", next: ORDER_STATUS.WAITING, nextLabel: "Stok Sudah Siap" },
   [ORDER_STATUS.WAITING]: { label: "Pesanan Baru", owner: "Kitchen", next: ORDER_STATUS.PREPARING, nextLabel: "Mulai Proses" },
   [ORDER_STATUS.PREPARING]: { label: "Sedang Diproses", owner: "Kitchen", next: ORDER_STATUS.READY, nextLabel: "Tandai Siap" },
   [ORDER_STATUS.READY]: { label: "Siap Diambil", owner: "Kasir", next: ORDER_STATUS.COMPLETED, nextLabel: "Pesanan Diambil" }
@@ -164,6 +165,7 @@ function putSales(url, payload) {
 function canActOnOrderStatus(status) {
   const code = orderStatusCode(status);
   if (code === ORDER_STATUS.PENDING_CASHIER) return canUsePermission("queue.cashier", "update", state, session);
+  if (code === ORDER_STATUS.FULFILLMENT) return canUsePermission("queue.cashier", "update", state, session) || canUsePermission("queue.kitchen", "update", state, session);
   if ([ORDER_STATUS.WAITING, ORDER_STATUS.PREPARING].includes(code)) return canUsePermission("queue.kitchen", "update", state, session);
   if (code === ORDER_STATUS.READY) return canUsePermission("queue.cashier", "update", state, session);
   return false;
@@ -1301,11 +1303,12 @@ function renderProducts() {
       const available = productAvailability(state, product);
       const canAdd = canAddProductFromCurrentDraft(product);
       const soldOut = !canAdd;
+      const stockBadge = isPreorderStockedProduct(product) ? "Preorder" : (available < 1 ? (canAdd && editingOrder() ? "Draft tersedia" : "Sold Out") : `${available} unit`);
       return `
         <article class="product-card ${soldOut ? "product-card-soldout" : ""}" aria-disabled="${soldOut ? "true" : "false"}">
           <div class="product-visual product-tone-${index % 4}">
             ${product.imageUrl ? `<img src="${product.imageUrl}" alt="${product.name}" />` : `<span></span>`}
-            <span class="product-stock-badge ${available < 1 ? "product-stock-badge-soldout" : ""}">${available < 1 ? (canAdd && editingOrder() ? "Draft tersedia" : "Sold Out") : `${available} unit`}</span>
+            <span class="product-stock-badge ${available < 1 && !isPreorderStockedProduct(product) ? "product-stock-badge-soldout" : ""}">${stockBadge}</span>
           </div>
           <div class="product-card-copy">
             <span class="product-category-label">${product.category}</span>
@@ -2041,7 +2044,9 @@ function releasedProductQty(items = []) {
   const released = new Map();
   items.forEach((item) => {
     const product = productById(state, item.productId);
-    if (product && isStockedProduct(product)) released.set(product.id, (released.get(product.id) || 0) + Number(item.qty || 0));
+    if (product && isStockedProduct(product) && !isPreorderStockedProduct(product)) {
+      released.set(product.id, (released.get(product.id) || 0) + Number(item.qty || 0));
+    }
   });
   return released;
 }
@@ -2077,7 +2082,9 @@ function draftProductUsage(draft = cart) {
   const usage = new Map();
   draft.forEach((line) => {
     const product = productById(state, line.productId);
-    if (product && isStockedProduct(product)) usage.set(product.id, (usage.get(product.id) || 0) + Number(line.qty || 0));
+    if (product && isStockedProduct(product) && !isPreorderStockedProduct(product)) {
+      usage.set(product.id, (usage.get(product.id) || 0) + Number(line.qty || 0));
+    }
   });
   return usage;
 }
@@ -2385,7 +2392,7 @@ function checkout() {
   const orderItems = cart.map((line) => {
     const product = productById(state, line.productId);
     const modifiers = productModifierOptions(state, product).filter((modifier) => line.modifierIds.includes(modifier.id));
-    return { productId: product.id, name: product.name, qty: line.qty, price: product.price + modifierPrice(product, line.modifierIds, state), cogs: productCogsWithModifiers(state, product, line.modifierIds), lossCost: 0, modifierIds: [...line.modifierIds], modifiers: modifiers.map((modifier) => `${modifier.groupName}: ${modifier.name}`) };
+    return { productId: product.id, name: product.name, qty: line.qty, price: product.price + modifierPrice(product, line.modifierIds, state), cogs: productCogsWithModifiers(state, product, line.modifierIds), lossCost: 0, modifierIds: [...line.modifierIds], modifiers: modifiers.map((modifier) => `${modifier.groupName}: ${modifier.name}`), isPreorder: isPreorderStockedProduct(product) };
   }).concat(packagingLines);
 
   if (editingOrderId) {

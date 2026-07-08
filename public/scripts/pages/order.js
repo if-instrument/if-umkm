@@ -1,4 +1,4 @@
-import { effectiveRecipe, ingredientById, isStockedProduct, modifierPrice, productModifierOptions } from "../inventory.js";
+import { effectiveRecipe, ingredientById, isPreorderStockedProduct, isStockedProduct, modifierPrice, productModifierOptions } from "../inventory.js";
 import { ORDER_STATUS, PAYMENT_STATUS, isActiveStatus, isInactiveStatus, orderStatusCode, paymentStatusCode, statusLabel } from "../status-codes.js";
 
 const rupiah = new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 });
@@ -755,7 +755,8 @@ function renderProducts() {
 }
 
 function productCard(product) {
-  const soldOut = product.soldOut || Number(product.availableQty || 0) <= 0;
+  const preorder = isPreorderStockedProduct(product);
+  const soldOut = !preorder && (product.soldOut || Number(product.availableQty || 0) <= 0);
   const inCart = state.cart.filter((line) => line.productId === product.id).reduce((sum, line) => sum + line.qty, 0);
   const preorderBadge = product.isPreorder ? `<span class="preorder-pill">Preorder</span>` : "";
   const preorderNote = product.isPreorder ? `<div class="preorder-note">${escapeHtml(product.preorderNote || "Pesanan khusus, diproses sesuai jadwal outlet")}</div>` : "";
@@ -1025,10 +1026,11 @@ function orderStatusSteps(order = {}, timeline = []) {
   const createdAt = order.createdAt || rawRows[0]?.createdAt || new Date().toISOString();
   const pendingAt = firstTimelineAt(rawRows, ORDER_STATUS.PENDING_CASHIER) || createdAt;
   const confirmedAt = order.paidAt || firstPaidTimelineAt(rawRows) || firstTimelineAt(rawRows, ORDER_STATUS.WAITING);
+  const fulfillmentAt = firstTimelineAt(rawRows, ORDER_STATUS.FULFILLMENT);
   const preparingAt = firstTimelineAt(rawRows, ORDER_STATUS.PREPARING);
   const readyAt = firstTimelineAt(rawRows, ORDER_STATUS.READY);
   const completedAt = firstTimelineAt(rawRows, ORDER_STATUS.COMPLETED);
-  const confirmed = currentPayment === PAYMENT_STATUS.PAID || confirmedAt || [ORDER_STATUS.WAITING, ORDER_STATUS.PREPARING, ORDER_STATUS.READY, ORDER_STATUS.COMPLETED].includes(currentStatus);
+  const confirmed = currentPayment === PAYMENT_STATUS.PAID || confirmedAt || [ORDER_STATUS.FULFILLMENT, ORDER_STATUS.WAITING, ORDER_STATUS.PREPARING, ORDER_STATUS.READY, ORDER_STATUS.COMPLETED].includes(currentStatus);
   const currentIndex = currentOrderStepIndex(currentStatus, confirmed);
   const stepDefinitions = [
     {
@@ -1053,11 +1055,18 @@ function orderStatusSteps(order = {}, timeline = []) {
       createdAt: confirmed ? (confirmedAt || order.statusUpdatedAt || createdAt) : ""
     },
     {
+      title: "Pemenuhan Stok",
+      status: ORDER_STATUS.FULFILLMENT,
+      actorName: "Inventory",
+      note: "Produk preorder sedang diproduksi atau dipenuhi dari vendor.",
+      createdAt: fulfillmentAt || (currentStatus === ORDER_STATUS.FULFILLMENT ? (order.statusUpdatedAt || confirmedAt || createdAt) : "")
+    },
+    {
       title: "Diproses",
       status: ORDER_STATUS.PREPARING,
       actorName: "Kitchen",
       note: "Pesanan sedang dibuat oleh kitchen.",
-      createdAt: preparingAt || ([ORDER_STATUS.PREPARING, ORDER_STATUS.READY, ORDER_STATUS.COMPLETED].includes(currentStatus) ? (order.statusUpdatedAt || confirmedAt || createdAt) : "")
+      createdAt: preparingAt || ([ORDER_STATUS.PREPARING, ORDER_STATUS.READY, ORDER_STATUS.COMPLETED].includes(currentStatus) ? (order.statusUpdatedAt || fulfillmentAt || confirmedAt || createdAt) : "")
     },
     {
       title: "Siap Diambil",
@@ -1083,9 +1092,10 @@ function orderStatusSteps(order = {}, timeline = []) {
 }
 
 function currentOrderStepIndex(currentStatus, confirmed) {
-  if (currentStatus === ORDER_STATUS.COMPLETED) return 5;
-  if (currentStatus === ORDER_STATUS.READY) return 4;
-  if (currentStatus === ORDER_STATUS.PREPARING) return 3;
+  if (currentStatus === ORDER_STATUS.COMPLETED) return 6;
+  if (currentStatus === ORDER_STATUS.READY) return 5;
+  if (currentStatus === ORDER_STATUS.PREPARING) return 4;
+  if (currentStatus === ORDER_STATUS.FULFILLMENT) return 3;
   if (currentStatus === ORDER_STATUS.WAITING || confirmed) return 2;
   return 1;
 }
@@ -1139,6 +1149,7 @@ function fallbackReceiptTimeline(order = {}) {
 
 function actorNameForOrderStatus(status) {
   const label = statusLabel(status, "order");
+  if (label === "Menunggu Pemenuhan") return "Inventory";
   if (["Diproses", "Siap Diambil", "Pesanan Baru"].includes(label)) return "Kitchen";
   if (["Selesai", "Menunggu Kasir"].includes(label)) return "Kasir";
   return "System";
@@ -1403,7 +1414,7 @@ function requiresModifierChoice(product) {
 
 function addProduct(productId) {
   const product = productById(productId);
-  if (!product || product.soldOut || Number(product.availableQty || 0) <= 0) return;
+  if (!product || (!isPreorderStockedProduct(product) && (product.soldOut || Number(product.availableQty || 0) <= 0))) return;
   openMenuDetail(product);
 }
 
@@ -1495,6 +1506,7 @@ function cartStockReservations(excludeLineId = "") {
       if (!product) return;
       const qty = Number(line.qty || 0);
       if (isStockedProduct(product)) {
+        if (isPreorderStockedProduct(product)) return;
         reservations.products.set(product.id, (reservations.products.get(product.id) || 0) + qty);
         return;
       }
@@ -1510,6 +1522,7 @@ function maxQtyForConfig(product, modifierIds = [], excludeLineId = "") {
   if (!product) return 0;
   const reservations = cartStockReservations(excludeLineId);
   if (isStockedProduct(product)) {
+    if (isPreorderStockedProduct(product)) return 999999;
     return Math.max(0, Math.floor(Number(product.finishedStock || 0) - (reservations.products.get(product.id) || 0)));
   }
   const recipe = effectiveRecipe(product, modifierIds, state);
@@ -1525,6 +1538,7 @@ function maxQtyForConfig(product, modifierIds = [], excludeLineId = "") {
 
 function stockNote(product, modifierIds = [], maxQty = 0) {
   if (!product) return "";
+  if (isPreorderStockedProduct(product)) return product.preorderNote || "Produk preorder, stok akan dipenuhi sesuai jadwal outlet.";
   return maxQty > 0 ? `Tersedia ${maxQty} item untuk pilihan ini.` : "Maaf, pilihan ini sedang tidak tersedia.";
 }
 

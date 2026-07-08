@@ -16,6 +16,7 @@ export const PAYMENT_STATUS = {
 export const ORDER_STATUS = {
   PENDING_CASHIER: "00",
   WAITING: "10",
+  FULFILLMENT: "15",
   PREPARING: "20",
   READY: "30",
   COMPLETED: "90",
@@ -51,6 +52,7 @@ export const EXPENSE_STATUS = {
 export const orderStatusLabels = {
   [ORDER_STATUS.PENDING_CASHIER]: "Menunggu Kasir",
   [ORDER_STATUS.WAITING]: "Pesanan Baru",
+  [ORDER_STATUS.FULFILLMENT]: "Menunggu Pemenuhan",
   [ORDER_STATUS.PREPARING]: "Diproses",
   [ORDER_STATUS.READY]: "Siap Diambil",
   [ORDER_STATUS.COMPLETED]: "Selesai",
@@ -60,6 +62,7 @@ export const orderStatusLabels = {
 export const openOrderStatuses = [
   ORDER_STATUS.PENDING_CASHIER,
   ORDER_STATUS.WAITING,
+  ORDER_STATUS.FULFILLMENT,
   ORDER_STATUS.PREPARING,
   ORDER_STATUS.READY
 ];
@@ -109,6 +112,9 @@ export function orderStatusCode(status, fallback = ORDER_STATUS.WAITING) {
   return codeFor(status, {
     pending_cashier: ORDER_STATUS.PENDING_CASHIER,
     waiting: ORDER_STATUS.WAITING,
+    fulfillment: ORDER_STATUS.FULFILLMENT,
+    waiting_fulfillment: ORDER_STATUS.FULFILLMENT,
+    preorder_fulfillment: ORDER_STATUS.FULFILLMENT,
     preparing: ORDER_STATUS.PREPARING,
     ready: ORDER_STATUS.READY,
     completed: ORDER_STATUS.COMPLETED,
