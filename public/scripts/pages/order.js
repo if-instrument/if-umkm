@@ -1549,12 +1549,18 @@ function stockNote(product, modifierIds = [], maxQty = 0) {
 }
 
 function openCustomerDetailPage() {
-  state.spread = "checkout";
   render();
   showFeedback("");
   renderCustomerGate();
+  const jumpToCustomer = () => {
+    const page = customerPageNumber();
+    state.spread = "checkout";
+    turnToPage(page, true);
+  };
+  jumpToCustomer();
   requestAnimationFrame(() => {
-    forceTurnToElement("#order-customer-page", customerPageNumber());
+    jumpToCustomer();
+    requestAnimationFrame(jumpToCustomer);
   });
 }
 
