@@ -316,7 +316,6 @@
 .preorder-pill {
   position: absolute;
   right: 10px;
-  bottom: 10px;
   padding: 6px 9px;
   border-radius: 999px;
   font-size: 11px;
@@ -325,11 +324,13 @@
 }
 
 .soldout-badge {
+  bottom: 10px;
   background: #fff0ed;
   color: #b23a2e !important;
 }
 
 .preorder-pill {
+  top: 10px;
   background: #fff4de;
   color: #9a5b00 !important;
   box-shadow: 0 4px 10px rgba(154, 91, 0, 0.12);

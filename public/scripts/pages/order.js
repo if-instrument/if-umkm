@@ -361,7 +361,13 @@ function pageNumberForElement(element) {
 
 function forceTurnToElement(selector, fallbackPage) {
   const element = document.querySelector(selector);
-  turnToPage(pageNumberForElement(element) || fallbackPage, true);
+  const page = pageNumberForElement(element) || fallbackPage;
+  turnToPage(page, true);
+  requestAnimationFrame(() => {
+    const nextElement = document.querySelector(selector);
+    const nextPage = pageNumberForElement(nextElement) || page;
+    if (nextPage) turnToPage(nextPage, true);
+  });
 }
 
 function flipbook() {
@@ -525,20 +531,24 @@ function rebuildFlipbook(targetPage = null) {
 
 function turnToPage(page, force = false) {
   const book = flipbook();
+  const requestedPage = Number(page);
   if (flipbookReady && book?.length) {
     syncingFlipbook = true;
     forcedBookTurn = Boolean(force);
+    let safePage = 1;
     try {
-      book.turn("page", Math.min(page, book.turn("pages")));
+      const totalPages = Number(book.turn("pages")) || 1;
+      safePage = Number.isFinite(requestedPage) && requestedPage > 0 ? Math.min(requestedPage, totalPages) : 1;
+      book.turn("page", safePage);
     } finally {
       forcedBookTurn = false;
       syncingFlipbook = false;
     }
-    state.spread = spreadForPage(page);
+    state.spread = spreadForPage(safePage);
     renderSpread(false);
     return;
   }
-  state.spread = spreadForPage(page);
+  state.spread = spreadForPage(Number.isFinite(requestedPage) && requestedPage > 0 ? requestedPage : pageForSpread(state.spread));
   renderSpread(false);
 }
 
@@ -1421,7 +1431,8 @@ function addProduct(productId) {
 function addConfiguredProduct(productId, modifierIds = [], qty = 1) {
   const product = productById(productId);
   if (!product) return;
-  const activePage = flipbookReady && flipbook()?.length ? flipbook().turn("page") : pageForSpread("menu");
+  const rawActivePage = flipbookReady && flipbook()?.length ? Number(flipbook().turn("page")) : pageForSpread("menu");
+  const activePage = Number.isFinite(rawActivePage) && rawActivePage > 0 ? rawActivePage : menuStartPage();
   const quantity = Math.max(1, Number(qty || 1));
   const key = lineKey(productId, modifierIds);
   const current = state.cart.find((line) => line.id === key);
@@ -1445,18 +1456,18 @@ function addConfiguredProduct(productId, modifierIds = [], qty = 1) {
   }
   markCartChanged();
   closeMenuDetail();
-  state.spread = "menu";
+  const targetPage = Math.min(Math.max(activePage, menuStartPage()), Math.max(menuStartPage(), checkoutStartPage() - 1));
   renderProducts();
   renderCart();
   renderBill();
-  rebuildFlipbook(activePage);
-  renderSpread(false);
+  turnToPage(targetPage, true);
 }
 
 function setConfiguredProductQty(productId, modifierIds = [], qty = 1, options = {}) {
   const product = productById(productId);
   if (!product) return;
-  const activePage = flipbookReady && flipbook()?.length ? flipbook().turn("page") : pageForSpread("menu");
+  const rawActivePage = flipbookReady && flipbook()?.length ? Number(flipbook().turn("page")) : pageForSpread("menu");
+  const activePage = Number.isFinite(rawActivePage) && rawActivePage > 0 ? rawActivePage : menuStartPage();
   const quantity = Math.max(1, Number(qty || 1));
   const key = lineKey(productId, modifierIds);
   const current = state.cart.find((line) => line.id === key);
@@ -1469,12 +1480,13 @@ function setConfiguredProductQty(productId, modifierIds = [], qty = 1, options =
   else state.cart.push({ id: key, productId, modifierIds: [...modifierIds], qty: quantity });
   markCartChanged();
   closeMenuDetail();
-  state.spread = options.spread || "menu";
+  const targetPage = options.spread === "checkout"
+    ? checkoutStartPage()
+    : Math.min(Math.max(activePage, menuStartPage()), Math.max(menuStartPage(), checkoutStartPage() - 1));
   renderProducts();
   renderCart();
   renderBill();
-  rebuildFlipbook(activePage);
-  renderSpread(false);
+  turnToPage(targetPage, true);
 }
 
 function detailQty() {
@@ -2014,7 +2026,8 @@ document.addEventListener("click", (event) => {
     state.cartConfirmed = true;
     render();
     showFeedback("");
-    turnToPage(customerPageNumber(), true);
+    renderCustomerGate();
+    forceTurnToElement("#order-customer-page", customerPageNumber());
     return;
   }
 
