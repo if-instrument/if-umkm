@@ -243,6 +243,11 @@ export function initFlipbook() {
           showFeedback("Gunakan tombol di halaman ini untuk melanjutkan.", true);
           return;
         }
+        if (state.orderStatus === "ORDER_CREATED" && page < receiptStartPage() && !bookState.forcedBookTurn) {
+          event.preventDefault();
+          showFeedback("Gunakan tombol di halaman ini untuk kembali ke cover depan.", true);
+          return;
+        }
         if (page < pageForSpread("cover")) event.preventDefault();
         if (hasMultipleOutlets() && !hasSelectedOutlet() && page > pageForSpread("cover")) {
           event.preventDefault();
@@ -353,6 +358,11 @@ export function turnNextPage() {
 export function turnPrevPage() {
   const book = flipbook();
   if (bookState.flipbookReady && book?.length) {
+    const currentPage = book.turn("page");
+    if (state.orderStatus === "ORDER_CREATED" && currentPage <= receiptStartPage()) {
+      showFeedback("Gunakan tombol di halaman ini untuk kembali ke cover depan.", true);
+      return;
+    }
     if (book.turn("page") <= pageForSpread("cover")) return;
     if (shouldSkipServicePage() && book.turn("page") <= menuStartPage()) {
       book.turn("page", pageForSpread("cover"));
@@ -423,7 +433,7 @@ export function snapshotBookInputs() {
 export function restoreBookInputs(snapshot) {
   if (!snapshot) return;
   if (optionalById("order-search")) byId("order-search").value = snapshot.search || "";
-  if (optionalById("order-status-lookup-input")) byId("order-status-lookup-input").value = snapshot.statusLookup || state.orderResult?.order?.orderNumber || "";
+  if (optionalById("order-status-lookup-input")) byId("order-status-lookup-input").value = snapshot.statusLookup || state.lastOrderNumber || state.orderResult?.order?.orderNumber || "";
   if (optionalById("order-customer-name")) byId("order-customer-name").value = snapshot.customerName || "";
   if (optionalById("order-customer-email")) byId("order-customer-email").value = snapshot.customerEmail || "";
   if (optionalById("order-customer-phone")) byId("order-customer-phone").value = snapshot.customerPhone || "";

@@ -3,7 +3,8 @@ import {
   optionalById,
   byId,
   orderSessionKey,
-  showFeedback
+  showFeedback,
+  persistOrderSession
 } from "../order-utils.js";
 import { forceTurnToElement, coverStartPage } from "../order-navigation.js";
 import { syncSelectedMemberFields } from "./page-5-customer-detail.js";
@@ -18,14 +19,13 @@ export function resetOrder() {
   state.cartConfirmed = false;
   state.selectedMemberId = "";
   state.categoryId = "all";
-  if (optionalById("order-search")) byId("order-search").value = "";
-  optionalById("order-customer-form")?.reset();
-  syncSelectedMemberFields();
+  
+  if (state.outlets && state.outlets.length > 1) {
+    state.outletId = "";
+    state.outletConfirmed = false;
+  }
 
   state.spread = "cover";
-  import("../order-render.js").then(({ render }) => {
-    render();
-    forceTurnToElement(".public-cover-page:not(.public-back-cover-page)", coverStartPage());
-    showFeedback("");
-  });
+  persistOrderSession();
+  location.reload();
 }

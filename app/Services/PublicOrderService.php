@@ -15,28 +15,58 @@ class PublicOrderService
         $this->db = Database::connect();
     }
 
-    public function bootstrap(int $companyId, ?int $outletId = null): array
+    public function bootstrap(int $companyId, ?int $outletId = null, string $only = ''): array
     {
-        $outlets = $this->outlets($companyId);
-        $activeOutletId = $outletId ?: (int) ($outlets[0]['numericId'] ?? 0);
-        if (! $activeOutletId && $outlets) {
-            $activeOutletId = (int) $outlets[0]['numericId'];
+        $outlets = [];
+        if ($only === '' || $only === 'outlets') {
+            $outlets = $this->outlets($companyId);
         }
 
-        $settingsData = $activeOutletId ? (new SettingsService())->data($companyId, $activeOutletId) : ['settings' => [], 'ingredients' => []];
-        $productData = $activeOutletId ? (new ProductSuiteService())->data($companyId, $activeOutletId) : ['categories' => [], 'products' => [], 'modifiers' => [], 'ingredients' => []];
-        $reservations = $activeOutletId ? $this->pendingReservations($companyId, $activeOutletId, $productData['products'] ?? []) : ['products' => [], 'ingredients' => []];
+        $activeOutletId = $outletId;
+        if (! $activeOutletId && $outlets) {
+            $activeOutletId = (int) ($outlets[0]['numericId'] ?? 0);
+        }
 
-        return [
-            'company' => $this->companyPayload($companyId),
-            'outlets' => $outlets,
-            'activeOutletId' => $activeOutletId ? $this->outletCode($activeOutletId) : '',
-            'settings' => $settingsData['settings'] ?? [],
-            'categories' => array_values(array_filter($productData['categories'] ?? [], fn ($row) => ! StatusCodeService::isInactive($row['status'] ?? ''))),
-            'products' => array_values(array_map(fn ($product) => $this->productPublicPayload($product, $reservations, $productData['ingredients'] ?? []), array_filter($productData['products'] ?? [], fn ($row) => StatusCodeService::isActive($row['status'] ?? '')))),
-            'modifiers' => array_values(array_filter($productData['modifiers'] ?? [], fn ($row) => StatusCodeService::isActive($row['status'] ?? ''))),
-            'ingredients' => $productData['ingredients'] ?? [],
-        ];
+        $company = [];
+        if ($only === '' || $only === 'outlets') {
+            $company = $this->companyPayload($companyId);
+        }
+
+        $settings = [];
+        $categories = [];
+        $products = [];
+        $modifiers = [];
+        $ingredients = [];
+
+        if ($only === '' || $only === 'menu' || $only === 'stock') {
+            if ($activeOutletId) {
+                $settingsData = (new SettingsService())->data($companyId, $activeOutletId);
+                $productData = (new ProductSuiteService())->data($companyId, $activeOutletId);
+                $reservations = $this->pendingReservations($companyId, $activeOutletId, $productData['products'] ?? []);
+
+                $settings = $settingsData['settings'] ?? [];
+                $categories = array_values(array_filter($productData['categories'] ?? [], fn ($row) => ! StatusCodeService::isInactive($row['status'] ?? '')));
+                $products = array_values(array_map(fn ($product) => $this->productPublicPayload($product, $reservations, $productData['ingredients'] ?? []), array_filter($productData['products'] ?? [], fn ($row) => StatusCodeService::isActive($row['status'] ?? ''))));
+                $modifiers = array_values(array_filter($productData['modifiers'] ?? [], fn ($row) => StatusCodeService::isActive($row['status'] ?? '')));
+                $ingredients = $productData['ingredients'] ?? [];
+            }
+        }
+
+        $response = [];
+        if ($only === '' || $only === 'outlets') {
+            $response['company'] = $company;
+            $response['outlets'] = $outlets;
+        }
+        if ($only === '' || $only === 'menu' || $only === 'stock') {
+            $response['activeOutletId'] = $activeOutletId ? $this->outletCode($activeOutletId) : '';
+            $response['settings'] = $settings;
+            $response['categories'] = $categories;
+            $response['products'] = $products;
+            $response['modifiers'] = $modifiers;
+            $response['ingredients'] = $ingredients;
+        }
+
+        return $response;
     }
 
     public function memberLookup(int $companyId, int $outletId, string $name = '', string $email = ''): array

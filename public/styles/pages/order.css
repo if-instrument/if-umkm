@@ -782,10 +782,6 @@ body.app-busy .public-order-shell {
   background: linear-gradient(270deg, rgba(var(--order-accent-deep-rgb, 110, 58, 22), 0.06), transparent);
 }
 
-#order-book-frame[data-active-spread="receipt"] .public-book-hit-right {
-  display: none !important;
-}
-
 #order-book-frame[data-active-spread="cover"] #order-flipbook {
   pointer-events: none;
 }

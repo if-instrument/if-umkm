@@ -17,7 +17,9 @@ import {
   outletLabel,
   lineUnitPrice,
   modifierNames,
-  calculateTotals
+  calculateTotals,
+  requestJson,
+  companySlug
 } from "./order-utils.js";
 import {
   pageForSpread,
@@ -455,12 +457,13 @@ export function renderSpread(syncBook = true) {
   if (frame) {
     frame.setAttribute("data-active-spread", state.spread);
   }
+  manageStockRefreshInterval();
 }
 
 export function lockAllOrderInputs() {
-  if (state.orderStatus !== "ORDER_CREATED") return;
-  
+  const isLocked = state.orderStatus === "ORDER_CREATED";
   const selectors = ["#order-flipbook", "#order-menu-detail"];
+  
   selectors.forEach((sel) => {
     const container = document.getElementById(sel.substring(1));
     if (!container) return;
@@ -469,11 +472,60 @@ export function lockAllOrderInputs() {
     elements.forEach((el) => {
       if (el.id === "order-reset-cover" || el.closest("#order-reset-cover")) return;
       if (el.matches("[data-toggle-order-timeline]") || el.closest("[data-toggle-order-timeline]")) return;
-      if (el.id === "order-status-lookup-button" || el.closest("#order-status-lookup-button")) return;
-      if (el.id === "order-status-lookup-input" || el.closest("#order-status-lookup-input")) return;
+      if (el.closest("#order-status-lookup-form")) return;
       
-      el.disabled = true;
-      el.setAttribute("disabled", "true");
+      if (isLocked) {
+        el.disabled = true;
+        el.setAttribute("disabled", "true");
+      } else {
+        el.disabled = false;
+        el.removeAttribute("disabled");
+      }
     });
   });
+}
+
+let stockIntervalId = null;
+
+export async function refreshMenuStock() {
+  if (!state.outletId) {
+    console.log("refreshMenuStock: no outletId, skipping.");
+    return;
+  }
+  console.log("refreshMenuStock: fetching stock for outlet", state.outletId);
+  try {
+    const query = new URLSearchParams({ only: "menu", outlet_id: state.outletId });
+    if (companySlug()) query.set("company", companySlug());
+    const data = await requestJson(`/api/page/order/bootstrap?${query.toString()}`);
+    console.log("refreshMenuStock: fetched data successfully, count of products:", data.products?.length);
+    
+    state.products = data.products || [];
+    state.ingredients = data.ingredients || [];
+    state.modifiers = data.modifiers || [];
+    
+    const { updateStockInDOM } = await import("./pages/page-3-book-menu.js");
+    updateStockInDOM();
+    console.log("refreshMenuStock: DOM stock update complete.");
+  } catch (error) {
+    console.error("Failed to refresh stock:", error);
+  }
+}
+
+export function manageStockRefreshInterval() {
+  console.log("manageStockRefreshInterval: active spread is", state.spread, "outletId is", state.outletId);
+  if (state.spread === "menu" && state.outletId) {
+    if (stockIntervalId) {
+      console.log("manageStockRefreshInterval: interval already running.");
+      return;
+    }
+    console.log("manageStockRefreshInterval: starting stock refresh interval!");
+    refreshMenuStock();
+    stockIntervalId = setInterval(refreshMenuStock, 60000);
+  } else {
+    if (stockIntervalId) {
+      console.log("manageStockRefreshInterval: clearing stock refresh interval.");
+      clearInterval(stockIntervalId);
+      stockIntervalId = null;
+    }
+  }
 }

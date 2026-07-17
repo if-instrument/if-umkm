@@ -10,7 +10,8 @@ import {
   modifierNames,
   showFeedback,
   loadOrderData,
-  shouldSkipServicePage
+  shouldSkipServicePage,
+  setBusy
 } from "../order-utils.js";
 import {
   menuPageCapacity,
@@ -75,7 +76,7 @@ export function productCard(product) {
   const preorderBadge = product.isPreorder ? `<span class="preorder-pill">Preorder</span>` : "";
   const preorderNote = product.isPreorder ? `<div class="preorder-note">${escapeHtml(product.preorderNote || "Pesanan khusus, diproses sesuai jadwal outlet")}</div>` : "";
   return `
-    <article class="public-product-card ${soldOut ? "is-soldout" : ""}" ${soldOut ? `aria-disabled="true"` : `data-product-card="${escapeHtml(product.id)}" role="button" tabindex="0"`}>
+    <article class="public-product-card ${soldOut ? "is-soldout" : ""}" data-id="${escapeHtml(product.id)}" ${soldOut ? `aria-disabled="true"` : `data-product-card="${escapeHtml(product.id)}" role="button" tabindex="0"`}>
       <div class="public-product-photo">${product.imageUrl ? `<img src="${escapeHtml(product.imageUrl)}" alt="${escapeHtml(product.name)}" />` : `<span>${escapeHtml((product.name || "?").slice(0, 1))}</span>`}</div>
       <div class="public-product-info">
         <strong>${escapeHtml(product.name)}</strong>
@@ -423,7 +424,22 @@ export function setConfiguredProductQty(productId, modifierIds = [], qty = 1, op
   turnToPage(targetPage, true);
 }
 
-export function handleModifierSubmit(event) {
+export function validateCartStock() {
+  for (const line of state.cart) {
+    const product = productById(line.productId);
+    if (!product) continue;
+    const available = maxQtyForConfig(product, line.modifierIds, line.id);
+    if (line.qty > available) {
+      return {
+        valid: false,
+        reason: `Stok "${product.name}" tidak mencukupi. Hanya tersedia ${available} item.`
+      };
+    }
+  }
+  return { valid: true };
+}
+
+export async function handleModifierSubmit(event) {
   event.preventDefault();
   const missingRequired = [...event.target.querySelectorAll("[data-required-modifier-group]")]
     .filter((group) => group.dataset.requiredModifierGroup && !group.querySelector("input:checked"));
@@ -433,16 +449,53 @@ export function handleModifierSubmit(event) {
   }
   const modifierIds = [...event.target.querySelectorAll(".public-modifier-option input:checked")].map((input) => input.value);
   const productId = byId("order-modifier-product-id").value;
-  const selectedKey = lineKey(productId, modifierIds);
-  const isEditingCartLine = byId("order-detail-edit-mode").value === "1";
+  const qty = detailQty();
+
+  setBusy(true, "Memeriksa stok...");
+  try {
+    const { refreshMenuStock } = await import("../order-render.js");
+    await Promise.all([
+      refreshMenuStock(),
+      new Promise((resolve) => setTimeout(resolve, 500))
+    ]);
+  } catch (err) {
+    console.error("Failed to check stock:", err);
+  } finally {
+    setBusy(false);
+  }
+
+  const product = productById(productId);
+  if (!product) return;
   const originalLineId = byId("order-detail-original-line-id").value;
+  const isEditingCartLine = byId("order-detail-edit-mode").value === "1";
+  const selectedKey = lineKey(productId, modifierIds);
+  const current = state.cart.find((line) => line.id === selectedKey);
+
+  const excludeLineId = isEditingCartLine && originalLineId ? originalLineId : (current?.id || "");
+  const available = maxQtyForConfig(product, modifierIds, excludeLineId);
+
+  const targetQty = isEditingCartLine && originalLineId && originalLineId === selectedKey
+    ? qty
+    : (current ? current.qty + qty : qty);
+
+  if (targetQty > available) {
+    if (isEditingCartLine && originalLineId && originalLineId === selectedKey) {
+      showFeedback(`Pilihan ini hanya tersedia ${available} item.`, true);
+    } else if (current) {
+      showFeedback(`Pilihan ini tersisa ${Math.max(0, available - current.qty)} item lagi.`, true);
+    } else {
+      showFeedback(`Pilihan ini hanya tersedia ${available} item.`, true);
+    }
+    return;
+  }
+
   if (isEditingCartLine && originalLineId && originalLineId !== selectedKey) {
     state.cart = state.cart.filter((line) => line.id !== originalLineId);
-    setConfiguredProductQty(productId, modifierIds, detailQty(), { spread: state.spread });
+    setConfiguredProductQty(productId, modifierIds, qty, { spread: state.spread });
   } else if (byId("order-detail-line-id").value === selectedKey) {
-    setConfiguredProductQty(productId, modifierIds, detailQty(), { spread: state.spread });
+    setConfiguredProductQty(productId, modifierIds, qty, { spread: state.spread });
   } else {
-    addConfiguredProduct(productId, modifierIds, detailQty());
+    addConfiguredProduct(productId, modifierIds, qty);
   }
 }
 
@@ -452,4 +505,18 @@ export function detailQty() {
 
 function flipbook() {
   return window.jQuery ? window.jQuery("#order-flipbook") : null;
+}
+
+export function updateStockInDOM() {
+  state.products.forEach((product) => {
+    const cards = document.querySelectorAll(`article.public-product-card[data-id="${product.id}"]`);
+    cards.forEach((card) => {
+      const temp = document.createElement("div");
+      temp.innerHTML = productCard(product);
+      const newCard = temp.firstElementChild;
+      if (newCard) {
+        card.replaceWith(newCard);
+      }
+    });
+  });
 }

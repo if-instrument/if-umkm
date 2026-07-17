@@ -158,31 +158,34 @@ export async function requestJson(url, options = {}) {
 }
 
 export async function loadOrderData(outletId = "") {
-  setBusy(true, "Memuat menu outlet...");
+  setBusy(true, "Memuat data...");
   try {
     const saved = readOrderSession();
     
     if (saved.orderStatus === "ORDER_CREATED" && saved.orderNumber) {
-      const query = new URLSearchParams();
+      const query = new URLSearchParams({ only: "outlets" });
       if (companySlug()) query.set("company", companySlug());
-      if (outletId) query.set("outlet_id", outletId);
       const data = await requestJson(`/api/page/order/bootstrap?${query.toString()}`);
       
       const statusQuery = new URLSearchParams({ q: saved.orderNumber });
       if (companySlug()) statusQuery.set("company", companySlug());
-      if (data.activeOutletId) statusQuery.set("outlet_id", data.activeOutletId);
+      if (outletId) {
+        statusQuery.set("outlet_id", outletId);
+      } else if (data.outlets && data.outlets.length === 1) {
+        statusQuery.set("outlet_id", data.outlets[0].id);
+      }
       
       const orderResult = await requestJson(`/api/page/order/status?${statusQuery.toString()}`);
       
       Object.assign(state, {
         company: data.company || {},
         outlets: data.outlets || [],
-        settings: data.settings || {},
-        categories: data.categories || [],
-        products: data.products || [],
-        modifiers: data.modifiers || [],
-        ingredients: data.ingredients || [],
-        outletId: orderResult?.order?.outletId || data.activeOutletId || "",
+        settings: {},
+        categories: [],
+        products: [],
+        modifiers: [],
+        ingredients: [],
+        outletId: orderResult?.order?.outletId || "",
         outletConfirmed: true,
         serviceType: orderResult?.order?.serviceType || "Take Away",
         tableName: orderResult?.order?.tableName || "",
@@ -205,43 +208,102 @@ export async function loadOrderData(outletId = "") {
       return;
     }
 
-    const query = new URLSearchParams();
-    if (companySlug()) query.set("company", companySlug());
-    if (outletId) query.set("outlet_id", outletId);
-    const data = await requestJson(`/api/page/order/bootstrap?${query.toString()}`);
-    const outlets = data.outlets || [];
-    const savedOutletId = saved.outletId && outlets.some((outlet) => String(outlet.id) === String(saved.outletId)) ? saved.outletId : "";
-    const requestedOutletId = outletId && outlets.some((outlet) => String(outlet.id) === String(outletId)) ? outletId : "";
-    const responseOutletId = data.activeOutletId && outlets.some((outlet) => String(outlet.id) === String(data.activeOutletId)) ? data.activeOutletId : "";
-    const singleOutletId = outlets.length === 1 ? outlets[0].id : "";
-    const nextOutletId = requestedOutletId || savedOutletId || responseOutletId || singleOutletId || "";
-    const outletConfirmed = Boolean(singleOutletId || requestedOutletId || savedOutletId || responseOutletId);
-    const previousOutletId = state.outletId;
-    const outletChanged = Boolean(
-      (previousOutletId && nextOutletId && nextOutletId !== previousOutletId) ||
-      (requestedOutletId && savedOutletId && String(requestedOutletId) !== String(savedOutletId))
-    );
+    // Normal path
+    const targetOutletId = outletId || saved.outletId || "";
     
-    Object.assign(state, {
-      company: data.company || {},
-      outlets,
-      settings: data.settings || {},
-      categories: data.categories || [],
-      products: data.products || [],
-      modifiers: data.modifiers || [],
-      ingredients: data.ingredients || [],
-      outletId: nextOutletId,
-      outletConfirmed,
-      serviceType: saved.serviceType || state.serviceType,
-      tableName: outletChanged ? "" : (saved.tableName || state.tableName),
-      categoryId: saved.categoryId || state.categoryId,
-      paymentMethodId: saved.paymentMethodId || state.paymentMethodId,
-      cartConfirmed: outletChanged ? false : Boolean(saved.cartConfirmed),
-      spread: saved.spread || state.spread,
-      cart: outletChanged ? [] : (Array.isArray(saved.cart) ? saved.cart : state.cart),
-      orderResult: outletChanged ? null : state.orderResult,
-      lastOrderNumber: saved.lastOrderNumber || ""
-    });
+    if (!targetOutletId) {
+      // 1. Cover page path: only load outlets and company
+      const query = new URLSearchParams({ only: "outlets" });
+      if (companySlug()) query.set("company", companySlug());
+      const data = await requestJson(`/api/page/order/bootstrap?${query.toString()}`);
+      const outlets = data.outlets || [];
+      const singleOutletId = outlets.length === 1 ? outlets[0].id : "";
+      
+      if (singleOutletId) {
+        // If single outlet, automatically fetch its menu immediately!
+        setBusy(true, "Memuat menu outlet...");
+        const menuQuery = new URLSearchParams({ only: "menu", outlet_id: singleOutletId });
+        if (companySlug()) menuQuery.set("company", companySlug());
+        const menuData = await requestJson(`/api/page/order/bootstrap?${menuQuery.toString()}`);
+        
+        Object.assign(state, {
+          company: data.company || {},
+          outlets: outlets,
+          settings: menuData.settings || {},
+          categories: menuData.categories || [],
+          products: menuData.products || [],
+          modifiers: menuData.modifiers || [],
+          ingredients: menuData.ingredients || [],
+          outletId: singleOutletId,
+          outletConfirmed: true,
+          serviceType: saved.serviceType || state.serviceType,
+          tableName: saved.tableName || state.tableName,
+          categoryId: saved.categoryId || state.categoryId,
+          paymentMethodId: saved.paymentMethodId || state.paymentMethodId,
+          cartConfirmed: Boolean(saved.cartConfirmed),
+          spread: saved.spread || state.spread,
+          cart: Array.isArray(saved.cart) ? saved.cart : state.cart,
+          orderResult: state.orderResult,
+          lastOrderNumber: saved.lastOrderNumber || ""
+        });
+      } else {
+        // Multi outlet selection page
+        Object.assign(state, {
+          company: data.company || {},
+          outlets: outlets,
+          settings: {},
+          categories: [],
+          products: [],
+          modifiers: [],
+          ingredients: [],
+          outletId: "",
+          outletConfirmed: false,
+          spread: "cover",
+          cart: [],
+          cartConfirmed: false,
+          orderResult: null
+        });
+      }
+    } else {
+      // 2. Menu page path: load outlets list first if not present in state, then load selected outlet menu
+      if (!state.outlets || !state.outlets.length) {
+        const outletsQuery = new URLSearchParams({ only: "outlets" });
+        if (companySlug()) outletsQuery.set("company", companySlug());
+        const outletsData = await requestJson(`/api/page/order/bootstrap?${outletsQuery.toString()}`);
+        state.company = outletsData.company || {};
+        state.outlets = outletsData.outlets || [];
+      }
+      
+      const query = new URLSearchParams({ only: "menu", outlet_id: targetOutletId });
+      if (companySlug()) query.set("company", companySlug());
+      const data = await requestJson(`/api/page/order/bootstrap?${query.toString()}`);
+      
+      const outlets = state.outlets || [];
+      const savedOutletId = saved.outletId && outlets.some((outlet) => String(outlet.id) === String(saved.outletId)) ? saved.outletId : "";
+      const requestedOutletId = outletId && outlets.some((outlet) => String(outlet.id) === String(outletId)) ? outletId : "";
+      const nextOutletId = requestedOutletId || savedOutletId || targetOutletId || "";
+      const previousOutletId = state.outletId;
+      const outletChanged = Boolean(previousOutletId && nextOutletId && String(nextOutletId) !== String(previousOutletId));
+      
+      Object.assign(state, {
+        outletId: nextOutletId,
+        outletConfirmed: true,
+        settings: data.settings || {},
+        categories: data.categories || [],
+        products: data.products || [],
+        modifiers: data.modifiers || [],
+        ingredients: data.ingredients || [],
+        serviceType: saved.serviceType || state.serviceType,
+        tableName: outletChanged ? "" : (saved.tableName || state.tableName),
+        categoryId: saved.categoryId || state.categoryId,
+        paymentMethodId: saved.paymentMethodId || state.paymentMethodId,
+        cartConfirmed: outletChanged ? false : Boolean(saved.cartConfirmed),
+        spread: saved.spread || state.spread,
+        cart: outletChanged ? [] : (Array.isArray(saved.cart) ? saved.cart : state.cart),
+        orderResult: outletChanged ? null : state.orderResult,
+        lastOrderNumber: saved.lastOrderNumber || ""
+      });
+    }
     
     normalizeSelections();
     const { render } = await import("./order-render.js");

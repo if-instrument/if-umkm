@@ -135,9 +135,21 @@ export async function submitOrder() {
     showFeedback(validationMessage(), true);
     return;
   }
-  setBusy(true, "Menyimpan order...");
+  setBusy(true, "Memeriksa ketersediaan stok...");
   showFeedback("");
   try {
+    const { refreshMenuStock } = await import("../order-render.js");
+    await Promise.all([
+      refreshMenuStock(),
+      new Promise((resolve) => setTimeout(resolve, 500))
+    ]);
+    const { validateCartStock } = await import("./page-3-book-menu.js");
+    const validation = validateCartStock();
+    if (!validation.valid) {
+      showFeedback(validation.reason, true);
+      return;
+    }
+    setBusy(true, "Menyimpan order...");
     if (paymentRequiresProof() && !state.paymentProof?.dataUrl) {
       throw new Error("Upload bukti bayar terlebih dahulu.");
     }

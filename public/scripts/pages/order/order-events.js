@@ -6,7 +6,8 @@ import {
   loadOrderData,
   activePaymentMethods,
   paymentById,
-  needsServiceChoice
+  needsServiceChoice,
+  setBusy
 } from "./order-utils.js";
 import {
   currentBookPage,
@@ -265,11 +266,30 @@ export function registerGlobalClickDispatcher() {
         showFeedback("Pilih minimal satu menu terlebih dahulu.", true);
         return;
       }
-      state.cartConfirmed = true;
-      state.spread = "checkout";
-      import("./order-render.js").then(({ render }) => {
-        render();
-      });
+      (async () => {
+        setBusy(true, "Memeriksa ketersediaan stok...");
+        try {
+          const { refreshMenuStock } = await import("./order-render.js");
+          await Promise.all([
+            refreshMenuStock(),
+            new Promise((resolve) => setTimeout(resolve, 500))
+          ]);
+          const { validateCartStock } = await import("./pages/page-3-book-menu.js");
+          const validation = validateCartStock();
+          if (!validation.valid) {
+            showFeedback(validation.reason, true);
+            return;
+          }
+          state.cartConfirmed = true;
+          state.spread = "checkout";
+          const { render } = await import("./order-render.js");
+          render();
+        } catch (err) {
+          console.error(err);
+        } finally {
+          setBusy(false);
+        }
+      })();
       return;
     }
 

@@ -12,7 +12,7 @@ class OnlineOrderApiService
         [$companyId] = $this->activateCompany($filters);
         $outletId = $this->numericId($filters['outlet_id'] ?? $filters['outletId'] ?? null);
 
-        return (new PublicOrderService())->bootstrap($companyId, $outletId ?: null);
+        return (new PublicOrderService())->bootstrap($companyId, $outletId ?: null, (string) ($filters['only'] ?? ''));
     }
 
     public function member(array $filters): array
