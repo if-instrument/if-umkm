@@ -9,7 +9,9 @@ import { forceTurnToElement, coverStartPage } from "../order-navigation.js";
 import { syncSelectedMemberFields } from "./page-5-customer-detail.js";
 
 export function resetOrder() {
-  sessionStorage.removeItem(orderSessionKey());
+  if (state.orderResult?.order?.orderNumber) {
+    state.lastOrderNumber = state.orderResult.order.orderNumber;
+  }
   state.cart = [];
   state.orderResult = null;
   state.orderStatus = "NEW_ORDER";
@@ -17,9 +19,9 @@ export function resetOrder() {
   state.selectedMemberId = "";
   state.categoryId = "all";
   if (optionalById("order-search")) byId("order-search").value = "";
-  if (optionalById("order-status-lookup-input")) byId("order-status-lookup-input").value = "";
   optionalById("order-customer-form")?.reset();
   syncSelectedMemberFields();
+
   state.spread = "cover";
   import("../order-render.js").then(({ render }) => {
     render();

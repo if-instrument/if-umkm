@@ -451,6 +451,10 @@ export function renderSpread(syncBook = true) {
   renderProgress();
   persistOrderSession();
   lockAllOrderInputs();
+  const frame = document.getElementById("order-book-frame");
+  if (frame) {
+    frame.setAttribute("data-active-spread", state.spread);
+  }
 }
 
 export function lockAllOrderInputs() {

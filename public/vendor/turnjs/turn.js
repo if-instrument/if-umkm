@@ -1059,6 +1059,7 @@
           b = a.opts.page,
           c = a.opts.turn.data(),
           d = b % 2;
+        if (b <= 3) return [];
         return "hard" == a.effect
           ? "ltr" == c.direction
             ? [d ? "r" : "l"]

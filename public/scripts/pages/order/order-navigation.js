@@ -138,7 +138,7 @@ export function menuLayoutLabel() {
 }
 
 export function guardNavigation(targetPage) {
-  if (state.orderStatus === "ORDER_CREATED") {
+  if (state.orderStatus === "ORDER_CREATED" || state.orderResult) {
     return { allowed: true };
   }
 
@@ -231,6 +231,8 @@ export function initFlipbook() {
     autoCenter: true,
     gradients: true,
     acceleration: true,
+    turnCorners: "bl,br,tl,tr",
+    cornerSize: 40,
     display: window.matchMedia("(max-width: 760px)").matches ? "single" : "double",
     when: {
       turning(event, page) {
@@ -421,7 +423,7 @@ export function snapshotBookInputs() {
 export function restoreBookInputs(snapshot) {
   if (!snapshot) return;
   if (optionalById("order-search")) byId("order-search").value = snapshot.search || "";
-  if (optionalById("order-status-lookup-input")) byId("order-status-lookup-input").value = snapshot.statusLookup || "";
+  if (optionalById("order-status-lookup-input")) byId("order-status-lookup-input").value = snapshot.statusLookup || state.orderResult?.order?.orderNumber || "";
   if (optionalById("order-customer-name")) byId("order-customer-name").value = snapshot.customerName || "";
   if (optionalById("order-customer-email")) byId("order-customer-email").value = snapshot.customerEmail || "";
   if (optionalById("order-customer-phone")) byId("order-customer-phone").value = snapshot.customerPhone || "";

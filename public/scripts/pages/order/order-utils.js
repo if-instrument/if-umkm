@@ -118,9 +118,11 @@ export function readOrderSession() {
 
 export function persistOrderSession() {
   if (state.orderStatus === "ORDER_CREATED" && state.orderResult?.order?.orderNumber) {
+    state.lastOrderNumber = state.orderResult.order.orderNumber;
     const payload = {
       orderNumber: state.orderResult.order.orderNumber,
-      orderStatus: "ORDER_CREATED"
+      orderStatus: "ORDER_CREATED",
+      lastOrderNumber: state.lastOrderNumber
     };
     sessionStorage.setItem(orderSessionKey(), JSON.stringify(payload));
     return;
@@ -135,7 +137,8 @@ export function persistOrderSession() {
     paymentMethodId: state.paymentMethodId,
     spread: state.spread,
     cartConfirmed: state.cartConfirmed,
-    cart: state.cart
+    cart: state.cart,
+    lastOrderNumber: state.lastOrderNumber
   };
   sessionStorage.setItem(orderSessionKey(), JSON.stringify(payload));
 }
@@ -189,12 +192,16 @@ export async function loadOrderData(outletId = "") {
         spread: "receipt",
         cart: [],
         orderResult: orderResult,
-        orderStatus: "ORDER_CREATED"
+        orderStatus: "ORDER_CREATED",
+        lastOrderNumber: saved.orderNumber || saved.lastOrderNumber || ""
       });
       
       normalizeSelections();
       const { render } = await import("./order-render.js");
       render();
+      if (optionalById("order-status-lookup-input")) {
+        byId("order-status-lookup-input").value = saved.orderNumber;
+      }
       return;
     }
 
@@ -232,7 +239,8 @@ export async function loadOrderData(outletId = "") {
       cartConfirmed: outletChanged ? false : Boolean(saved.cartConfirmed),
       spread: saved.spread || state.spread,
       cart: outletChanged ? [] : (Array.isArray(saved.cart) ? saved.cart : state.cart),
-      orderResult: outletChanged ? null : state.orderResult
+      orderResult: outletChanged ? null : state.orderResult,
+      lastOrderNumber: saved.lastOrderNumber || ""
     });
     
     normalizeSelections();

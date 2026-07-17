@@ -85,10 +85,36 @@ export function bindDynamicFieldListeners() {
     }
   });
   optionalById("order-customer-form")?.addEventListener("submit", (event) => event.preventDefault());
-  optionalById("order-status-lookup-form")?.addEventListener("submit", (event) => {
-    event.preventDefault();
-    lookupPreviousOrder();
-  });
+  const lookupForm = optionalById("order-status-lookup-form");
+  if (lookupForm) {
+    const stopBubbling = (e) => e.stopPropagation();
+    lookupForm.addEventListener("mousedown", stopBubbling);
+    lookupForm.addEventListener("touchstart", stopBubbling);
+    lookupForm.addEventListener("pointerdown", stopBubbling);
+    lookupForm.addEventListener("click", stopBubbling);
+    lookupForm.addEventListener("submit", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      lookupPreviousOrder();
+    });
+  }
+  const lookupInput = optionalById("order-status-lookup-input");
+  if (lookupInput) {
+    const handleClear = () => {
+      const val = lookupInput.value.trim();
+      if (!val) {
+        state.lastOrderNumber = "";
+        state.orderResult = null;
+        state.orderStatus = "NEW_ORDER";
+        persistOrderSession();
+        import("./order-render.js").then(({ render }) => {
+          render();
+        });
+      }
+    };
+    lookupInput.addEventListener("input", handleClear);
+    lookupInput.addEventListener("search", handleClear);
+  }
   optionalById("order-modifier-form")?.addEventListener("submit", handleModifierSubmit);
   optionalById("order-modifier-form")?.addEventListener("change", (event) => {
     if (event.target.matches(".public-modifier-option input")) {
@@ -166,6 +192,10 @@ export function interactiveSwipeTarget(target) {
 
 export function registerGlobalClickDispatcher() {
   document.addEventListener("click", (event) => {
+    if (event.target.closest("#order-status-lookup-form")) {
+      event.stopPropagation();
+    }
+
     const isMutation = event.target.closest("[data-add-product]") ||
                        event.target.closest("[data-detail-qty-plus]") ||
                        event.target.closest("[data-detail-qty-minus]") ||
@@ -322,5 +352,13 @@ export function registerGlobalClickDispatcher() {
     if (!productCardButton) return;
     event.preventDefault();
     addProduct(productCardButton.dataset.productCard);
+  });
+
+  document.addEventListener("submit", (event) => {
+    if (event.target.closest("#order-status-lookup-form")) {
+      event.preventDefault();
+      event.stopPropagation();
+      lookupPreviousOrder();
+    }
   });
 }

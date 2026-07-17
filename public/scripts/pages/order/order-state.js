@@ -26,7 +26,8 @@ export const state = {
   spread: "cover",
   outletConfirmed: false,
   orderResult: null,
-  orderStatus: "NEW_ORDER"
+  orderStatus: "NEW_ORDER",
+  lastOrderNumber: ""
 };
 
 export const bookState = {

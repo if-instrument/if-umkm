@@ -705,22 +705,26 @@ body.app-busy .public-order-shell {
 
 .public-book-hit-zone {
   position: absolute;
-  top: 0;
-  bottom: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 120px;
   z-index: 20;
   width: 90px;
   border: 0;
   background: transparent;
   cursor: pointer;
   outline: none;
+  transition: background 0.3s ease;
 }
 
 .public-book-hit-left {
   left: 0;
+  border-radius: 0 20px 20px 0;
 }
 
 .public-book-hit-right {
   right: 0;
+  border-radius: 20px 0 0 20px;
 }
 
 .public-book-hit-zone::before {
@@ -776,6 +780,19 @@ body.app-busy .public-order-shell {
 
 .public-book-hit-right:hover {
   background: linear-gradient(270deg, rgba(var(--order-accent-deep-rgb, 110, 58, 22), 0.06), transparent);
+}
+
+#order-book-frame[data-active-spread="receipt"] .public-book-hit-right {
+  display: none !important;
+}
+
+#order-book-frame[data-active-spread="cover"] #order-flipbook {
+  pointer-events: none;
+}
+
+#order-book-frame[data-active-spread="cover"] .public-cover-page,
+#order-book-frame[data-active-spread="cover"] .public-service-page {
+  pointer-events: auto;
 }
 
 .public-book-spread {
@@ -871,6 +888,8 @@ body.app-busy .public-order-shell {
 .public-order-lookup {
   width: min(340px, 100%);
   margin: 0 auto;
+  position: relative;
+  z-index: 100 !important;
 }
 
 .public-order-lookup label {
@@ -914,6 +933,24 @@ body.app-busy .public-order-shell {
   border-radius: 8px;
   padding-inline: 12px;
   font-size: 11px;
+}
+
+.public-lookup-feedback {
+  min-height: 0;
+  margin: 0;
+  padding: 0 2px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--order-cover-text, #fffaf3);
+  transition: all 200ms ease;
+}
+
+.public-lookup-feedback:empty {
+  display: none;
+}
+
+.public-lookup-feedback.error {
+  color: #ffa4a0;
 }
 
 .single-outlet-order .public-cover-page {
