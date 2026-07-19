@@ -1,226 +1,145 @@
 # 09. REST API Documentation
 
-REST API Aplikasi UMKM (IFresso Coffee) berbasis stateless JSON API yang diamankan menggunakan token Bearer JWT pada middleware filter `jwt-auth`.
+REST API Aplikasi UMKM (IFresso Coffee) terdiri dari grup route publik (unprotected) dan route terproteksi (`jwt-auth`).
 
 ---
 
-## 1. Autentikasi Pengguna
+## 1. Group Route Publik (No Auth)
 
-### `POST /api/auth/login`
-- **Deskripsi**: Melakukan verifikasi email dan password user serta mengembalikan token JWT.
-- **Authentication**: None (Public)
-- **Request Body**:
-  ```json
-  {
-    "email": "cashier@ifresso.com",
-    "password": "secretpassword"
-  }
-  ```
-- **Validation**:
-  - `email`: Required, valid email format.
-  - `password`: Required, string minimum 6 characters.
-- **Success Response (HTTP 200)**:
-  ```json
-  {
-    "ok": true,
-    "data": {
-      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-      "user": {
-        "id": 5,
-        "name": "Staf Kasir",
-        "email": "cashier@ifresso.com",
-        "type": "outlet_user"
-      },
-      "companies": [
-        {
-          "id": 1,
-          "name": "IFresso Coffee",
-          "routeSlug": "ifresso-coffee"
-        }
-      ],
-      "outlets": [
-        {
-          "id": 1,
-          "companyId": 1,
-          "name": "IFresso Coffee Outlet 1"
-        }
-      ]
-    }
-  }
-  ```
-- **Error Response (HTTP 422)**:
-  ```json
-  {
-    "ok": false,
-    "message": "Email atau password salah."
-  }
-  ```
+### Autentikasi & Undangan
+- **`POST /api/auth/login`**
+  - **Fungsi**: Verifikasi email/password kasir/admin, mengembalikan JWT token.
+  - **Body**: `{ "email": "string", "password": "string" }`
+  - **Response**: `{ "ok": true, "data": { "token": "string", "user": {}, "outlets": [] } }`
+- **`GET /api/invitation/(:segment)`**
+  - **Fungsi**: Memeriksa validitas kode undangan karyawan baru.
+  - **Response**: `{ "ok": true, "data": { "email": "string", "companyName": "string" } }`
+- **`POST /api/invitation/(:segment)/accept`**
+  - **Fungsi**: Menerima undangan, menginput nama, password, dan membuat akun user aktif.
+  - **Body**: `{ "name": "string", "password": "string" }`
+  - **Response**: `{ "ok": true, "data": true }`
+- **`GET /api/tenants`**
+  - **Fungsi**: Mengembalikan daftar seluruh tenant perusahaan aktif di platform.
+- **`GET /api/tenant/(:segment)`**
+  - **Fungsi**: Membaca detail tenant berdasarkan route slug perusahaan.
+
+### Pemesanan Mandiri Pelanggan (QR Order)
+- **`GET /api/public/order/bootstrap`**
+  - **Fungsi**: Mengambil data katalog menu, status outlet, dan opsi pembayaran untuk browser pelanggan.
+  - **Response**: `{ "ok": true, "data": { "outlet": {}, "products": [], "paymentMethods": [] } }`
+- **`GET /api/public/order/member`**
+  - **Fungsi**: Pengecekan status loyalitas CRM pelanggan via nomor telepon.
+  - **Params**: `?phone=0812...`
+- **`POST /api/public/order`**
+  - **Fungsi**: Kirim pesanan mandiri meja. Mendukung upload file bukti bayar transfer.
+  - **Body**: Multipart form-data (`company_id`, `outlet_id`, `service_type`, `table_name`, `customer_name`, `customer_phone`, `items` [JSON], `payment_proof` [File]).
+  - **Response**: `{ "ok": true, "data": { "id": "string", "orderNumber": "string", "status": "pending_cashier" } }`
+- **`POST /api/webhook/xendit`**
+  - **Fungsi**: Callback dari Xendit API saat status invoice/QRIS dinamis terbayar.
+- **`GET /api/public/card-payment/(:segment)`**
+  - **Fungsi**: Mengecek status invoice EDC kartu online dari ponsel pelanggan.
+- **`POST /api/public/card-payment/(:segment)/sync`**
+  - **Fungsi**: Sinkronisasi status EDC manual.
 
 ---
 
-## 2. POS Kasir (Point of Sale)
+## 2. Group Route Terproteksi (`jwt-auth`)
 
-### `GET /api/page/pos/bootstrap`
-- **Deskripsi**: Mengambil seluruh data awal (settings, catalog, active orders) untuk di-cache di browser POS kasir.
-- **Authentication**: JWT Bearer Token (`jwt-auth`)
-- **Query Parameters**:
-  - `date`: Format `YYYY-MM-DD` (Required, default hari ini).
-  - `per_page`: Integer (Optional, default 100).
-- **Success Response (HTTP 200)**:
-  ```json
-  {
-    "ok": true,
-    "data": {
-      "settings": {
-        "companyName": "IFresso Coffee",
-        "themeColor": "#6e3a16",
-        "taxRate": 10,
-        "dineInServiceRate": 5,
-        "tableServiceMode": "free_seating_pay_first",
-        "paymentMethods": [
-          { "id": 1, "name": "Cash", "type": "cash", "status": "10" },
-          { "id": 2, "name": "QRIS", "type": "qris", "qrisMode": "offline", "status": "10" }
-        ]
-      },
-      "categories": [
-        { "id": 1, "name": "Coffee" },
-        { "id": 2, "name": "Non-Coffee" }
-      ],
-      "products": [
-        { "id": 12, "sku": "IF-ACP-01", "name": "Es Kopi Aren", "price": 18000, "category": "Coffee" }
-      ],
-      "transactions": [
-        { "id": "ord-35", "orderNumber": "WEB-20260719-0005", "status": "10", "total": 70000 }
-      ]
-    }
-  }
-  ```
+Semua endpoint berikut wajib menyertakan header `Authorization: Bearer <JWT_Token>`.
 
-### `POST /api/order`
-- **Deskripsi**: Menyimpan data transaksi POS penjualan baru ke database tenant.
-- **Authentication**: JWT Bearer Token (`jwt-auth`)
-- **Request Body**:
-  ```json
-  {
-    "orderNo": "POS-20260720-0001",
-    "serviceType": "Take Away",
-    "tableName": "-",
-    "customerName": "Imam",
-    "items": [
-      {
-        "productId": 12,
-        "qty": 2,
-        "price": 18000,
-        "modifierIds": []
-      }
-    ],
-    "payment": {
-      "paymentMethod": "Cash",
-      "cashTendered": 40000,
-      "changeDue": 4000
-    }
-  }
-  ```
-- **Success Response (HTTP 200)**:
-  ```json
-  {
-    "ok": true,
-    "data": {
-      "id": "ord-36",
-      "orderNumber": "POS-20260720-0001",
-      "status": "completed",
-      "total": 36000
-    }
-  }
-  ```
+### A. Modul Perusahaan (Company) & Gerai (Outlet)
+- **`GET /api/company`** - Membaca daftar perusahaan.
+- **`GET /api/company/(:segment)`** - Membaca detail data perusahaan.
+- **`POST /api/company`** - Registrasi tenant perusahaan baru (hanya Super Admin).
+- **`PUT /api/company/(:segment)`** - Mengupdate setelan logo/warna tema perusahaan.
+- **`DELETE /api/company/(:segment)`** - Menghapus tenant perusahaan.
+- **`POST /api/company/(:segment)/invite-admin`** - Mengirim undangan admin utama.
+- **`POST /api/company-logo`** - Upload file logo perusahaan.
+- **`GET /api/outlet`** - Daftar gerai cabang aktif.
+- **`POST /api/outlet`** - Membuat gerai baru.
+- **`PUT /api/outlet/(:segment)`** - Update alamat/nama gerai.
+- **`DELETE /api/outlet/(:segment)`** - Nonaktifkan gerai.
 
----
+### B. Otorisasi Pengguna (User & Role)
+- **`GET /api/role`** - Membaca daftar jabatan role perusahaan.
+- **`POST /api/role`** - Membuat role baru & mendefinisikan permission matrix JSON.
+- **`PUT /api/role/(:segment)`** - Edit permission role.
+- **`DELETE /api/role/(:segment)`** - Hapus role.
+- **`GET /api/user`** - Daftar karyawan.
+- **`POST /api/user`** - Menambah data karyawan baru.
+- **`PUT /api/user/(:segment)`** - Edit data karyawan (nama/status).
+- **`POST /api/user/(:segment)/invite`** - Mengirim ulang email undangan aktifasi password.
+- **`DELETE /api/user/(:segment)`** - Cabut akses karyawan.
 
-## 3. Persetujuan Pesanan Online (Order Approval)
+### C. Halaman Bootstrap Data
+Mengambil bundel data konfigurasi dan cache untuk dimuat di frontend SPA.
+- **`GET /api/page/pos/bootstrap`** - Data master POS kasir.
+- **`GET /api/page/settings/bootstrap`** - Data master form pengaturan.
+- **`GET /api/page/users/bootstrap`** - Data master manajemen user.
+- **`GET /api/page/products/bootstrap`** - Data katalog & modifier.
+- **`GET /api/page/inventory/bootstrap`** - Data bahan & opname.
+- **`GET /api/page/finance/bootstrap`** - Data pengeluaran operasional.
 
-### `PUT /api/order/(:segment)/approve`
-- **Deskripsi**: Menyetujui pesanan online yang dibuat pelanggan, memverifikasi metode pembayaran, dan mengirim order ke dapur.
-- **Authentication**: JWT Bearer Token (`jwt-auth`)
-- **Request Body**:
-  ```json
-  {
-    "paymentMethod": "QRIS",
-    "cashTendered": 0,
-    "changeDue": 0
-  }
-  ```
-- **Success Response (HTTP 200)**:
-  ```json
-  {
-    "ok": true,
-    "data": {
-      "id": "ord-35",
-      "orderNumber": "WEB-20260719-0005",
-      "status": "waiting",
-      "paymentStatus": "paid",
-      "paymentMethod": "QRIS"
-    }
-  }
-  ```
+### D. Setelan Operasional (Settings)
+- **`GET /api/setting`** - Membaca parameter operasional outlet (PPN, service rate).
+- **`PUT /api/setting`** - Update parameter operasional.
+- **`GET /api/printer`** - Daftar device printer thermal di outlet.
+- **`GET /api/dining-table`** - Daftar meja makan.
+- **`POST /api/dining-table`** - Membuat meja makan baru.
+- **`PUT /api/dining-table/(:segment)`** - Edit kapasitas/nama meja.
+- **`DELETE /api/dining-table/(:segment)`** - Hapus meja.
+- **`GET /api/payment-method`** - Daftar metode pembayaran outlet.
+- **`POST /api/payment-method`** - Membuat metode pembayaran baru.
+- **`PUT /api/payment-method/(:segment)`** - Edit detail EDC / QRIS Static image.
+- **`DELETE /api/payment-method/(:segment)`** - Nonaktifkan metode pembayaran.
+- **`POST /api/payment-method-qris-image`** - Upload gambar QRIS Static outlet.
+- **`GET /api/packaging-rule`** - Daftar kemasan otomatis.
+- **`POST /api/packaging-rule`** - Membuat aturan kemasan baru.
 
----
+### E. Manajemen Inventaris (Inventory)
+- **`GET /api/ingredient-template`** - Master bahan baku perusahaan.
+- **`POST /api/ingredient-template`** - Tambah item bahan template.
+- **`GET /api/ingredient`** - Stok bahan lokal outlet.
+- **`POST /api/ingredient`** - Tambah bahan lokal baru.
+- **`PUT /api/ingredient/(:segment)`** - Update average cost / min stock.
+- **`PUT /api/ingredient-mapping`** - Pemetaan relasi template bahan ke outlet.
+- **`GET /api/stock-movement`** - Log mutasi stok.
+- **`POST /api/purchase`** - Input pembelian bahan baru (menambah stok).
+- **`POST /api/inventory-loss`** - Input barang rusak/waste (mengurangi stok).
 
-## 4. Pembayaran Gateway (Payment Transactions)
+### F. Katalog Produk & Resep (Product Suite)
+- **`GET /api/category`** - Membaca kategori produk.
+- **`POST /api/category`** - Membuat kategori baru.
+- **`GET /api/product`** - Membaca katalog menu.
+- **`POST /api/product`** - Menambah menu baru.
+- **`PUT /api/product/(:segment)/price`** - Kustomisasi harga jual produk per outlet.
+- **`PUT /api/product/(:segment)/category`** - Ubah kategori produk.
+- **`POST /api/product/(:segment)/produce`** - Memproses produksi manual produk prepackaged (potong bahan mentah, tambah stok produk jadi).
+- **`POST /api/product-batch/(:segment)/loss`** - Jurnal penyusutan batch produk jadi.
+- **`GET /api/modifier`** - Daftar group modifier rasa/topping.
+- **`POST /api/modifier`** - Membuat modifier group baru.
+- **`GET /api/recipe`** - Membaca daftar resep produk.
+- **`POST /api/recipe`** - Mengupdate/menyimpan baris resep produk baru.
+- **`POST /api/product-image`** - Upload gambar produk menu.
 
-### `POST /api/payment-transaction`
-- **Deskripsi**: Membuat invoice transaksi pembayaran QRIS dinamis atau request kartu EDC pada sistem payment gateway terintegrasi.
-- **Authentication**: JWT Bearer Token (`jwt-auth`)
-- **Request Body**:
-  ```json
-  {
-    "orderNumber": "WEB-20260719-0005",
-    "paymentMethodId": 2,
-    "amount": 70000,
-    "paymentFeeAmount": 0,
-    "paymentFeePayer": "merchant"
-  }
-  ```
-- **Success Response (HTTP 200)**:
-  ```json
-  {
-    "ok": true,
-    "data": {
-      "id": 84,
-      "reference": "XENDIT-QRIS-20260720-6394",
-      "status": "pending",
-      "amount": 70000,
-      "qrPayload": "00020101021226380010ID.CO.XENDIT.WWW...",
-      "provider": "xendit"
-    }
-  }
-  ```
+### G. Transaksi POS & Order (Sales)
+- **`GET /api/order`** - Membaca riwayat transaksi.
+- **`POST /api/order`** - Checkout POS baru.
+- **`PUT /api/order/(:segment)/status`** - Memperbarui status pesanan (WAITING -> PREPARING -> READY).
+- **`PUT /api/order/(:segment)/ready-items`** - Menyimpan checklist produksi item per pesanan (KDS).
+- **`PUT /api/order/(:segment)/settle`** - Settlement pembayaran dine-in/bill meja.
+- **`PUT /api/order/(:segment)/approve`** - Penerimaan & approval order online.
+- **`PUT /api/order/(:segment)/move-table`** - Pindah meja pelanggan dine-in.
+- **`POST /api/payment-transaction`** - Request transaksi gateway baru.
+- **`PUT /api/payment-transaction/(:segment)/confirm`** - Konfirmasi manual pembayaran.
+- **`PUT /api/payment-transaction/(:segment)/cancel`** - Batalkan invoice pembayaran.
 
----
-
-## 5. Layanan Mandiri Pelanggan (Customer Public Order)
-
-### `POST /api/public/order`
-- **Deskripsi**: Mengirimkan pesanan mandiri dari browser pelanggan.
-- **Authentication**: None (Public - Validated via Meja/Outlet Code)
-- **Request Body**: multipart/form-data
-  - `company_id`: 1
-  - `outlet_id`: 1
-  - `service_type`: "Dine In"
-  - `table_name`: "Meja 05"
-  - `customer_name`: "Faisal"
-  - `customer_phone`: "08123456789"
-  - `payment_method`: "QRIS"
-  - `items`: JSON string `[{"productId":12,"qty":1,"price":18000}]`
-  - `payment_proof`: File upload (JPG/PNG bukti bayar transfer/QRIS offline)
-- **Success Response (HTTP 200)**:
-  ```json
-  {
-    "ok": true,
-    "data": {
-      "id": "ord-37",
-      "orderNumber": "WEB-20260720-0002",
-      "status": "pending_cashier",
-      "total": 18000
-    }
-  }
-  ```
+### H. CRM & Pengeluaran (CRM & Finance)
+- **`GET /api/customer`** - Membaca daftar pelanggan.
+- **`POST /api/customer`** - Mendaftarkan member baru.
+- **`GET /api/customer-transaction`** - Histori belanja per member.
+- **`GET /api/reports/profit-loss`** - Laporan laba rugi bulanan.
+- **`GET /api/finance/expense`** - Daftar pengeluaran operasional outlet.
+- **`POST /api/finance/expense`** - Tambah pengeluaran baru.
+- **`DELETE /api/finance/expense/(:segment)`** - Hapus jurnal pengeluaran.
+- **`GET /api/payment-gateway-log`** - Log detail API transaksi payment.
