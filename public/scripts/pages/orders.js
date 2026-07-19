@@ -58,7 +58,10 @@ function postSales(url, payload) {
 function canActOnOrderStatus(status) {
   const code = orderStatusCode(status);
   if (code === ORDER_STATUS.PENDING_CASHIER) return false;
-  if (code === ORDER_STATUS.FULFILLMENT) return canUsePermission("queue.cashier", "update", state, session) || canUsePermission("queue.kitchen", "update", state, session);
+  if (code === ORDER_STATUS.FULFILLMENT) return canUsePermission("queue.cashier", "update", state, session) ||
+                                                canUsePermission("queue.kitchen", "update", state, session) ||
+                                                canUsePermission("inventory.overview", "update", state, session) ||
+                                                canUsePermission("inventory.ingredients", "update", state, session);
   if ([ORDER_STATUS.WAITING, ORDER_STATUS.PREPARING].includes(code)) return canUsePermission("queue.kitchen", "update", state, session);
   if (code === ORDER_STATUS.READY) return canUsePermission("queue.cashier", "update", state, session);
   return false;
@@ -126,6 +129,10 @@ function preparationItems(order) {
   }).join("");
 }
 
+function activeStatuses() {
+  return [ORDER_STATUS.WAITING, ORDER_STATUS.PREPARING, ORDER_STATUS.READY];
+}
+
 function renderSummary(orders) {
   if (queueFilter === "completed") {
     byId("queue-summary").innerHTML = `
@@ -133,7 +140,7 @@ function renderSummary(orders) {
     `;
     return;
   }
-  byId("queue-summary").innerHTML = [ORDER_STATUS.FULFILLMENT, ORDER_STATUS.WAITING, ORDER_STATUS.PREPARING, ORDER_STATUS.READY].map((status) => `
+  byId("queue-summary").innerHTML = activeStatuses().map((status) => `
     <article class="pos-queue-summary-${status}"><span>${statusConfig[status].label}</span><strong>${orders.filter((order) => orderStatusIs(order.status, status)).length}</strong></article>
   `).join("");
 }
@@ -199,13 +206,20 @@ function completedTable(orders) {
 function renderBoard() {
   refreshSales();
   const todayOrders = state.transactions.filter((order) => visibleForSession(order, state, session) && isToday(order.createdAt));
-  const activeOrders = state.transactions.filter((order) => visibleForSession(order, state, session) && orderStatusIn(order.status, [ORDER_STATUS.FULFILLMENT, ORDER_STATUS.WAITING, ORDER_STATUS.PREPARING, ORDER_STATUS.READY]));
+  const statuses = activeStatuses();
+  const activeOrders = state.transactions.filter((order) => visibleForSession(order, state, session) && orderStatusIn(order.status, statuses));
   const boardOrders = queueFilter === "completed" ? todayOrders : activeOrders;
   renderSummary(boardOrders);
-  byId("order-board").classList.toggle("completed-only", queueFilter === "completed");
-  byId("order-board").innerHTML = queueFilter === "completed"
-    ? completedTable(todayOrders)
-    : [ORDER_STATUS.FULFILLMENT, ORDER_STATUS.WAITING, ORDER_STATUS.PREPARING, ORDER_STATUS.READY].map((status) => queueColumn(status, activeOrders)).join("");
+  
+  const boardEl = byId("order-board");
+  boardEl.classList.toggle("completed-only", queueFilter === "completed");
+  if (queueFilter === "completed") {
+    boardEl.style.gridTemplateColumns = "none";
+    boardEl.innerHTML = completedTable(todayOrders);
+  } else {
+    boardEl.style.gridTemplateColumns = `repeat(${statuses.length}, minmax(240px, 1fr))`;
+    boardEl.innerHTML = statuses.map((status) => queueColumn(status, activeOrders)).join("");
+  }
   applyPermissionControls(document, state, session);
 }
 
@@ -270,15 +284,24 @@ document.addEventListener("click", (event) => {
     const visibleItems = orderStatusIs(order.status, ORDER_STATUS.COMPLETED) ? order.items : (order.lastOrderItems || order.items);
     const allReady = visibleItems.every((item, index) => (order.readyItemKeys || []).includes(`${item.productId || item.name}-${index}`));
     if (orderStatusIs(order.status, ORDER_STATUS.PREPARING) && !allReady) return;
-    try {
-      postSales(`/api/order/${order.id}/status`, { status: status.dataset.nextStatus });
-      closeDetail();
-      renderBoard();
-    } catch (error) {
-      alert(error?.message || "Aksi pesanan belum berhasil disimpan.");
-      closeDetail();
-      renderBoard();
-    }
+    
+    const originalText = status.textContent;
+    status.disabled = true;
+    status.textContent = "Memproses...";
+
+    setTimeout(() => {
+      try {
+        postSales(`/api/order/${order.id}/status`, { status: status.dataset.nextStatus });
+        closeDetail();
+        renderBoard();
+      } catch (error) {
+        alert(error?.message || "Aksi pesanan belum berhasil disimpan.");
+        status.disabled = false;
+        status.textContent = originalText;
+        closeDetail();
+        renderBoard();
+      }
+    }, 50);
   }
   if (event.target.closest("[data-close-order-detail]") || event.target.matches("[data-order-detail-backdrop]")) closeDetail();
 });

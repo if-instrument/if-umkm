@@ -1,10 +1,10 @@
 import { renderLayout } from "../layout.js?v=coffee-v151";
-import { apiDelete, apiPost, apiPut, appPath, applyPermissionControls, canUsePermission, loadSession, loadState, scopedPayload, visibleForSession } from "../store.js?v=coffee-v151";
+import { apiDelete, apiGet, apiPost, apiPut, appPath, applyPermissionControls, canUsePermission, loadSession, loadState, scopedApiUrl, scopedPayload, visibleForSession } from "../store.js?v=coffee-v151";
 import { formatQty, money, shortDate } from "../format.js";
 import { byId, setText, showAlert, showFeedback } from "../dom.js";
-import { costingMethodLabel, ingredientStockValue, ingredientUnitCost, isStockedProduct } from "../inventory.js";
+import { costingMethodLabel, ingredientStockValue, ingredientUnitCost, isStockedProduct, productById, realProductAvailability, isPreorderStockedProduct, productModifierOptions } from "../inventory.js";
 import { enhanceAllDataTables } from "../datatable.js";
-import { COMMON_STATUS, isInactiveStatus } from "../status-codes.js";
+import { COMMON_STATUS, isInactiveStatus, ORDER_STATUS, orderStatusCode } from "../status-codes.js";
 import { applyPageBootstrap, loadPageBootstrap } from "../page-engine.js?v=coffee-v154";
 
 renderLayout();
@@ -307,6 +307,292 @@ function renderHistoryFilterOptions() {
   byId("history-filter-ingredient").value = currentValue;
 }
 
+let activePreorders = [];
+
+function posOrderItemKey(item, index) {
+  return `${item.productId || item.name}-${index}`;
+}
+
+function posItemProductionReadiness(product) {
+  if (!product) return { ready: false, maxQty: 0, message: "Produk tidak ditemukan.", blockers: ["Produk tidak ditemukan."] };
+  const type = product.inventoryType || product.inventory_type || "made_to_order";
+  if (type === "retail") {
+    return { ready: true, maxQty: Number.POSITIVE_INFINITY, message: "Barang dagang memakai stok masuk dari pembelian.", blockers: [] };
+  }
+  const lines = product.recipe || [];
+  if (!lines.length) return { ready: false, maxQty: 0, message: "Recipe produk belum tersedia.", blockers: ["Recipe produk belum tersedia."] };
+  const blockers = [];
+  const capacities = lines
+    .filter((line) => Number(line.qty || 0) > 0)
+    .map((line) => {
+      const ingredient = state.ingredients.find((ing) => ing.id === line.ingredientId);
+      const label = line.templateName || line.ingredientName || "Bahan resep";
+      if (!ingredient || isInactiveStatus(ingredient.status)) { blockers.push(`${label} belum dimapping ke bahan outlet.`); return 0; }
+      const capacity = Math.floor(Number(ingredient.stock || 0) / Number(line.qty || 0));
+      if (capacity < 1) blockers.push(`${ingredient.name} tidak cukup (${formatQty(ingredient.stock || 0)} ${ingredient.unit || ""})`);
+      return capacity;
+    });
+  if (!capacities.length) blockers.push("Qty resep belum lengkap.");
+  const maxQty = capacities.length ? Math.min(...capacities) : 0;
+  return { ready: blockers.length === 0 && maxQty > 0, maxQty, message: blockers.length ? blockers[0] : `Maksimal produksi ${formatQty(maxQty)} unit.`, blockers };
+}
+
+function escapeHtml(value = "") {
+  return String(value).replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[char]));
+}
+
+function openPosItemStockModal(item, product, order, itemKey, itemIndex, onSuccess) {
+  let backdrop = document.querySelector("[data-pos-item-stock-backdrop]");
+  if (!backdrop) {
+    backdrop = document.createElement("div");
+    backdrop.className = "modal-backdrop";
+    backdrop.setAttribute("data-pos-item-stock-backdrop", "");
+    backdrop.style.zIndex = "200";
+    backdrop.hidden = true;
+    const dialog = document.createElement("section");
+    dialog.className = "modal-dialog";
+    dialog.id = "pos-item-stock-modal";
+    dialog.style.maxWidth = "560px";
+    dialog.hidden = true;
+    backdrop.appendChild(dialog);
+    document.body.appendChild(backdrop);
+    backdrop.addEventListener("click", (e) => {
+      if (e.target.matches("[data-pos-item-stock-backdrop]") || e.target.closest("[data-close-pos-item-stock]")) {
+        closePosItemStockModal();
+      }
+    });
+  }
+  const dialog = backdrop.querySelector("#pos-item-stock-modal");
+  const type = product ? (product.inventoryType || product.inventory_type || "made_to_order") : "made_to_order";
+  const isRetail = type === "retail";
+  const readiness = posItemProductionReadiness(product);
+  const today = new Date().toISOString().slice(0, 10);
+  const shelfLifeDays = Number(product?.shelfLifeDays || 0);
+  const autoExpiry = shelfLifeDays > 0 ? (() => { const d = new Date(`${today}T00:00:00`); d.setDate(d.getDate() + shelfLifeDays); return d.toISOString().slice(0, 10); })() : "";
+
+  dialog.innerHTML = `
+    <header class="modal-header">
+      <div>
+        <h3 id="pis-title">${isRetail ? "Beli Barang Dagang" : "Produksi Produk"} — ${escapeHtml(product?.name || item.name)}</h3>
+        <p id="pis-desc">${isRetail ? "Pembelian akan membuat batch produk dengan HPP dari total harga beli." : "Produksi batch memotong bahan resep FEFO lalu menambah stok produk."}</p>
+      </div>
+      <button class="icon-button" data-close-pos-item-stock type="button" aria-label="Tutup modal">x</button>
+    </header>
+    <form class="form-grid input-workflow" id="pis-form">
+      <label class="full-row">Produk
+        <input type="text" value="${escapeHtml(product?.name || item.name)} · ${isRetail ? "Barang Dagang" : "Produk Produksi"}" disabled style="width:100%;" />
+      </label>
+      <label><span id="pis-qty-label">${isRetail ? "Qty Beli" : "Qty Produksi"}</span>
+        <input id="pis-qty" min="1" step="1" type="number" required value="${Number(item.qty)}" ${!isRetail && readiness.ready ? `max="${readiness.maxQty}"` : ""} />
+      </label>
+      ${isRetail ? `
+        <label id="pis-total-cost-field">Total Harga Beli <input id="pis-total-cost" min="1" step="1" type="number" required /></label>
+        <label>Manufactured Date <input id="pis-manufactured-at" type="date" required value="${today}" /></label>
+        <label id="pis-expired-at-field">Expired Date <small>Opsional</small><input id="pis-expired-at" type="date" /></label>
+        <div class="form-preview full-row" id="pis-expired-preview">Expired barang dagang diisi manual bila produk memiliki masa kedaluwarsa.</div>
+      ` : `
+        <label>Manufactured Date <input id="pis-manufactured-at" type="date" required value="${today}" /></label>
+        <div class="form-preview full-row" id="pis-expired-preview">${autoExpiry ? `Expired otomatis: ${autoExpiry} (${shelfLifeDays} hari setelah produksi)` : "Produk ini tidak memakai expired otomatis karena shelf life belum diisi."}</div>
+      `}
+      <label class="full-row">Catatan <input id="pis-note" autocomplete="off" placeholder="Contoh: pembelian supplier / produksi pagi" type="text" value="Fulfillment preorder #${order.orderNumber}" /></label>
+      <p class="form-preview full-row" id="pis-preview">${!isRetail && !readiness.ready ? readiness.message : (isRetail ? `Stok masuk ${Number(item.qty)} unit.` : `Maksimal produksi ${formatQty(readiness.maxQty)} unit. Stok saat ini ${formatQty(product?.finishedStock || 0)} unit.`)}</p>
+      <div class="modal-actions full-row">
+        <button class="ghost-button" data-close-pos-item-stock type="button">Batal</button>
+        <button class="primary-button" id="pis-submit" type="submit">${isRetail ? "Simpan Pembelian" : "Simpan Produksi"}</button>
+      </div>
+      <p class="form-feedback full-row" id="pis-feedback" role="status"></p>
+    </form>
+  `;
+
+  const form = dialog.querySelector("#pis-form");
+  const updateModal = () => {
+    const qtyInput = dialog.querySelector("#pis-qty");
+    const totalCostInput = dialog.querySelector("#pis-total-cost");
+    const feedback = dialog.querySelector("#pis-feedback");
+    const preview = dialog.querySelector("#pis-preview");
+    const submitBtn = dialog.querySelector("#pis-submit");
+
+    const qty = Math.floor(Number(qtyInput.value) || 0);
+    feedback.textContent = "";
+    feedback.classList.remove("show");
+    submitBtn.disabled = false;
+
+    if (!isRetail) {
+      const currentReadiness = posItemProductionReadiness(product);
+      if (!currentReadiness.ready) {
+        feedback.textContent = `Bahan kurang: ${currentReadiness.message}`;
+        feedback.classList.add("show");
+        submitBtn.disabled = true;
+        preview.textContent = currentReadiness.message;
+        return;
+      }
+      qtyInput.max = currentReadiness.maxQty;
+      if (qty > currentReadiness.maxQty) {
+        feedback.textContent = `Bahan kurang. Qty produksi maksimal ${formatQty(currentReadiness.maxQty)} unit.`;
+        feedback.classList.add("show");
+        submitBtn.disabled = true;
+        preview.textContent = currentReadiness.message;
+        return;
+      }
+      preview.textContent = `Maksimal produksi ${formatQty(currentReadiness.maxQty)} unit. Stok saat ini ${formatQty(product?.finishedStock || 0)} unit.`;
+    } else {
+      const totalCost = Number(totalCostInput?.value || 0);
+      if (qty > 0 && totalCost > 0) {
+        const unitCost = totalCost / qty;
+        preview.textContent = `Stok masuk ${formatQty(qty)} unit. HPP per unit ${money(unitCost)} dari total harga beli ${money(totalCost)}.`;
+      } else {
+        preview.textContent = "Isi qty stok masuk dan total harga beli.";
+      }
+    }
+  };
+
+  const qtyInput = dialog.querySelector("#pis-qty");
+  const totalCostInput = dialog.querySelector("#pis-total-cost");
+  if (qtyInput) {
+    qtyInput.addEventListener("input", updateModal);
+    qtyInput.addEventListener("change", updateModal);
+  }
+  if (totalCostInput) {
+    totalCostInput.addEventListener("input", updateModal);
+    totalCostInput.addEventListener("change", updateModal);
+  }
+  updateModal();
+
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const feedback = dialog.querySelector("#pis-feedback");
+    feedback.textContent = "";
+    feedback.classList.remove("show");
+    const submitBtn = dialog.querySelector("#pis-submit");
+    const qty = Math.floor(Number(dialog.querySelector("#pis-qty").value) || 0);
+    const manufacturedAt = dialog.querySelector("#pis-manufactured-at").value;
+    const note = dialog.querySelector("#pis-note").value.trim() || `Fulfillment preorder #${order.orderNumber}`;
+    if (qty <= 0) { feedback.textContent = "Qty wajib lebih dari 0."; feedback.classList.add("show"); return; }
+    if (!isRetail) {
+      const currentReadiness = posItemProductionReadiness(product);
+      if (!currentReadiness.ready) {
+        feedback.textContent = `Bahan kurang: ${currentReadiness.message}`;
+        feedback.classList.add("show");
+        return;
+      }
+      if (qty > currentReadiness.maxQty) {
+        feedback.textContent = `Bahan kurang. Qty produksi maksimal ${formatQty(currentReadiness.maxQty)} unit.`;
+        feedback.classList.add("show");
+        return;
+      }
+    }
+    const payload = { qty, manufacturedAt, note, totalCost: 0 };
+    if (isRetail) {
+      const totalCost = Number(dialog.querySelector("#pis-total-cost")?.value || 0);
+      if (totalCost <= 0) { feedback.textContent = "Total harga beli wajib lebih dari 0 untuk barang dagang."; feedback.classList.add("show"); return; }
+      const expiredAt = dialog.querySelector("#pis-expired-at")?.value || "";
+      payload.totalCost = totalCost;
+      payload.expiredAt = expiredAt;
+    }
+    const origText = submitBtn.textContent;
+    submitBtn.disabled = true;
+    submitBtn.textContent = "Memproses...";
+    setTimeout(() => {
+      try {
+        const res = apiPost(scopedApiUrl(`/api/product/${product.id}/produce`, state, session), scopedPayload(payload, state, session));
+        if (!res || !res.ok) throw new Error(res?.message || "Gagal menyimpan stok produk.");
+        
+        // Mark this item as ready in the database
+        const nextReadyItemKeys = [...(order.readyItemKeys || [])];
+        if (!nextReadyItemKeys.includes(itemKey)) {
+          nextReadyItemKeys.push(itemKey);
+        }
+        
+        const response = apiPut(scopedApiUrl(`/api/order/${order.id}/ready-items`, state, session), scopedPayload({ readyItemKeys: nextReadyItemKeys }, state, session));
+        if (!response || !response.ok) throw new Error(response?.message || "Gagal menyimpan status pemenuhan ke pesanan.");
+        
+        closePosItemStockModal();
+        onSuccess();
+      } catch (err) {
+        feedback.textContent = err.message;
+        feedback.classList.add("show");
+        submitBtn.disabled = false;
+        submitBtn.textContent = origText;
+      }
+    }, 50);
+  });
+
+  backdrop.hidden = false;
+  dialog.hidden = false;
+  document.body.classList.add("modal-open");
+}
+
+function closePosItemStockModal() {
+  const backdrop = document.querySelector("[data-pos-item-stock-backdrop]");
+  if (backdrop) {
+    backdrop.hidden = true;
+    backdrop.querySelector("#pos-item-stock-modal").hidden = true;
+    document.body.classList.remove("modal-open");
+  }
+}
+
+function renderPreorders() {
+  const panel = byId("preorder-fulfillment-panel");
+  const list = byId("preorder-fulfillment-list");
+  if (!panel || !list) return;
+
+  const ordersResponse = apiGet(scopedApiUrl("/api/order?per_page=100", state, session));
+  activePreorders = ordersResponse?.ok ? ordersResponse.data.items || [] : [];
+  const poOrders = activePreorders
+    .filter((order) => orderStatusCode(order.status) === ORDER_STATUS.FULFILLMENT && visibleForSession(order, state, session));
+  
+  panel.hidden = false;
+  if (poOrders.length === 0) {
+    list.innerHTML = `<tr><td colspan="6" class="empty-state" style="text-align: center; padding: 20px; color: #8c8c8c;">Belum ada pesanan preorder (PO) yang menunggu pemenuhan saat ini.</td></tr>`;
+  } else {
+    list.innerHTML = poOrders.map((order) => {
+      const poItems = order.items.filter((item) => Boolean(item.isPreorder || item.is_preorder));
+      const allPoFulfilled = poItems.length > 0 && poItems.every((item, i) => {
+        const globalIdx = order.items.indexOf(item);
+        return (order.readyItemKeys || []).includes(posOrderItemKey(item, globalIdx >= 0 ? globalIdx : i));
+      });
+
+      return `
+        <tr>
+          <td><strong>#${order.orderNumber}</strong></td>
+          <td>${new Date(order.createdAt).toLocaleString("id-ID", { dateStyle: "short", timeStyle: "short" })}</td>
+          <td><span class="status-pill status-ok">${order.serviceType}</span></td>
+          <td>${order.customerName || "-"}</td>
+          <td>
+            <div class="preorder-items-detail" style="line-height: 1.4;">
+              ${order.items.map((item, index) => {
+                const itemKey = posOrderItemKey(item, index);
+                const checked = (order.readyItemKeys || []).includes(itemKey);
+                const isPo = Boolean(item.isPreorder || item.is_preorder);
+                const product = productById(state, item.productId);
+                const readyStock = product ? realProductAvailability(state, product, []) : 0;
+                const badge = isPo
+                  ? ` <span class="status-pill status-empty" style="font-size: 8px; padding: 1px 4px; margin-left: 4px; display: inline-block;">Preorder (PO)</span> <span style="font-size: 10px; color: var(--text-secondary); margin-left: 4px;">(Ready: ${readyStock})</span>`
+                  : ` <span class="status-pill status-ok" style="font-size: 8px; padding: 1px 4px; margin-left: 4px; display: inline-block;">Ready Stok</span>`;
+                
+                const fulfillButton = isPo 
+                  ? (checked
+                      ? `<div style="margin-top: 4px;"><span class="status-pill status-ok" style="font-size: 10px;">✓ Stok Sudah Disiapkan</span></div>`
+                      : `<div style="margin-top: 4px;"><button class="ghost-button compact-button" data-fulfill-po-item="${itemKey}" data-fulfill-po-order="${order.id}" data-fulfill-po-index="${index}" type="button" style="font-size: 10px; padding: 2px 6px;">Siapkan Stok →</button></div>`
+                    )
+                  : "";
+
+                return `<div style="margin-bottom: 8px;">
+                  <span><strong>${item.qty}x</strong> ${item.name}${badge}${item.modifiers?.length ? ` <small class="text-muted">(${item.modifiers.join(", ")})</small>` : ""}</span>
+                  ${fulfillButton}
+                </div>`;
+              }).join("")}
+            </div>
+          </td>
+          <td>
+            <button class="primary-button compact-button" data-fulfill-order="${order.id}" data-order-no="${order.orderNumber}" ${!allPoFulfilled ? "disabled title='Siapkan semua item PO terlebih dahulu'" : ""} type="button">Stok Sudah Siap</button>
+          </td>
+        </tr>
+      `;
+    }).join("");
+  }
+}
+
 function renderInventory() {
   const ingredients = visibleIngredients();
   const missingTemplates = missingTemplateRows(ingredients);
@@ -360,6 +646,7 @@ function renderInventory() {
     <div class="health-row"><span>Habis</span><strong>${stockHealth.critical}</strong></div>
   `);
   renderExpiryDashboard();
+  renderPreorders();
 
   writeHtml("ingredient-table", [
     ...availableLotRows.map((row) => ({ ...row, isLotRow: true })),
@@ -966,6 +1253,69 @@ if (exists("modal-ingredient-template")) {
 }
 if (exists("modal-edit-template")) {
   byId("modal-edit-template").addEventListener("change", () => fillFromTemplate("modal-edit-template", "modal-edit-name", "modal-edit-category", "modal-edit-unit"));
+}
+
+if (exists("preorder-fulfillment-list")) {
+  byId("preorder-fulfillment-list").addEventListener("click", (e) => {
+    const fulfillItemBtn = e.target.closest("[data-fulfill-po-item]");
+    if (fulfillItemBtn) {
+      const order = activePreorders.find((o) => o.id === fulfillItemBtn.dataset.fulfillPoOrder);
+      if (order) {
+        const itemIndex = Number(fulfillItemBtn.dataset.fulfillPoIndex);
+        const item = order.items[itemIndex];
+        const product = item ? productById(state, item.productId) : null;
+        if (item) {
+          openPosItemStockModal(item, product, order, fulfillItemBtn.dataset.fulfillPoItem, itemIndex, () => {
+            state = loadState();
+            renderPreorders();
+            renderInventory();
+          });
+        }
+      }
+      return;
+    }
+
+    const btn = e.target.closest("[data-fulfill-order]");
+    if (btn) {
+      const orderId = btn.dataset.fulfillOrder;
+      const orderNo = btn.dataset.orderNo;
+      const order = activePreorders.find((item) => item.id === orderId);
+      if (!order) return;
+      
+      const originalText = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = "Memproses...";
+      
+      const poItems = order.items.filter((oi) => Boolean(oi.isPreorder || oi.is_preorder));
+      const hasFinishedGood = poItems.some((oi) => {
+        const p = productById(state, oi.productId);
+        const t = p ? (p.inventoryType || p.inventory_type || "made_to_order") : "made_to_order";
+        return t === "finished_good" || t === "made_to_order";
+      });
+      const nextStatus = hasFinishedGood ? ORDER_STATUS.WAITING : ORDER_STATUS.READY;
+
+      setTimeout(() => {
+        try {
+          const response = apiPut(scopedApiUrl(`/api/order/${orderId}/status`, state, session), scopedPayload({ status: nextStatus }, state, session));
+          if (response?.ok) {
+            showAlert(nextStatus === ORDER_STATUS.READY 
+              ? `Stok pesanan #${orderNo} dikonfirmasi siap (Barang Dagang)!`
+              : `Stok pesanan #${orderNo} dikonfirmasi siap! Dikirim ke dapur.`
+            );
+            state = loadState();
+            renderPreorders();
+            renderInventory();
+          } else {
+            throw new Error(response?.message || "Gagal memproses pemenuhan preorder.");
+          }
+        } catch (err) {
+          showAlert(err.message, "error");
+          btn.disabled = false;
+          btn.textContent = originalText;
+        }
+      }, 50);
+    }
+  });
 }
 
 const bootstrapResponse = refreshInventory();

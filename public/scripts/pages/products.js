@@ -100,16 +100,13 @@ function isRetailProduct(product) {
 
 function syncPreorderFields() {
   if (!exists("modal-product-is-preorder") || !exists("modal-product-preorder-note")) return;
-  const canPreorder = byId("modal-product-inventory-type").value !== "made_to_order";
+  const canPreorder = true;
   const card = document.querySelector(".preorder-card");
-  byId("modal-product-is-preorder").disabled = !canPreorder;
-  if (!canPreorder) byId("modal-product-is-preorder").checked = false;
+  byId("modal-product-is-preorder").disabled = false;
   if (card) {
-    card.classList.toggle("is-disabled", !canPreorder);
+    card.classList.toggle("is-disabled", false);
     const hint = card.querySelector("small");
-    if (hint) hint.textContent = canPreorder
-      ? "Produk ini akan tampil sebagai preorder dan tetap bisa dipesan saat stok kosong."
-      : "Preorder hanya tersedia untuk Produk Jadi / Batch dan Retail / Barang Dagang.";
+    if (hint) hint.textContent = "Produk ini akan tampil sebagai preorder dan tetap bisa dipesan saat stok kosong.";
   }
   const isPreorder = byId("modal-product-is-preorder").checked;
   byId("modal-product-preorder-note").closest("label").hidden = !isPreorder;
@@ -267,8 +264,8 @@ if (exists("product-modal-form")) byId("product-modal-form").addEventListener("s
     status: byId("modal-product-status").value,
     imageUrl: byId("modal-product-image-url").value.trim(),
     description: byId("modal-product-description").value.trim(),
-    isPreorder: byId("modal-product-inventory-type").value !== "made_to_order" && byId("modal-product-is-preorder").checked,
-    preorderNote: byId("modal-product-inventory-type").value !== "made_to_order" ? byId("modal-product-preorder-note").value.trim() : ""
+    isPreorder: byId("modal-product-is-preorder").checked,
+    preorderNote: byId("modal-product-preorder-note").value.trim()
   }, state, session);
   if (existing && !canEditMaster(existing)) {
     showFeedback("modal-product-feedback", "User Selected Outlet hanya bisa edit produk outlet yang dipilih.");

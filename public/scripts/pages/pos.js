@@ -2,7 +2,7 @@ import { renderLayout } from "../layout.js?v=coffee-v151";
 import { apiGet, apiPost, apiPut, applyPermissionControls, canUsePermission, loadSession, loadState, primaryOutletId, scopedApiUrl, scopedPayload, visibleForSession } from "../store.js?v=coffee-v151";
 import { applyPageBootstrap, loadPageBootstrap, pageDateValue } from "../page-engine.js?v=coffee-v151";
 import { formatQty, money } from "../format.js";
-import { costingMethod, effectiveRecipe, ingredientCostForQty, ingredientUnitCost, isPreorderStockedProduct, isStockedProduct, modifierPrice, productAvailability, productAvailabilityWithModifiers, productById, productCogs, productCogsWithModifiers, productModifierOptions } from "../inventory.js";
+import { costingMethod, effectiveRecipe, ingredientCostForQty, ingredientUnitCost, isPreorderStockedProduct, isStockedProduct, modifierPrice, productAvailability, productAvailabilityWithModifiers, productById, productCogs, productCogsWithModifiers, productModifierOptions, realProductAvailability } from "../inventory.js";
 import { byId, showAlert } from "../dom.js";
 import { ORDER_STATUS, PAYMENT_STATUS, isActiveStatus, isInactiveStatus, isPaidStatus, isUnpaidStatus, orderStatusCode, orderStatusIn, orderStatusIs, paymentStatusCode, statusLabel } from "../status-codes.js";
 
@@ -259,10 +259,15 @@ function renderPosQueue() {
   const orders = activeQueueOrders();
   byId("pos-queue-count").textContent = orders.length;
   renderApprovalCount();
-  byId("pos-queue-summary").innerHTML = Object.entries(queueStatuses).map(([status, config]) => `
-    <article class="pos-queue-summary-${status}"><span>${config.label}</span><strong>${orders.filter((order) => order.status === status).length}</strong></article>
-  `).join("");
-  byId("pos-queue-board").innerHTML = Object.entries(queueStatuses).map(([status, config]) => {
+  const activeStatuses = [
+    ORDER_STATUS.FULFILLMENT,
+    ORDER_STATUS.WAITING,
+    ORDER_STATUS.PREPARING,
+    ORDER_STATUS.READY
+  ];
+
+  byId("pos-queue-board").innerHTML = activeStatuses.map((status) => {
+    const config = queueStatuses[status];
     const statusOrders = orders.filter((order) => orderStatusIs(order.status, status));
     return `
       <section class="pos-queue-column column-${status}">
@@ -338,22 +343,274 @@ function posOrderItemRecipe(item) {
 }
 
 function posOrderPreparationItems(order) {
+  const isFulfillment = orderStatusIs(order.status, ORDER_STATUS.FULFILLMENT);
   return posOrderVisibleItems(order).map((item, index) => {
     const itemKey = posOrderItemKey(item, index);
     const checked = (order.readyItemKeys || []).includes(itemKey);
     const product = productById(state, item.productId);
     const showRecipe = item.isPackaging || !product || !isStockedProduct(product);
     const recipeRows = showRecipe ? posOrderItemRecipe(item) : [];
+    const isPoItem = Boolean(item.isPreorder || item.is_preorder);
     return `
       <article class="preparation-item ${checked ? "ready" : ""}">
         <label class="preparation-item-heading">
           ${orderStatusIs(order.status, ORDER_STATUS.PREPARING) && canActOnOrderStatus(order.status) ? `<input data-pos-ready-item="${itemKey}" data-pos-ready-order="${order.id}" type="checkbox" ${checked ? "checked" : ""} />` : ""}
-          <span><strong>${item.qty}x ${item.name}</strong>${item.modifiers?.length ? `<small>${item.modifiers.join(", ")}</small>` : ""}</span>
+          <span>
+            <strong>${item.qty}x ${item.name}</strong>
+            ${isPoItem ? ` <span class="status-pill status-empty" style="font-size: 8px; padding: 1px 4px; margin-left: 4px; display: inline-block;">Preorder (PO)</span> <span style="font-size: 10px; color: var(--text-secondary); margin-left: 4px;">(Ready: ${product ? realProductAvailability(state, product) : 0})</span>` : ` <span class="status-pill status-ok" style="font-size: 8px; padding: 1px 4px; margin-left: 4px; display: inline-block;">Ready Stok</span>`}
+            ${item.modifiers?.length ? `<small>${item.modifiers.join(", ")}</small>` : ""}
+          </span>
         </label>
-        ${showRecipe ? `<div class="preparation-ingredients">${recipeRows.map((ingredient) => `<div><span>${ingredient.name}</span><strong>${formatQty(ingredient.qty)} ${ingredient.unit}</strong></div>`).join("") || `<p>Recipe belum tersedia.</p>`}</div>` : ""}
+        ${isFulfillment && isPoItem && canActOnOrderStatus(order.status) ? `
+          <div style="margin-top: 6px; margin-left: 4px;">
+            ${checked
+              ? `<span class="status-pill status-ok" style="font-size: 11px;">✓ Stok Sudah Disiapkan</span>`
+              : `<button class="ghost-button compact-button" data-pos-fulfill-item="${itemKey}" data-pos-fulfill-order="${order.id}" data-pos-fulfill-index="${index}" type="button" style="font-size: 11px;">Siapkan Stok →</button>`
+            }
+          </div>
+        ` : ""}
+        ${showRecipe && !isFulfillment ? `<div class="preparation-ingredients">${recipeRows.map((ingredient) => `<div><span>${ingredient.name}</span><strong>${formatQty(ingredient.qty)} ${ingredient.unit}</strong></div>`).join("") || `<p>Recipe belum tersedia.</p>`}</div>` : ""}
       </article>
     `;
   }).join("");
+}
+
+function posItemProductionReadiness(product) {
+  if (!product) return { ready: false, maxQty: 0, message: "Produk tidak ditemukan.", blockers: ["Produk tidak ditemukan."] };
+  const type = product.inventoryType || product.inventory_type || "made_to_order";
+  if (type === "retail") {
+    return { ready: true, maxQty: Number.POSITIVE_INFINITY, message: "Barang dagang memakai stok masuk dari pembelian.", blockers: [] };
+  }
+  const lines = product.recipe || [];
+  if (!lines.length) return { ready: false, maxQty: 0, message: "Recipe produk belum tersedia.", blockers: ["Recipe produk belum tersedia."] };
+  const blockers = [];
+  const capacities = lines
+    .filter((line) => Number(line.qty || 0) > 0)
+    .map((line) => {
+      const ingredient = state.ingredients.find((ing) => ing.id === line.ingredientId);
+      const label = line.templateName || line.ingredientName || "Bahan recipe";
+      if (!ingredient || isInactiveStatus(ingredient.status)) { blockers.push(`${label} belum dimapping ke bahan outlet.`); return 0; }
+      const capacity = Math.floor(Number(ingredient.stock || 0) / Number(line.qty || 0));
+      if (capacity < 1) blockers.push(`${ingredient.name} tidak cukup (${formatQty(ingredient.stock || 0)} ${ingredient.unit || ""})`);
+      return capacity;
+    });
+  if (!capacities.length) blockers.push("Qty recipe belum lengkap.");
+  const maxQty = capacities.length ? Math.min(...capacities) : 0;
+  return { ready: blockers.length === 0 && maxQty > 0, maxQty, message: blockers.length ? blockers[0] : `Maksimal produksi ${formatQty(maxQty)} unit.`, blockers };
+}
+
+function openPosItemStockModal(item, product, order, itemKey, itemIndex) {
+  let backdrop = document.querySelector("[data-pos-item-stock-backdrop]");
+  if (!backdrop) {
+    backdrop = document.createElement("div");
+    backdrop.className = "modal-backdrop";
+    backdrop.setAttribute("data-pos-item-stock-backdrop", "");
+    backdrop.style.zIndex = "200";
+    backdrop.hidden = true;
+    const dialog = document.createElement("section");
+    dialog.className = "modal-dialog";
+    dialog.id = "pos-item-stock-modal";
+    dialog.style.maxWidth = "560px";
+    dialog.hidden = true;
+    backdrop.appendChild(dialog);
+    document.body.appendChild(backdrop);
+    backdrop.addEventListener("click", (e) => {
+      if (e.target.matches("[data-pos-item-stock-backdrop]") || e.target.closest("[data-close-pos-item-stock]")) {
+        closePosItemStockModal();
+      }
+    });
+  }
+  const dialog = backdrop.querySelector("#pos-item-stock-modal");
+  const type = product ? (product.inventoryType || product.inventory_type || "made_to_order") : "made_to_order";
+  const isRetail = type === "retail";
+  const isFinished = type === "finished_good";
+  const readiness = posItemProductionReadiness(product);
+  const today = new Date().toISOString().slice(0, 10);
+  const shelfLifeDays = Number(product?.shelfLifeDays || 0);
+  const autoExpiry = shelfLifeDays > 0 ? (() => { const d = new Date(`${today}T00:00:00`); d.setDate(d.getDate() + shelfLifeDays); return d.toISOString().slice(0, 10); })() : "";
+
+  dialog.innerHTML = `
+    <header class="modal-header">
+      <div>
+        <h3 id="pis-title">${isRetail ? "Beli Barang Dagang" : "Produksi Produk"} — ${escapeHtml(product?.name || item.name)}</h3>
+        <p id="pis-desc">${isRetail ? "Pembelian akan membuat batch produk dengan HPP dari total harga beli." : "Produksi batch memotong bahan recipe FEFO lalu menambah stok produk."}</p>
+      </div>
+      <button class="icon-button" data-close-pos-item-stock type="button" aria-label="Tutup modal">x</button>
+    </header>
+    <form class="form-grid input-workflow" id="pis-form">
+      <label class="full-row">Produk
+        <input type="text" value="${escapeHtml(product?.name || item.name)} · ${isRetail ? "Barang Dagang" : "Produk Produksi"}" disabled style="width:100%;" />
+      </label>
+      <label><span id="pis-qty-label">${isRetail ? "Qty Beli" : "Qty Produksi"}</span>
+        <input id="pis-qty" min="1" step="1" type="number" required value="${Number(item.qty)}" ${!isRetail && readiness.ready ? `max="${readiness.maxQty}"` : ""} />
+      </label>
+      ${isRetail ? `
+        <label id="pis-total-cost-field">Total Harga Beli <input id="pis-total-cost" min="1" step="1" type="number" required /></label>
+        <label>Manufactured Date <input id="pis-manufactured-at" type="date" required value="${today}" /></label>
+        <label id="pis-expired-at-field">Expired Date <small>Opsional</small><input id="pis-expired-at" type="date" /></label>
+        <div class="form-preview full-row" id="pis-expired-preview">Expired barang dagang diisi manual bila produk memiliki masa kedaluwarsa.</div>
+      ` : `
+        <label>Manufactured Date <input id="pis-manufactured-at" type="date" required value="${today}" /></label>
+        <div class="form-preview full-row" id="pis-expired-preview">${autoExpiry ? `Expired otomatis: ${autoExpiry} (${shelfLifeDays} hari setelah produksi)` : "Produk ini tidak memakai expired otomatis karena shelf life belum diisi."}</div>
+      `}
+      <label class="full-row">Catatan <input id="pis-note" autocomplete="off" placeholder="Contoh: pembelian supplier / produksi pagi" type="text" value="Fulfillment preorder #${order.orderNumber}" /></label>
+      <p class="form-preview full-row" id="pis-preview">${!isRetail && !readiness.ready ? readiness.message : (isRetail ? `Stok masuk ${Number(item.qty)} unit.` : `Maksimal produksi ${formatQty(readiness.maxQty)} unit. Stok saat ini ${formatQty(product?.finishedStock || 0)} unit.`)}</p>
+      <div class="modal-actions full-row">
+        <button class="ghost-button" data-close-pos-item-stock type="button">Batal</button>
+        <button class="primary-button" id="pis-submit" type="submit">${isRetail ? "Simpan Pembelian" : "Simpan Produksi"}</button>
+      </div>
+      <p class="form-feedback full-row" id="pis-feedback" role="status"></p>
+    </form>
+  `;
+
+  const form = dialog.querySelector("#pis-form");
+  const updateModal = () => {
+    const qtyInput = dialog.querySelector("#pis-qty");
+    const totalCostInput = dialog.querySelector("#pis-total-cost");
+    const feedback = dialog.querySelector("#pis-feedback");
+    const preview = dialog.querySelector("#pis-preview");
+    const submitBtn = dialog.querySelector("#pis-submit");
+
+    const qty = Math.floor(Number(qtyInput.value) || 0);
+    feedback.textContent = "";
+    feedback.classList.remove("show");
+    submitBtn.disabled = false;
+
+    if (!isRetail) {
+      const currentReadiness = posItemProductionReadiness(product);
+      if (!currentReadiness.ready) {
+        feedback.textContent = `Bahan kurang: ${currentReadiness.message}`;
+        feedback.classList.add("show");
+        submitBtn.disabled = true;
+        preview.textContent = currentReadiness.message;
+        return;
+      }
+      qtyInput.max = currentReadiness.maxQty;
+      if (qty > currentReadiness.maxQty) {
+        feedback.textContent = `Bahan kurang. Qty produksi maksimal ${formatQty(currentReadiness.maxQty)} unit.`;
+        feedback.classList.add("show");
+        submitBtn.disabled = true;
+        preview.textContent = currentReadiness.message;
+        return;
+      }
+      preview.textContent = `Maksimal produksi ${formatQty(currentReadiness.maxQty)} unit. Stok saat ini ${formatQty(product?.finishedStock || 0)} unit.`;
+    } else {
+      const totalCost = Number(totalCostInput?.value || 0);
+      if (qty > 0 && totalCost > 0) {
+        const unitCost = totalCost / qty;
+        preview.textContent = `Stok masuk ${formatQty(qty)} unit. HPP per unit ${money(unitCost)} dari total harga beli ${money(totalCost)}.`;
+      } else {
+        preview.textContent = "Isi qty stok masuk dan total harga beli.";
+      }
+    }
+  };
+
+  const qtyInput = dialog.querySelector("#pis-qty");
+  const totalCostInput = dialog.querySelector("#pis-total-cost");
+  if (qtyInput) {
+    qtyInput.addEventListener("input", updateModal);
+    qtyInput.addEventListener("change", updateModal);
+  }
+  if (totalCostInput) {
+    totalCostInput.addEventListener("input", updateModal);
+    totalCostInput.addEventListener("change", updateModal);
+  }
+  updateModal();
+
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const feedback = dialog.querySelector("#pis-feedback");
+    feedback.textContent = "";
+    feedback.classList.remove("show");
+    const submitBtn = dialog.querySelector("#pis-submit");
+    const qty = Math.floor(Number(dialog.querySelector("#pis-qty").value) || 0);
+    const manufacturedAt = dialog.querySelector("#pis-manufactured-at").value;
+    const note = dialog.querySelector("#pis-note").value.trim() || `Fulfillment preorder #${order.orderNumber}`;
+    if (qty <= 0) { feedback.textContent = "Qty wajib lebih dari 0."; feedback.classList.add("show"); return; }
+    if (!isRetail) {
+      const currentReadiness = posItemProductionReadiness(product);
+      if (!currentReadiness.ready) {
+        feedback.textContent = `Bahan kurang: ${currentReadiness.message}`;
+        feedback.classList.add("show");
+        return;
+      }
+      if (qty > currentReadiness.maxQty) {
+        feedback.textContent = `Bahan kurang. Qty produksi maksimal ${formatQty(currentReadiness.maxQty)} unit.`;
+        feedback.classList.add("show");
+        return;
+      }
+    }
+    const payload = { qty, manufacturedAt, note, totalCost: 0 };
+    if (isRetail) {
+      const totalCost = Number(dialog.querySelector("#pis-total-cost")?.value || 0);
+      if (totalCost <= 0) { feedback.textContent = "Total harga beli wajib lebih dari 0 untuk barang dagang."; feedback.classList.add("show"); return; }
+      const expiredAt = dialog.querySelector("#pis-expired-at")?.value || "";
+      payload.totalCost = totalCost;
+      payload.expiredAt = expiredAt;
+    }
+    const origText = submitBtn.textContent;
+    submitBtn.disabled = true;
+    submitBtn.textContent = "Memproses...";
+    setTimeout(() => {
+      try {
+        const res = apiPost(scopedApiUrl(`/api/product/${product.id}/produce`, state, session), scopedPayload(payload, state, session));
+        if (!res || !res.ok) throw new Error(res?.message || "Gagal menyimpan stok produk.");
+        
+        // Mark this item as ready in the database
+        const nextReadyItemKeys = [...(order.readyItemKeys || [])];
+        if (!nextReadyItemKeys.includes(itemKey)) {
+          nextReadyItemKeys.push(itemKey);
+        }
+        
+        putSales(`/api/order/${order.id}/ready-items`, { readyItemKeys: nextReadyItemKeys });
+        closePosItemStockModal();
+
+        // Find the updated order reference from state since refreshSales() updated it
+        const updatedOrder = state.transactions.find((o) => o.id === order.id) || order;
+
+        // Check if all PO items in the order have been fulfilled
+        const allPoItems = posOrderVisibleItems(updatedOrder).filter((oi) => Boolean(oi.isPreorder || oi.is_preorder));
+        const allPoKeys = allPoItems.map((oi, i) => {
+          const globalIdx = posOrderVisibleItems(updatedOrder).indexOf(oi);
+          return posOrderItemKey(oi, globalIdx >= 0 ? globalIdx : i);
+        });
+        const allFulfilled = allPoKeys.length > 0 && allPoKeys.every((k) => (updatedOrder.readyItemKeys || []).includes(k));
+        if (allFulfilled) {
+          // All PO items fulfilled — determine next status
+          const hasFinishedGood = allPoItems.some((oi) => {
+            const p = productById(state, oi.productId);
+            const t = p ? (p.inventoryType || p.inventory_type || "made_to_order") : "made_to_order";
+            return t === "finished_good" || t === "made_to_order";
+          });
+          const nextStatus = hasFinishedGood ? ORDER_STATUS.WAITING : ORDER_STATUS.READY;
+          putSales(`/api/order/${order.id}/status`, { status: nextStatus });
+          closePosOrderDetail();
+          showAlert(nextStatus === ORDER_STATUS.READY ? "Semua stok siap! Pesanan langsung Siap Diambil." : "Semua stok siap! Pesanan dikirim ke dapur.");
+        } else {
+          showAlert(`Stok ${item.name} berhasil disiapkan.`);
+        }
+        renderPosQueue();
+        renderOpenTableSessions();
+      } catch (err) {
+        feedback.textContent = err.message;
+        submitBtn.disabled = false;
+        submitBtn.textContent = origText;
+      }
+    }, 50);
+  });
+
+  backdrop.hidden = false;
+  dialog.hidden = false;
+  document.body.classList.add("modal-open");
+}
+
+function closePosItemStockModal() {
+  const backdrop = document.querySelector("[data-pos-item-stock-backdrop]");
+  if (backdrop) {
+    backdrop.hidden = true;
+    backdrop.querySelector("#pos-item-stock-modal").hidden = true;
+    document.body.classList.remove("modal-open");
+  }
 }
 
 function posOrderDetailMarkup(order) {
@@ -363,7 +620,15 @@ function posOrderDetailMarkup(order) {
   const visibleItems = posOrderVisibleItems(order);
   const allReady = visibleItems.every((item, index) => (order.readyItemKeys || []).includes(posOrderItemKey(item, index)));
   const canAct = canActOnOrderStatus(order.status);
-  const actionDisabled = orderStatusIs(order.status, ORDER_STATUS.PREPARING) && !allReady;
+  const isFulfillment = orderStatusIs(order.status, ORDER_STATUS.FULFILLMENT);
+  const poItems = visibleItems.filter((item) => Boolean(item.isPreorder || item.is_preorder));
+  const fulfilledKeys = order.readyItemKeys || [];
+  const allPoFulfilled = poItems.length > 0 && poItems.every((item, i) => {
+    const globalIdx = visibleItems.indexOf(item);
+    return fulfilledKeys.includes(posOrderItemKey(item, globalIdx >= 0 ? globalIdx : i));
+  });
+  const actionDisabled = (orderStatusIs(order.status, ORDER_STATUS.PREPARING) && !allReady)
+    || (isFulfillment && !allPoFulfilled);
   return `
     <div class="pos-queue-card-detail">
       <div class="selected-order-meta">
@@ -374,6 +639,7 @@ function posOrderDetailMarkup(order) {
         ${order.packagingNote ? `<article><span>Packaging</span><strong>${order.packagingNote}</strong></article>` : ""}
       </div>
       ${orderStatusIs(order.status, ORDER_STATUS.PREPARING) ? `<div class="preparation-note">${canAct ? "Centang setiap produk yang sudah selesai dibuat." : "Checklist produksi hanya bisa dilakukan oleh user Kitchen."}</div>` : ""}
+      ${isFulfillment && canAct ? `<div class="preparation-note">${allPoFulfilled ? "Semua stok sudah disiapkan. Tekan Stok Sudah Siap untuk melanjutkan." : "Tekan tombol <strong>Siapkan Stok →</strong> di setiap item PO di bawah untuk menyiapkan stok satu per satu."}</div>` : ""}
       ${orderStatusIs(order.status, ORDER_STATUS.PENDING_CASHIER) ? paymentProofMarkup(order) : ""}
       ${orderTimelineMarkup(order)}
       <div class="preparation-list">${posOrderPreparationItems(order)}</div>
@@ -687,10 +953,15 @@ function renderBillDetail(order, settlementMode = false, mode = "settle") {
     ? (isApproveMode ? "Cek pesanan online dan terima pembayaran sebelum masuk ke kitchen." : "Cek ulang pesanan pelanggan sebelum menutup dan menerima pembayaran.")
     : "Rincian bill berjalan untuk konfirmasi kasir dan pelanggan.";
   const itemRows = (order.items || []).map((item) => {
-    const modifiers = item.modifiers?.length ? `<small>${item.modifiers.join(", ")}</small>` : "";
+    const modifiers = item.modifiers?.length ? `<br><small>${item.modifiers.join(", ")}</small>` : "";
+    const isPo = Boolean(item.isPreorder || item.is_preorder);
+    const product = productById(state, item.productId);
+    const badge = isPo
+      ? ` <span class="status-pill status-empty" style="font-size: 8px; padding: 1px 4px; margin-left: 4px; display: inline-block;">Preorder (PO)</span><span style="font-size: 8px; color: var(--text-secondary); margin-left: 4px;">(Ready: ${product ? realProductAvailability(state, product) : 0})</span>`
+      : ` <span class="status-pill status-ok" style="font-size: 8px; padding: 1px 4px; margin-left: 4px; display: inline-block;">Ready Stok</span>`;
     return `
       <tr>
-        <td><strong>${item.name}</strong>${modifiers}</td>
+        <td><strong>${item.name}</strong>${badge}${modifiers}</td>
         <td>${item.qty}</td>
         <td>${money(item.price || 0)}</td>
         <td>${money((item.price || 0) * (item.qty || 0))}</td>
@@ -833,24 +1104,38 @@ function settleTable(orderId, paymentMethodValue) {
   }
   const order = state.transactions.find((item) => item.id === orderId);
   if (!order) return;
-  try {
-    setActivePaymentMethod(paymentMethodValue || paymentMethod || activePaymentMethods()[0]?.name || "Settlement");
-    const paymentMeta = paymentMetaForBill(order, "settle");
-    const settledOrder = putSales(`/api/order/${order.id}/settle`, paymentMeta);
-    autoPrintPaidOrder(settledOrder);
-    if (activeOpenOrderId === order.id) activeOpenOrderId = "";
-    pendingPayment = null;
-    paymentIntentContext = null;
-    closeBillDetail();
-    renderDiningTableOptions();
-    renderOpenTableSessions();
-    renderPosQueue();
-    renderCart();
-    renderActiveOpenOrderContext();
-    byId("checkout-note").textContent = `${order.tableName} ditutup dan dibayar.`;
-  } catch (error) {
-    byId("checkout-note").textContent = error.message;
+  
+  const btn = document.querySelector(`[data-confirm-close-table="${orderId}"]`);
+  const originalText = btn ? btn.textContent : "";
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = "Memproses...";
   }
+
+  setTimeout(() => {
+    try {
+      setActivePaymentMethod(paymentMethodValue || paymentMethod || activePaymentMethods()[0]?.name || "Settlement");
+      const paymentMeta = paymentMetaForBill(order, "settle");
+      const settledOrder = putSales(`/api/order/${order.id}/settle`, paymentMeta);
+      autoPrintPaidOrder(settledOrder);
+      if (activeOpenOrderId === order.id) activeOpenOrderId = "";
+      pendingPayment = null;
+      paymentIntentContext = null;
+      closeBillDetail();
+      renderDiningTableOptions();
+      renderOpenTableSessions();
+      renderPosQueue();
+      renderCart();
+      renderActiveOpenOrderContext();
+      byId("checkout-note").textContent = `${order.tableName} ditutup dan dibayar.`;
+    } catch (error) {
+      byId("checkout-note").textContent = error.message;
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = originalText;
+      }
+    }
+  }, 50);
 }
 
 function approvePendingOrder(orderId, paymentMethodValue) {
@@ -860,26 +1145,40 @@ function approvePendingOrder(orderId, paymentMethodValue) {
   }
   const order = state.transactions.find((item) => item.id === orderId);
   if (!order) return;
-  try {
-    setActivePaymentMethod(paymentMethodValue || paymentMethod || activePaymentMethods()[0]?.name || "Cash");
-    const paymentMeta = paymentMetaForBill(order, "approve");
-    const approvedOrder = putSales(`/api/order/${order.id}/approve`, paymentMeta);
-    autoPrintPaidOrder(approvedOrder);
-    pendingPayment = null;
-    paymentIntentContext = null;
-    closeBillDetail();
-    renderDiningTableOptions();
-    renderOpenTableSessions();
-    renderPosQueue();
-    renderPosApprovals();
-    renderProducts();
-    renderCart();
-    renderActiveOpenOrderContext();
-    byId("checkout-note").textContent = `${order.orderNumber} sudah dibayar dan masuk ke kitchen.`;
-    showAlert("Order online berhasil di-approve dan masuk ke kitchen.");
-  } catch (error) {
-    byId("checkout-note").textContent = error.message;
+  
+  const btn = document.querySelector(`[data-confirm-approve-order="${orderId}"]`);
+  const originalText = btn ? btn.textContent : "";
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = "Memproses...";
   }
+
+  setTimeout(() => {
+    try {
+      setActivePaymentMethod(paymentMethodValue || paymentMethod || activePaymentMethods()[0]?.name || "Cash");
+      const paymentMeta = paymentMetaForBill(order, "approve");
+      const approvedOrder = putSales(`/api/order/${order.id}/approve`, paymentMeta);
+      autoPrintPaidOrder(approvedOrder);
+      pendingPayment = null;
+      paymentIntentContext = null;
+      closeBillDetail();
+      renderDiningTableOptions();
+      renderOpenTableSessions();
+      renderPosQueue();
+      renderPosApprovals();
+      renderProducts();
+      renderCart();
+      renderActiveOpenOrderContext();
+      byId("checkout-note").textContent = `${order.orderNumber} sudah dibayar dan masuk ke kitchen.`;
+      showAlert("Order online berhasil di-approve dan masuk ke kitchen.");
+    } catch (error) {
+      byId("checkout-note").textContent = error.message;
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = originalText;
+      }
+    }
+  }, 50);
 }
 
 function orderLineIngredients(item, qty) {
@@ -1303,7 +1602,8 @@ function renderProducts() {
       const available = productAvailability(state, product);
       const canAdd = canAddProductFromCurrentDraft(product);
       const soldOut = !canAdd;
-      const stockBadge = isPreorderStockedProduct(product) ? "Preorder" : (available < 1 ? (canAdd && editingOrder() ? "Draft tersedia" : "Sold Out") : `${available} unit`);
+      const readyStock = realProductAvailability(state, product, []);
+      const stockBadge = isPreorderStockedProduct(product) ? `Preorder (Stok: ${readyStock})` : (available < 1 ? (canAdd && editingOrder() ? "Draft tersedia" : "Sold Out") : `${available} unit`);
       return `
         <article class="product-card ${soldOut ? "product-card-soldout" : ""}" aria-disabled="${soldOut ? "true" : "false"}">
           <div class="product-visual product-tone-${index % 4}">
@@ -2389,11 +2689,57 @@ function checkout() {
     return false;
   }
 
-  const orderItems = cart.map((line) => {
+  const productItems = [];
+  cart.forEach((line) => {
     const product = productById(state, line.productId);
     const modifiers = productModifierOptions(state, product).filter((modifier) => line.modifierIds.includes(modifier.id));
-    return { productId: product.id, name: product.name, qty: line.qty, price: product.price + modifierPrice(product, line.modifierIds, state), cogs: productCogsWithModifiers(state, product, line.modifierIds), lossCost: 0, modifierIds: [...line.modifierIds], modifiers: modifiers.map((modifier) => `${modifier.groupName}: ${modifier.name}`), isPreorder: isPreorderStockedProduct(product) };
-  }).concat(packagingLines);
+    const itemBase = {
+      productId: product.id,
+      name: product.name,
+      price: product.price + modifierPrice(product, line.modifierIds, state),
+      cogs: productCogsWithModifiers(state, product, line.modifierIds),
+      lossCost: 0,
+      modifierIds: [...line.modifierIds],
+      modifiers: modifiers.map((modifier) => `${modifier.groupName}: ${modifier.name}`)
+    };
+    
+    if (isPreorderStockedProduct(product)) {
+      const avail = realProductAvailability(state, product, line.modifierIds);
+      if (avail > 0 && avail < line.qty) {
+        // Ready portion
+        productItems.push({
+          ...itemBase,
+          qty: avail,
+          isPreorder: false
+        });
+        // PO portion
+        productItems.push({
+          ...itemBase,
+          qty: line.qty - avail,
+          isPreorder: true
+        });
+      } else if (avail <= 0) {
+        productItems.push({
+          ...itemBase,
+          qty: line.qty,
+          isPreorder: true
+        });
+      } else {
+        productItems.push({
+          ...itemBase,
+          qty: line.qty,
+          isPreorder: false
+        });
+      }
+    } else {
+      productItems.push({
+        ...itemBase,
+        qty: line.qty,
+        isPreorder: false
+      });
+    }
+  });
+  const orderItems = productItems.concat(packagingLines);
 
   if (editingOrderId) {
     const edited = editingOrder();
@@ -2432,45 +2778,53 @@ function checkout() {
       }
     : { revenue: totals.revenue, cogs: totals.cogs + packaging.cogs, packaging, serviceCharge, tax, taxableRevenue, total: taxableRevenue + tax + customerPaymentFee, packagingLoss: packaging.loss };
 
-  try {
-    const orderPayload = salesPayload(existingOpenOrder?.id || "", baseItems, {
-      revenue: payloadTotals.revenue,
-      cogs: payloadTotals.cogs - (payloadTotals.packaging?.cogs || 0)
-    }, {
-      revenue: payloadTotals.packaging.revenue,
-      cogs: payloadTotals.packaging.cogs || 0
-    }, payloadTotals.serviceCharge, payloadTotals.packaging.revenue, payloadTotals.tax, payloadTotals.taxableRevenue, payloadTotals.total, {
-      existingOpenOrder,
-      orderNumber,
-      payment: paymentMeta,
-      paymentFee
-    });
-    const savedOrder = existingOpenOrder?.id ? putSales(`/api/order/${existingOpenOrder.id}`, orderPayload) : postSales("/api/order", orderPayload);
-    autoPrintPaidOrder(savedOrder);
-  } catch (error) {
-    byId("checkout-note").textContent = error.message;
-    return false;
-  }
+  const checkoutBtn = byId("checkout");
+    const originalText = checkoutBtn.textContent;
+    checkoutBtn.disabled = true;
+    checkoutBtn.textContent = "Memproses...";
 
-  cart = [];
-  packagingOverride = null;
-  packagingManualLines = [];
-  pendingPayment = null;
-  byId("pos-pickup-name").value = "";
-  if (byId("cash-tendered")) byId("cash-tendered").value = "";
-  renderDiningTableOptions();
-  renderProducts();
-  renderCart();
-  renderPosQueue();
-  renderApprovalCount();
-  renderOpenTableSessions();
-  renderActiveOpenOrderContext();
-  byId("checkout-note").textContent = payLater
-    ? `${orderNumber} ${existingOpenOrder ? "ditambahkan ke" : "membuka"} ${existingOpenOrder?.tableName || (serviceType === "Dine In" ? byId("pos-table").value : "table")} dan masuk Antrian Pesanan.`
-    : `${orderNumber} tersimpan dan masuk Antrian Pesanan.`;
-  showAlert(payLater ? "Pesanan berhasil dikirim ke antrian." : "Pembayaran sukses dan pesanan berhasil dibuat.");
-  return true;
-}
+    setTimeout(() => {
+      try {
+        const orderPayload = salesPayload(existingOpenOrder?.id || "", baseItems, {
+          revenue: payloadTotals.revenue,
+          cogs: payloadTotals.cogs - (payloadTotals.packaging?.cogs || 0)
+        }, {
+          revenue: payloadTotals.packaging.revenue,
+          cogs: payloadTotals.packaging.cogs || 0
+        }, payloadTotals.serviceCharge, payloadTotals.packaging.revenue, payloadTotals.tax, payloadTotals.taxableRevenue, payloadTotals.total, {
+          existingOpenOrder,
+          orderNumber,
+          payment: paymentMeta,
+          paymentFee
+        });
+        const savedOrder = existingOpenOrder?.id ? putSales(`/api/order/${existingOpenOrder.id}`, orderPayload) : postSales("/api/order", orderPayload);
+        autoPrintPaidOrder(savedOrder);
+
+        cart = [];
+        packagingOverride = null;
+        packagingManualLines = [];
+        pendingPayment = null;
+        byId("pos-pickup-name").value = "";
+        if (byId("cash-tendered")) byId("cash-tendered").value = "";
+        renderDiningTableOptions();
+        renderProducts();
+        renderCart();
+        renderPosQueue();
+        renderApprovalCount();
+        renderOpenTableSessions();
+        renderActiveOpenOrderContext();
+        byId("checkout-note").textContent = payLater
+          ? `${orderNumber} ${existingOpenOrder ? "ditambahkan ke" : "membuka"} ${existingOpenOrder?.tableName || (serviceType === "Dine In" ? byId("pos-table").value : "table")} dan masuk Antrian Pesanan.`
+          : `${orderNumber} tersimpan dan masuk Antrian Pesanan.`;
+        showAlert(payLater ? "Pesanan berhasil dikirim ke antrian." : "Pembayaran sukses dan pesanan berhasil dibuat.");
+      } catch (error) {
+        byId("checkout-note").textContent = error.message;
+        checkoutBtn.disabled = false;
+        checkoutBtn.textContent = originalText;
+      }
+    }, 50);
+    return true;
+  }
 
 function consumeLots(ingredient, qty) {
   if (costingMethod(state) !== "fifo") return;
@@ -2502,19 +2856,39 @@ document.addEventListener("click", (event) => {
       const visibleItems = posOrderVisibleItems(order);
       const allReady = visibleItems.every((item, index) => (order.readyItemKeys || []).includes(posOrderItemKey(item, index)));
       if (orderStatusIs(order.status, ORDER_STATUS.PREPARING) && !allReady) return;
-      try {
-        putSales(`/api/order/${order.id}/status`, { status: queueAction.dataset.nextStatus });
-        closePosOrderDetail();
-        renderPosQueue();
-        renderOpenTableSessions();
-      } catch (error) {
-        byId("checkout-note").textContent = error.message;
-      }
+
+      const originalText = queueAction.textContent;
+      queueAction.disabled = true;
+      queueAction.textContent = "Memproses...";
+      
+      setTimeout(() => {
+        try {
+          putSales(`/api/order/${order.id}/status`, { status: queueAction.dataset.nextStatus });
+          closePosOrderDetail();
+          renderPosQueue();
+          renderOpenTableSessions();
+        } catch (error) {
+          byId("checkout-note").textContent = error.message;
+          queueAction.disabled = false;
+          queueAction.textContent = originalText;
+        }
+      }, 50);
     }
   }
 
   const queueDetail = event.target.closest("[data-pos-order-detail]");
   if (queueDetail) openPosOrderDetail(state.transactions.find((order) => order.id === queueDetail.dataset.posOrderDetail && visibleForSession(order, state, session)));
+
+  const fulfillItemBtn = event.target.closest("[data-pos-fulfill-item]");
+  if (fulfillItemBtn) {
+    const order = state.transactions.find((o) => o.id === fulfillItemBtn.dataset.posFulfillOrder);
+    if (order) {
+      const itemIndex = Number(fulfillItemBtn.dataset.posFulfillIndex);
+      const item = posOrderVisibleItems(order)[itemIndex];
+      const product = item ? productById(state, item.productId) : null;
+      if (item) openPosItemStockModal(item, product, order, fulfillItemBtn.dataset.posFulfillItem, itemIndex);
+    }
+  }
 
   const approvalDetail = event.target.closest("[data-pos-approval-detail]");
   if (approvalDetail) openPosOrderDetail(state.transactions.find((order) => order.id === approvalDetail.dataset.posApprovalDetail && visibleForSession(order, state, session)));
@@ -2844,4 +3218,13 @@ setInterval(() => {
   if (!byId("pos-queue-drawer").hidden) renderPosQueue();
   if (!byId("pos-approval-drawer").hidden) renderPosApprovals();
   if (!byId("pos-table-drawer").hidden) renderOpenTableSessions();
+  const billDetailModal = byId("bill-detail-modal");
+  if (billDetailModal && !billDetailModal.hidden) {
+    const orderId = byId("bill-detail-content").dataset.orderId;
+    const mode = byId("bill-detail-content").dataset.mode;
+    const order = state.transactions.find((o) => o.id === orderId);
+    if (order) {
+      renderBillDetail(order, true, mode);
+    }
+  }
 }, 30000);

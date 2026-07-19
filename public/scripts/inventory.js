@@ -99,7 +99,7 @@ export function isStockedProduct(product) {
 }
 
 export function isPreorderStockedProduct(product) {
-  return Boolean(product?.isPreorder) && isStockedProduct(product);
+  return Boolean(product?.isPreorder);
 }
 
 export function productCogs(state, product) {
@@ -187,10 +187,9 @@ export function productCogsWithModifiers(state, product, modifierIds = []) {
   }, 0);
 }
 
-export function productAvailabilityWithModifiers(state, product, modifierIds = []) {
+export function realProductAvailability(state, product, modifierIds = []) {
   const reservations = pendingStockReservations(state);
   if (isStockedProduct(product)) {
-    if (isPreorderStockedProduct(product)) return 999999;
     return Math.max(0, Math.floor(Number(product.finishedStock || 0) - (reservations.products.get(product.id) || 0)));
   }
   const recipe = effectiveRecipe(product, modifierIds, state);
@@ -203,21 +202,14 @@ export function productAvailabilityWithModifiers(state, product, modifierIds = [
   }));
 }
 
+export function productAvailabilityWithModifiers(state, product, modifierIds = []) {
+  if (isPreorderStockedProduct(product)) return 999999;
+  return realProductAvailability(state, product, modifierIds);
+}
+
 export function productAvailability(state, product) {
-  const reservations = pendingStockReservations(state);
-  if (isStockedProduct(product)) {
-    if (isPreorderStockedProduct(product)) return 999999;
-    return Math.max(0, Math.floor(Number(product.finishedStock || 0) - (reservations.products.get(product.id) || 0)));
-  }
-  if (!product.recipe.length) return 0;
-  return Math.min(
-    ...product.recipe.map((line) => {
-      const ingredient = ingredientById(state, line.ingredientId);
-      const heldQty = reservations.ingredients.get(line.ingredientId) || 0;
-      const availableStock = ingredient ? Math.max(0, Number(ingredient.stock || 0) - heldQty) : 0;
-      return ingredient && !isInactiveStatus(ingredient.status) ? Math.floor(availableStock / line.qty) : 0;
-    })
-  );
+  if (isPreorderStockedProduct(product)) return 999999;
+  return realProductAvailability(state, product, []);
 }
 
 function pendingStockReservations(state) {

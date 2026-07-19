@@ -168,7 +168,7 @@ class ProductSuiteService
         $inventoryType = in_array($payload['inventoryType'] ?? $payload['inventory_type'] ?? '', ['finished_good', 'made_to_stock', 'retail'], true)
             ? (($payload['inventoryType'] ?? $payload['inventory_type']) === 'retail' ? 'retail' : 'finished_good')
             : 'made_to_order';
-        $isPreorder = $inventoryType !== 'made_to_order' && ! empty($payload['isPreorder']);
+        $isPreorder = ! empty($payload['isPreorder']);
 
         $data = $this->withCompanyData('products', [
             'company_id' => $companyId,
@@ -776,7 +776,7 @@ class ProductSuiteService
             )),
             'inventoryType' => $row['inventory_type'] ?? 'made_to_order',
             'shelfLifeDays' => (int) ($row['shelf_life_days'] ?? 0),
-            'isPreorder' => ($row['inventory_type'] ?? 'made_to_order') !== 'made_to_order' && ! empty($row['is_preorder']) ? true : false,
+            'isPreorder' => ! empty($row['is_preorder']) ? true : false,
             'preorderNote' => $row['preorder_note'] ?? '',
             'finishedStock' => $this->productBatchStock((int) $row['id'], (int) ($row['company_id'] ?? 1), $activeOutletId),
             'finishedUnitCost' => $this->productBatchUnitCost((int) $row['id'], (int) ($row['company_id'] ?? 1), $activeOutletId),

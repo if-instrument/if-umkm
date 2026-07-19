@@ -23,6 +23,15 @@ class ReceiptRendererService
         $title = $options['title'] ?? 'Receipt Order';
         $paperStyle = 'width:380px;max-width:380px;margin:0 auto;background:#ffffff;border:1px solid #e5ddd4;font-family:Consolas,Menlo,Monaco,monospace;font-size:13px;line-height:1.45;color:#221d19;';
 
+        $hasPreorder = false;
+        foreach ($items as $item) {
+            $snapshot = json_decode((string) ($item['modifier_snapshot'] ?? '{}'), true) ?: [];
+            if (! empty($snapshot['isPreorder'])) {
+                $hasPreorder = true;
+                break;
+            }
+        }
+
         return '<div style="margin:0;padding:20px;background:#f7f1ea;color:#201a15;font-family:Arial,Helvetica,sans-serif;">'
             . '<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;background:#f7f1ea;"><tr><td align="center">'
             . '<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:380px;max-width:380px;border-collapse:collapse;margin:0 auto 14px;"><tr><td style="font-family:Arial,Helvetica,sans-serif;font-size:18px;line-height:1.3;font-weight:700;color:#201a15;">' . $this->e($title) . '</td></tr></table>'
@@ -53,6 +62,7 @@ class ReceiptRendererService
             . '<tr><td style="text-align:center;border-top:1px dashed #9c8c7e;padding:12px 16px 16px 16px;color:#4f4339;">'
             . '<strong style="display:block;color:#18130f;">TERIMA KASIH</strong>'
             . '<span>Simpan struk ini sebagai bukti transaksi.</span>'
+            . ($hasPreorder ? '<em style="display:block;margin-top:10px;border-top:1px dashed #9c8c7e;padding-top:10px;font-style:normal;color:#666666;font-size:11px;text-align:center;">* Catatan: Pesanan ini mengandung produk Preorder (PO). Tim kami akan menyiapkan produk PO Anda secara khusus.</em>' : '')
             . '</td></tr>'
             . '</table>'
             . '</td></tr></table>'

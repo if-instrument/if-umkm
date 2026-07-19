@@ -365,32 +365,67 @@ class PublicOrderService
             $modifierIds = array_values(array_filter($line['modifierIds'] ?? [], fn ($id) => is_string($id) && $id !== ''));
             $this->validateModifierSelection($product, $modifiers, $modifierIds);
             $selectedModifiers = $this->selectedModifierOptions($product, $modifiers, $modifierIds);
-            if (! $this->isPreorderStockedProduct($product) && $this->availableQty($product, $selectedModifiers, $ingredients) < $qty) {
+            
+            $isPreorderProduct = $this->isPreorderStockedProduct($product);
+            $avail = $this->availableQty($product, $selectedModifiers, $ingredients);
+            
+            if (! $isPreorderProduct && $avail < $qty) {
                 throw new \InvalidArgumentException($product['name'] . ' tidak memiliki stok cukup.');
             }
-            $recipeUsage = $this->recipeUsage($product, $qty, $selectedModifiers);
+            
             $unitCogs = $this->unitCogs($product, $ingredients, $selectedModifiers);
             $unitPrice = (float) ($product['price'] ?? 0) + array_sum(array_map(fn ($option) => (float) ($option['priceDelta'] ?? 0), $selectedModifiers));
-            $items[] = [
+            
+            $itemBase = [
                 'productId' => $product['id'],
                 'name' => $product['name'],
-                'qty' => $qty,
                 'price' => $unitPrice,
                 'cogs' => $unitCogs,
-                'recipeUsage' => $recipeUsage,
                 'modifierIds' => $modifierIds,
                 'modifiers' => array_map(fn ($option) => ($option['groupName'] ?? 'Modifier') . ': ' . ($option['name'] ?? 'Opsi'), $selectedModifiers),
-                'isPreorder' => $this->isPreorderStockedProduct($product),
             ];
+            
+            if ($isPreorderProduct) {
+                if ($avail > 0 && $avail < $qty) {
+                    // Ready portion
+                    $items[] = array_merge($itemBase, [
+                        'qty' => $avail,
+                        'isPreorder' => false,
+                        'recipeUsage' => $this->recipeUsage($product, $avail, $selectedModifiers),
+                    ]);
+                    // PO portion
+                    $items[] = array_merge($itemBase, [
+                        'qty' => $qty - $avail,
+                        'isPreorder' => true,
+                        'recipeUsage' => $this->recipeUsage($product, $qty - $avail, $selectedModifiers),
+                    ]);
+                } elseif ($avail <= 0) {
+                    $items[] = array_merge($itemBase, [
+                        'qty' => $qty,
+                        'isPreorder' => true,
+                        'recipeUsage' => $this->recipeUsage($product, $qty, $selectedModifiers),
+                    ]);
+                } else {
+                    $items[] = array_merge($itemBase, [
+                        'qty' => $qty,
+                        'isPreorder' => false,
+                        'recipeUsage' => $this->recipeUsage($product, $qty, $selectedModifiers),
+                    ]);
+                }
+            } else {
+                $items[] = array_merge($itemBase, [
+                    'qty' => $qty,
+                    'isPreorder' => false,
+                    'recipeUsage' => $this->recipeUsage($product, $qty, $selectedModifiers),
+                ]);
+            }
         }
         return $items;
     }
-
     private function isPreorderStockedProduct(array $product): bool
     {
-        return ! empty($product['isPreorder']) && in_array($product['inventoryType'] ?? 'made_to_order', ['finished_good', 'retail'], true);
+        return ! empty($product['isPreorder']);
     }
-
     private function recipeUsage(array $product, int $qty, array $selectedModifiers = []): array
     {
         if (in_array($product['inventoryType'] ?? 'made_to_order', ['finished_good', 'retail'], true)) {

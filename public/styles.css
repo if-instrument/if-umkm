@@ -2698,7 +2698,7 @@ body[data-page="orders"] .order-board {
 
 .pos-queue-board {
   display: grid;
-  grid-template-columns: repeat(3, minmax(240px, 1fr));
+  grid-template-columns: repeat(4, minmax(240px, 1fr));
   gap: 10px;
   min-height: 0;
   overflow-x: auto;

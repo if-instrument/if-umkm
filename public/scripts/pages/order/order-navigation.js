@@ -86,6 +86,9 @@ export function currentBookPage() {
 }
 
 export function blocksForwardTurnFromPage(page) {
+  if (page === checkoutStartPage()) {
+    return !state.cartConfirmed;
+  }
   return isCheckoutPageNumber(page);
 }
 

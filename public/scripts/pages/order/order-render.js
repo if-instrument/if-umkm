@@ -147,6 +147,14 @@ export function renderBill() {
   const outlet = activeOutlet();
   const logoUrl = state.company?.logoUrl || state.settings?.companyLogoUrl || "/assets/if-instrument-logo.jpg";
   const customerName = optionalById("order-customer-name")?.value?.trim() || "";
+  
+  const hasPreorder = Array.isArray(order.items) && order.items.length
+    ? order.items.some((item) => Boolean(item.isPreorder))
+    : state.cart.some((line) => {
+        const product = state.products.find((p) => p.id === line.productId);
+        return Boolean(product?.isPreorder);
+      });
+
   byId("order-final-bill").innerHTML = `
     <div class="public-receipt-paper">
       <div class="public-receipt-head">
@@ -166,6 +174,11 @@ export function renderBill() {
       <div class="public-receipt-foot">
         <strong>${escapeHtml(result ? "TERIMA KASIH" : "PREVIEW ORDER")}</strong>
         <span>${escapeHtml(result?.message || "Struk final akan dibuat setelah order dikirim.")}</span>
+        ${hasPreorder ? `
+          <em style="display: block; margin-top: 10px; border-top: 1px dashed #ccc; padding-top: 10px; font-style: normal; color: #666; font-size: 11px; text-align: center;">
+            * Catatan: Pesanan ini mengandung produk Preorder (PO). Tim kami akan menyiapkan produk PO Anda secara khusus.
+          </em>
+        ` : ""}
       </div>
     </div>
     ${receiptTimeline(order.timeline || [], order)}
@@ -180,6 +193,7 @@ export function billRows(total, order = {}) {
         modifiers: item.modifiers || [],
         qty: Number(item.qty || 0),
         unitPrice: Number(item.price || 0),
+        isPreorder: Boolean(item.isPreorder),
       }))
     : state.cart.map((line) => {
       const product = state.products.find((p) => p.id === line.productId);
@@ -188,14 +202,18 @@ export function billRows(total, order = {}) {
         modifiers: modifierNames(product, line.modifierIds || []) ? [modifierNames(product, line.modifierIds || [])] : [],
         qty: Number(line.qty || 0),
         unitPrice: lineUnitPrice(product, line),
+        isPreorder: Boolean(product?.isPreorder || line.isPreorder),
       };
     });
   const items = sourceItems.map((item) => {
     const modifiers = (item.modifiers || []).join(", ");
+    const poBadge = item.isPreorder
+      ? ` <span class="status-pill status-empty" style="font-size: 8px; padding: 1px 4px; display: inline-block; vertical-align: middle; margin-left: 4px; background: #fff2e8; border-color: #ffbb96; color: #fa541c;">Preorder (PO)</span>`
+      : "";
     return `
       <li>
         <div>
-          <strong>${escapeHtml(item.name || "Produk")}</strong>
+          <strong>${escapeHtml(item.name || "Produk")}${poBadge}</strong>
           ${modifiers ? `<small>${escapeHtml(modifiers)}</small>` : ""}
           <span>${item.qty} x ${money(item.unitPrice)}</span>
         </div>
@@ -511,21 +529,51 @@ export async function refreshMenuStock() {
   }
 }
 
+let receiptIntervalId = null;
+
+export async function refreshReceiptStatus() {
+  if (state.spread !== "receipt" || !state.lastOrderNumber) return;
+  try {
+    const query = new URLSearchParams({ q: state.lastOrderNumber });
+    if (companySlug()) query.set("company", companySlug());
+    if (state.outletId) query.set("outlet_id", state.outletId);
+    const result = await requestJson(`/api/page/order/status?${query.toString()}`);
+    if (result && result.order) {
+      state.orderResult = result;
+      render();
+    }
+  } catch (error) {
+    console.error("Failed to auto-refresh receipt status:", error);
+  }
+}
+
 export function manageStockRefreshInterval() {
   console.log("manageStockRefreshInterval: active spread is", state.spread, "outletId is", state.outletId);
   if (state.spread === "menu" && state.outletId) {
-    if (stockIntervalId) {
-      console.log("manageStockRefreshInterval: interval already running.");
-      return;
+    if (!stockIntervalId) {
+      console.log("manageStockRefreshInterval: starting stock refresh interval!");
+      refreshMenuStock();
+      stockIntervalId = setInterval(refreshMenuStock, 60000);
     }
-    console.log("manageStockRefreshInterval: starting stock refresh interval!");
-    refreshMenuStock();
-    stockIntervalId = setInterval(refreshMenuStock, 60000);
   } else {
     if (stockIntervalId) {
       console.log("manageStockRefreshInterval: clearing stock refresh interval.");
       clearInterval(stockIntervalId);
       stockIntervalId = null;
+    }
+  }
+
+  if (state.spread === "receipt" && state.lastOrderNumber) {
+    if (!receiptIntervalId) {
+      console.log("manageStockRefreshInterval: starting receipt status refresh interval!");
+      refreshReceiptStatus();
+      receiptIntervalId = setInterval(refreshReceiptStatus, 10000);
+    }
+  } else {
+    if (receiptIntervalId) {
+      console.log("manageStockRefreshInterval: clearing receipt status refresh interval.");
+      clearInterval(receiptIntervalId);
+      receiptIntervalId = null;
     }
   }
 }
