@@ -53,9 +53,12 @@
         </div>
 
         <div class="workspace-panel cart-panel">
-          <div class="panel-heading">
+          <div class="panel-heading" style="display: flex; justify-content: space-between; align-items: center;">
             <div><h3>Detail Pesanan</h3><p>#POS-NEW</p></div>
-            <span class="cart-count-badge" id="cart-count">0 item</span>
+            <div style="display: flex; gap: 8px; align-items: center;">
+              <span class="cart-count-badge" id="cart-count">0 item</span>
+              <button class="ghost-button compact-button" id="hide-cart-sidebar" type="button" style="padding: 4px 8px; font-size: 11px; font-weight: bold; border-color: #c2b6aa;">Sembunyikan</button>
+            </div>
           </div>
           <div class="active-open-table-context" id="active-open-table-context" hidden></div>
           <div class="cart-list" id="cart-list"></div>
@@ -79,6 +82,21 @@
               <label>Nominal Bayar
                 <input id="cash-tendered" min="0" step="500" type="number" placeholder="Masukkan uang diterima" />
               </label>
+              <div class="virtual-numpad" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 10px 0; max-width: 240px; margin-left: auto; margin-right: auto;">
+                <button type="button" class="ghost-button compact-button" data-numpad-val="1" data-numpad-target="#cash-tendered" style="font-size: 14px; padding: 6px; font-weight: bold;">1</button>
+                <button type="button" class="ghost-button compact-button" data-numpad-val="2" data-numpad-target="#cash-tendered" style="font-size: 14px; padding: 6px; font-weight: bold;">2</button>
+                <button type="button" class="ghost-button compact-button" data-numpad-val="3" data-numpad-target="#cash-tendered" style="font-size: 14px; padding: 6px; font-weight: bold;">3</button>
+                <button type="button" class="ghost-button compact-button" data-numpad-val="4" data-numpad-target="#cash-tendered" style="font-size: 14px; padding: 6px; font-weight: bold;">4</button>
+                <button type="button" class="ghost-button compact-button" data-numpad-val="5" data-numpad-target="#cash-tendered" style="font-size: 14px; padding: 6px; font-weight: bold;">5</button>
+                <button type="button" class="ghost-button compact-button" data-numpad-val="6" data-numpad-target="#cash-tendered" style="font-size: 14px; padding: 6px; font-weight: bold;">6</button>
+                <button type="button" class="ghost-button compact-button" data-numpad-val="7" data-numpad-target="#cash-tendered" style="font-size: 14px; padding: 6px; font-weight: bold;">7</button>
+                <button type="button" class="ghost-button compact-button" data-numpad-val="8" data-numpad-target="#cash-tendered" style="font-size: 14px; padding: 6px; font-weight: bold;">8</button>
+                <button type="button" class="ghost-button compact-button" data-numpad-val="9" data-numpad-target="#cash-tendered" style="font-size: 14px; padding: 6px; font-weight: bold;">9</button>
+                <button type="button" class="ghost-button compact-button" data-numpad-val="0" data-numpad-target="#cash-tendered" style="font-size: 14px; padding: 6px; font-weight: bold;">0</button>
+                <button type="button" class="ghost-button compact-button" data-numpad-val="000" data-numpad-target="#cash-tendered" style="font-size: 11px; padding: 6px; font-weight: bold;">000</button>
+                <button type="button" class="ghost-button compact-button" data-numpad-val="backspace" data-numpad-target="#cash-tendered" style="font-size: 14px; padding: 6px; font-weight: bold; color: var(--danger-color);">⌫</button>
+                <button type="button" class="ghost-button compact-button" data-numpad-val="pas" data-numpad-target="#cash-tendered" style="font-size: 12px; padding: 6px; font-weight: bold; grid-column: span 3; color: var(--primary-color);">Uang Pas</button>
+              </div>
               <div><span>Kembalian</span><strong id="cash-change">Rp0</strong></div>
             </div>
             <div class="third-party-payment" id="third-party-payment" hidden>
@@ -230,6 +248,10 @@
           <div id="bill-detail-content"></div>
         </section>
       </div>
+      <button id="show-cart-sidebar" type="button" class="primary-button" style="position: fixed; bottom: 20px; right: 20px; z-index: 999; display: none; gap: 8px; align-items: center; border-radius: 50px; padding: 12px 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); font-weight: bold;">
+        <span>🛒</span>
+        <span id="floating-cart-badge">0 item</span>
+      </button>
     </template>
 
     <script type="module" src="../scripts/pages/pos.js?v=coffee-v174"></script>

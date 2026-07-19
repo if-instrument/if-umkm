@@ -1331,3 +1331,11 @@ if (onboardingParams.get("onboarding") === "1" && onboardingParams.get("create")
   standardCostTouched = false;
   openModal("ingredient-modal");
 }
+
+setInterval(() => {
+  const res = refreshInventory();
+  if (res?.ok) {
+    state = loadState();
+    renderInventory();
+  }
+}, 30000);

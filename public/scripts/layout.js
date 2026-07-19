@@ -224,8 +224,31 @@ export function renderLayout() {
     </a>
   ` : "";
 
+  if (!document.getElementById("layout-sidebar-styles")) {
+    const style = document.createElement("style");
+    style.id = "layout-sidebar-styles";
+    style.textContent = `
+      @media (min-width: 981px) {
+        .app-shell.sidebar-collapsed {
+          display: block !important;
+        }
+        .app-shell.sidebar-collapsed .sidebar {
+          display: none !important;
+        }
+      }
+      @media (max-width: 980px) {
+        #sidebar-toggle {
+          display: none !important;
+        }
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  const isCollapsed = localStorage.getItem("sidebar-collapsed") === "true";
+
   document.body.innerHTML = `
-    <div class="app-shell">
+    <div class="app-shell ${isCollapsed ? "sidebar-collapsed" : ""}">
       <aside class="sidebar">
         <div class="brand">
           ${brandMark}
@@ -251,10 +274,11 @@ export function renderLayout() {
       </aside>
 
       <main class="main">
-        <header class="topbar">
-          <div>
+        <header class="topbar" style="display: flex; align-items: center; gap: 14px;">
+          <button id="sidebar-toggle" type="button" class="ghost-button" style="padding: 8px 12px; font-size: 16px; border-radius: 8px; border-color: #c2b6aa; line-height: 1; height: 38px; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0;" title="Toggle Sidebar">☰</button>
+          <div style="flex-grow: 1;">
             <p class="eyebrow">${eyebrow}</p>
-            <h2>${title}</h2>
+            <h2 style="margin: 0;">${title}</h2>
           </div>
           <div class="top-actions">
             ${onboardingTopbarMarkup}
@@ -266,6 +290,14 @@ export function renderLayout() {
     </div>
   `;
   applyPermissionControls(document, state, session);
+
+  document.querySelector("#sidebar-toggle")?.addEventListener("click", () => {
+    const shell = document.querySelector(".app-shell");
+    if (shell) {
+      const nowCollapsed = shell.classList.toggle("sidebar-collapsed");
+      localStorage.setItem("sidebar-collapsed", String(nowCollapsed));
+    }
+  });
 
   document.querySelector("#logout-button").addEventListener("click", () => {
     clearSession();

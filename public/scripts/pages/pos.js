@@ -994,6 +994,21 @@ function renderBillDetail(order, settlementMode = false, mode = "settle") {
       <label>Metode Bayar <select id="bill-settlement-method">${methods.map((method) => `<option value="${method.name}" ${method.name === paymentMethod ? "selected" : ""}>${method.name}</option>`).join("")}</select></label>
       <div class="bill-cash-fields" ${isCash ? "" : "hidden"}>
         <label>Nominal Bayar <input id="bill-cash-tendered" data-total="${Number(order.total || 0)}" min="0" step="500" type="number" placeholder="Masukkan uang diterima" /></label>
+        <div class="virtual-numpad" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 10px 0; max-width: 240px; margin-left: auto; margin-right: auto;">
+          <button type="button" class="ghost-button compact-button" data-numpad-val="1" data-numpad-target="#bill-cash-tendered" style="font-size: 14px; padding: 6px; font-weight: bold;">1</button>
+          <button type="button" class="ghost-button compact-button" data-numpad-val="2" data-numpad-target="#bill-cash-tendered" style="font-size: 14px; padding: 6px; font-weight: bold;">2</button>
+          <button type="button" class="ghost-button compact-button" data-numpad-val="3" data-numpad-target="#bill-cash-tendered" style="font-size: 14px; padding: 6px; font-weight: bold;">3</button>
+          <button type="button" class="ghost-button compact-button" data-numpad-val="4" data-numpad-target="#bill-cash-tendered" style="font-size: 14px; padding: 6px; font-weight: bold;">4</button>
+          <button type="button" class="ghost-button compact-button" data-numpad-val="5" data-numpad-target="#bill-cash-tendered" style="font-size: 14px; padding: 6px; font-weight: bold;">5</button>
+          <button type="button" class="ghost-button compact-button" data-numpad-val="6" data-numpad-target="#bill-cash-tendered" style="font-size: 14px; padding: 6px; font-weight: bold;">6</button>
+          <button type="button" class="ghost-button compact-button" data-numpad-val="7" data-numpad-target="#bill-cash-tendered" style="font-size: 14px; padding: 6px; font-weight: bold;">7</button>
+          <button type="button" class="ghost-button compact-button" data-numpad-val="8" data-numpad-target="#bill-cash-tendered" style="font-size: 14px; padding: 6px; font-weight: bold;">8</button>
+          <button type="button" class="ghost-button compact-button" data-numpad-val="9" data-numpad-target="#bill-cash-tendered" style="font-size: 14px; padding: 6px; font-weight: bold;">9</button>
+          <button type="button" class="ghost-button compact-button" data-numpad-val="0" data-numpad-target="#bill-cash-tendered" style="font-size: 14px; padding: 6px; font-weight: bold;">0</button>
+          <button type="button" class="ghost-button compact-button" data-numpad-val="000" data-numpad-target="#bill-cash-tendered" style="font-size: 11px; padding: 6px; font-weight: bold;">000</button>
+          <button type="button" class="ghost-button compact-button" data-numpad-val="backspace" data-numpad-target="#bill-cash-tendered" style="font-size: 14px; padding: 6px; font-weight: bold; color: var(--danger-color);">⌫</button>
+          <button type="button" class="ghost-button compact-button" data-numpad-val="pas" data-numpad-target="#bill-cash-tendered" style="font-size: 12px; padding: 6px; font-weight: bold; grid-column: span 3; color: var(--primary-color);">Uang Pas</button>
+        </div>
         <div><span>Kembalian</span><strong id="bill-cash-change">${money(0)}</strong></div>
       </div>
       <div class="bill-gateway-panel" ${isGateway ? "" : "hidden"}>
@@ -1723,6 +1738,11 @@ function renderCart() {
           </div>
         `).join("")
     : `<p class="empty-state">Keranjang masih kosong.</p>`;
+
+  const floatingBadge = byId("floating-cart-badge");
+  if (floatingBadge) {
+    floatingBadge.textContent = `${totals.qty} item`;
+  }
 }
 
 function renderPaymentPanel(currentTotal = null) {
@@ -2484,6 +2504,14 @@ function addConfiguredProduct(productId, modifierIds = []) {
   if (current) current.qty += 1;
   else cart.push({ id: key, productId, modifierIds: [...modifierIds], qty: 1 });
   byId("checkout-note").textContent = "";
+
+  const layout = document.querySelector(".pos-layout");
+  if (layout && layout.classList.contains("cart-hidden")) {
+    layout.classList.remove("cart-hidden");
+    const floatingFab = byId("show-cart-sidebar");
+    if (floatingFab) floatingFab.style.display = "none";
+  }
+
   renderProducts();
   renderCart();
 }
@@ -2842,6 +2870,57 @@ function consumeLots(ingredient, qty) {
 }
 
 document.addEventListener("click", (event) => {
+  const numpadBtn = event.target.closest("[data-numpad-val]");
+  if (numpadBtn) {
+    const val = numpadBtn.dataset.numpadVal;
+    const targetSelector = numpadBtn.dataset.numpadTarget;
+    const input = document.querySelector(targetSelector);
+    if (input) {
+      let currentVal = input.value || "";
+      if (val === "backspace") {
+        currentVal = currentVal.slice(0, -1);
+      } else if (val === "pas") {
+        const total = Number(input.dataset.total || Number(String(byId("cart-grand-total")?.textContent || "0").replace(/[^\d]/g, "")) || 0);
+        currentVal = String(total);
+      } else {
+        currentVal = currentVal + val;
+      }
+      input.value = currentVal;
+      if (targetSelector === "#cash-tendered") {
+        updateCashChange();
+      } else {
+        updateBillCashChange();
+      }
+    }
+    return;
+  }
+
+  if (event.target.closest("#hide-cart-sidebar")) {
+    const layout = document.querySelector(".pos-layout");
+    if (layout) {
+      layout.classList.add("cart-hidden");
+      const floatingFab = byId("show-cart-sidebar");
+      if (floatingFab) {
+        floatingFab.style.display = "flex";
+        const cartCountText = byId("cart-count")?.textContent || "0 item";
+        byId("floating-cart-badge").textContent = cartCountText;
+      }
+    }
+    return;
+  }
+
+  if (event.target.closest("#show-cart-sidebar")) {
+    const layout = document.querySelector(".pos-layout");
+    if (layout) {
+      layout.classList.remove("cart-hidden");
+      const floatingFab = byId("show-cart-sidebar");
+      if (floatingFab) {
+        floatingFab.style.display = "none";
+      }
+    }
+    return;
+  }
+
   if (event.target.closest("#open-pos-queue")) openPosQueue();
   if (event.target.closest("[data-close-pos-queue]") || event.target.matches("[data-pos-queue-backdrop]")) closePosQueue();
   if (event.target.closest("#open-pos-approvals")) openPosApprovals();
@@ -3228,3 +3307,137 @@ setInterval(() => {
     }
   }
 }, 30000);
+
+let activeKeyboardInput = null;
+
+function createVirtualKeyboard() {
+  if (!document.getElementById("virtual-keyboard-styles")) {
+    const style = document.createElement("style");
+    style.id = "virtual-keyboard-styles";
+    style.textContent = `
+      [data-virtual-keyboard] button {
+        touch-action: manipulation;
+      }
+      @media (max-width: 500px) {
+        [data-virtual-keyboard] {
+          width: calc(100% - 16px) !important;
+          padding: 6px !important;
+        }
+        [data-virtual-keyboard] button {
+          font-size: 11px !important;
+          padding: 6px 2px !important;
+          min-width: 20px !important;
+        }
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  let container = document.querySelector("[data-virtual-keyboard]");
+  if (container) return container;
+
+  container = document.createElement("div");
+  container.setAttribute("data-virtual-keyboard", "");
+  container.style.position = "fixed";
+  container.style.bottom = "12px";
+  container.style.left = "50%";
+  container.style.transform = "translateX(-50%)";
+  container.style.background = "rgba(255, 255, 255, 0.98)";
+  container.style.border = "1px solid #dcd6cd";
+  container.style.borderRadius = "12px";
+  container.style.boxShadow = "0 10px 30px rgba(0, 0, 0, 0.15)";
+  container.style.padding = "10px";
+  container.style.zIndex = "9999";
+  container.style.width = "480px";
+  container.style.maxWidth = "calc(100% - 24px)";
+  container.style.backdropFilter = "blur(10px)";
+  container.style.transition = "opacity 0.2s, transform 0.2s";
+
+  const layout = [
+    ["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P"],
+    ["A", "S", "D", "F", "G", "H", "J", "K", "L"],
+    ["Z", "X", "C", "V", "B", "N", "M", "space"],
+    ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"],
+    ["backspace", "clear", "close"]
+  ];
+
+  const keyLabels = {
+    space: "Spasi",
+    backspace: "⌫",
+    clear: "Clear",
+    close: "Tutup"
+  };
+
+  let html = `<div style="display: grid; gap: 6px;">`;
+  layout.forEach((row) => {
+    html += `<div style="display: flex; gap: 4px; justify-content: center;">`;
+    row.forEach((key) => {
+      const label = keyLabels[key] || key;
+      const flexGrow = key === "space" ? "3" : "1";
+      const color = ["backspace", "clear", "close"].includes(key) ? "color: var(--danger-color);" : "";
+      html += `<button type="button" class="ghost-button" data-keyboard-key="${key}" style="flex: ${flexGrow}; font-size: 13px; padding: 8px 4px; font-weight: bold; min-width: 28px; text-align: center; border: 1px solid #dcd6cd; border-radius: 6px; background: white; ${color}">${label}</button>`;
+    });
+    html += `</div>`;
+  });
+  html += `</div>`;
+
+  container.innerHTML = html;
+  document.body.appendChild(container);
+
+  container.addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-keyboard-key]");
+    if (!btn || !activeKeyboardInput) return;
+
+    const key = btn.dataset.keyboardKey;
+    let val = activeKeyboardInput.value || "";
+
+    if (key === "close") {
+      hideVirtualKeyboard();
+      return;
+    } else if (key === "backspace") {
+      val = val.slice(0, -1);
+    } else if (key === "clear") {
+      val = "";
+    } else if (key === "space") {
+      val += " ";
+    } else {
+      val += key.toLowerCase();
+    }
+
+    activeKeyboardInput.value = val;
+    activeKeyboardInput.dispatchEvent(new Event("input", { bubbles: true }));
+    activeKeyboardInput.dispatchEvent(new Event("change", { bubbles: true }));
+    activeKeyboardInput.focus();
+  });
+
+  return container;
+}
+
+function showVirtualKeyboard(input) {
+  activeKeyboardInput = input;
+  const keyboard = createVirtualKeyboard();
+  keyboard.hidden = false;
+}
+
+function hideVirtualKeyboard() {
+  const keyboard = document.querySelector("[data-virtual-keyboard]");
+  if (keyboard) {
+    keyboard.hidden = true;
+  }
+  activeKeyboardInput = null;
+}
+
+document.addEventListener("focusin", (e) => {
+  if (e.target?.id === "pos-product-search" || e.target?.id === "pos-pickup-name") {
+    showVirtualKeyboard(e.target);
+  }
+});
+
+document.addEventListener("mousedown", (e) => {
+  const keyboard = document.querySelector("[data-virtual-keyboard]");
+  if (!keyboard || keyboard.hidden) return;
+  if (e.target.closest("[data-virtual-keyboard]") || e.target.id === "pos-product-search" || e.target.id === "pos-pickup-name") {
+    return;
+  }
+  hideVirtualKeyboard();
+});
