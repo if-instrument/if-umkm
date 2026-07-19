@@ -19,6 +19,27 @@ const statusConfig = {
   [ORDER_STATUS.COMPLETED]: { label: "Telah Diambil", owner: "Kasir", next: "", nextLabel: "" }
 };
 
+function escapeHtml(value) {
+  return String(value ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+function paymentProofMarkup(order) {
+  if (!order?.paymentProofUrl) return "";
+  const isImage = /\.(png|jpe?g|webp)$/i.test(order.paymentProofUrl);
+  return `
+    <div class="payment-proof-panel">
+      <div>
+        <span>Bukti Bayar Customer</span>
+        <strong>${escapeHtml(order.paymentProofNote || order.paymentMethod || "Bukti bayar")}</strong>
+      </div>
+      ${isImage
+        ? `<a href="${escapeHtml(order.paymentProofUrl)}" target="_blank" rel="noopener"><img src="${escapeHtml(order.paymentProofUrl)}" alt="Bukti bayar customer" style="max-width:100%;border-radius:8px;margin-top:8px;" /></a>`
+        : `<a class="ghost-button compact-button" href="${escapeHtml(order.paymentProofUrl)}" target="_blank" rel="noopener">Buka Bukti Bayar</a>`
+      }
+    </div>
+  `;
+}
+
 function applySalesData(data) {
   if (!data) return;
   if (data.settings) state.settings = data.settings;
@@ -251,6 +272,7 @@ function openDetail(order) {
       ${order.packagingNote ? `<article><span>Packaging</span><strong>${order.packagingNote}</strong></article>` : ""}
     </div>
     ${orderStatusIs(order.status, ORDER_STATUS.PREPARING) ? `<div class="preparation-note">${canAct ? "Centang setiap produk yang sudah selesai dibuat." : "Checklist produksi hanya bisa dilakukan oleh user Kitchen."}</div>` : ""}
+    ${paymentProofMarkup(order)}
     <div class="preparation-list">${preparationItems(order)}</div>
   `;
   byId("order-detail-actions").innerHTML = `

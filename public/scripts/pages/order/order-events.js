@@ -7,7 +7,8 @@ import {
   activePaymentMethods,
   paymentById,
   needsServiceChoice,
-  setBusy
+  setBusy,
+  persistOrderSession
 } from "./order-utils.js";
 import {
   currentBookPage,
@@ -280,8 +281,10 @@ export function registerGlobalClickDispatcher() {
             showFeedback(validation.reason, true);
             return;
           }
+          state.lastOrderNumber = "";
           state.cartConfirmed = true;
           state.spread = "checkout";
+          persistOrderSession();
           const { render } = await import("./order-render.js");
           render();
         } catch (err) {

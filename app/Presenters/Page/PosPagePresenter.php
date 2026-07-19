@@ -191,6 +191,8 @@ class PosPagePresenter
             'changeDue' => (float) ($row['changeDue'] ?? 0),
             'paymentProvider' => $row['paymentProvider'] ?? '',
             'paymentReference' => $row['paymentReference'] ?? '',
+            'paymentProofUrl' => $row['paymentProofUrl'] ?? '',
+            'paymentProofNote' => $row['paymentProofNote'] ?? '',
         ];
     }
 

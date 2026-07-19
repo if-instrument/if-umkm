@@ -640,7 +640,6 @@ function posOrderDetailMarkup(order) {
       </div>
       ${orderStatusIs(order.status, ORDER_STATUS.PREPARING) ? `<div class="preparation-note">${canAct ? "Centang setiap produk yang sudah selesai dibuat." : "Checklist produksi hanya bisa dilakukan oleh user Kitchen."}</div>` : ""}
       ${isFulfillment && canAct ? `<div class="preparation-note">${allPoFulfilled ? "Semua stok sudah disiapkan. Tekan Stok Sudah Siap untuk melanjutkan." : "Tekan tombol <strong>Siapkan Stok →</strong> di setiap item PO di bawah untuk menyiapkan stok satu per satu."}</div>` : ""}
-      ${orderStatusIs(order.status, ORDER_STATUS.PENDING_CASHIER) ? paymentProofMarkup(order) : ""}
       ${orderTimelineMarkup(order)}
       <div class="preparation-list">${posOrderPreparationItems(order)}</div>
       <div class="modal-actions order-detail-actions">
@@ -941,7 +940,21 @@ function renderActiveOpenOrderContext() {
 function renderBillDetail(order, settlementMode = false, mode = "settle") {
   const isApproveMode = mode === "approve";
   const methods = activePaymentMethods();
-  if (settlementMode && !methods.some((method) => method.name === paymentMethod)) setActivePaymentMethod(order.paymentMethod && order.paymentMethod !== "Belum dibayar" ? order.paymentMethod : methods[0]?.name);
+  const orderPaymentMethod = order.paymentMethod && order.paymentMethod !== "Belum dibayar" ? order.paymentMethod : "";
+  if (settlementMode) {
+    const currentMethodValid = methods.some((m) => m.name === paymentMethod);
+    if (!currentMethodValid) {
+      // Current method not in list → fallback: use order's method or first available
+      setActivePaymentMethod(
+        isApproveMode && orderPaymentMethod && methods.some((m) => m.name === orderPaymentMethod)
+          ? orderPaymentMethod
+          : orderPaymentMethod || methods[0]?.name
+      );
+    } else if (isApproveMode && orderPaymentMethod && methods.some((m) => m.name === orderPaymentMethod) && paymentMethod !== orderPaymentMethod && !paymentIntentContext) {
+      // First open in approve mode (no paymentIntentContext yet) → pre-select customer's method
+      setActivePaymentMethod(orderPaymentMethod);
+    }
+  }
   const selectedMethod = selectedPaymentMethod();
   const methodType = selectedMethod?.type || "";
   const isCash = methodType === "cash" || /^cash$/i.test(paymentMethod || "");
@@ -1011,7 +1024,7 @@ function renderBillDetail(order, settlementMode = false, mode = "settle") {
         </div>
         <div><span>Kembalian</span><strong id="bill-cash-change">${money(0)}</strong></div>
       </div>
-      <div class="bill-gateway-panel" ${isGateway ? "" : "hidden"}>
+      <div class="bill-gateway-panel" ${isGateway && !(isApproveMode && order.paymentProofUrl) ? "" : "hidden"}>
         <span>${methodType === "qris" ? (selectedMethod?.qrisMode === "offline" ? "QRIS Static" : "QRIS Dinamis") : "Card / EDC"} - ${selectedPaymentGatewayLabel()}</span>
         <strong>${pendingPayment && paymentIntentContext?.orderId === order.id ? `${pendingPayment.status.toUpperCase()} · ${pendingPayment.reference}` : "Belum dibuat"}</strong>
         <small>${pendingPayment && paymentIntentContext?.orderId === order.id ? (pendingPayment.qrPayload || pendingPayment.cardActionMessage || pendingPayment.edcInstruction || "Konfirmasi setelah payment sukses.") : "Payment request dibuat saat konfirmasi bayar."}</small>
@@ -1019,6 +1032,7 @@ function renderBillDetail(order, settlementMode = false, mode = "settle") {
     </div>
     <div class="modal-actions">
       <button class="ghost-button" data-close-bill-detail type="button">Tutup</button>
+      ${isApproveMode && canActOnOrderStatus(order.status) ? `<button class="ghost-button danger-button" data-pos-order-reject="${order.id}" type="button">Reject</button>` : ""}
       ${settlementMode ? `<button class="primary-button" ${isApproveMode ? `data-confirm-approve-order="${order.id}"` : `data-confirm-close-table="${order.id}"`} type="button">${isApproveMode ? "Approve & Bayar" : "Konfirmasi Bayar"}</button>` : ""}
     </div>
   `;
@@ -2984,6 +2998,7 @@ document.addEventListener("click", (event) => {
     if (order && orderStatusIs(order.status, ORDER_STATUS.PENDING_CASHIER) && canActOnOrderStatus(order.status)) {
       try {
         putSales(`/api/order/${order.id}/status`, { status: ORDER_STATUS.CANCELLED });
+        closeBillDetail();
         closePosOrderDetail();
         renderPosQueue();
         renderPosApprovals();
