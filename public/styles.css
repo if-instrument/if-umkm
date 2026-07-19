@@ -4012,6 +4012,16 @@ body[data-page="orders"] .order-board {
   z-index: 111;
 }
 
+[data-qris-payment-backdrop],
+[data-card-payment-backdrop] {
+  z-index: 120;
+}
+
+#qris-payment-modal,
+#card-payment-modal {
+  z-index: 121;
+}
+
 .bill-detail-summary {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
