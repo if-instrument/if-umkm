@@ -760,13 +760,19 @@ function paymentFeeFor(baseAmount) {
   };
 }
 
+function isGatewayManual() {
+  const provider = state.settings?.paymentGateway?.provider || "manual";
+  return provider === "manual";
+}
+
 function selectedPaymentGatewayLabel() {
   const method = selectedPaymentMethod();
+  const gatewayManual = isGatewayManual();
   if (method?.type === "qris") {
-    return method.qrisMode === "offline" ? "QRIS Static / Manual" : `${paymentGatewayLabel(state.settings?.paymentGateway?.provider)} Online`;
+    return (method.qrisMode === "offline" || gatewayManual) ? "QRIS Static / Manual" : `${paymentGatewayLabel(state.settings?.paymentGateway?.provider)} Online`;
   }
   if (method?.type === "card") {
-    if (method.cardMode === "online") return `${paymentGatewayLabel(state.settings?.paymentGateway?.provider)} Online`;
+    if (method.cardMode === "online" && !gatewayManual) return `${paymentGatewayLabel(state.settings?.paymentGateway?.provider)} Online`;
     return method.channelCode ? `EDC ${method.channelCode}` : "Manual EDC";
   }
   const labels = { xendit: "Xendit", midtrans: "Midtrans", manual: "Manual" };
@@ -791,7 +797,7 @@ function isQrisPayment() {
 
 function isOfflineQrisPayment() {
   const method = selectedPaymentMethod();
-  return method?.type === "qris" && method.qrisMode === "offline";
+  return method?.type === "qris" && (method.qrisMode === "offline" || isGatewayManual());
 }
 
 function isCardPayment() {
@@ -1025,7 +1031,7 @@ function renderBillDetail(order, settlementMode = false, mode = "settle") {
         <div><span>Kembalian</span><strong id="bill-cash-change">${money(0)}</strong></div>
       </div>
       <div class="bill-gateway-panel" ${isGateway && !(isApproveMode && order.paymentProofUrl) ? "" : "hidden"}>
-        <span>${methodType === "qris" ? (selectedMethod?.qrisMode === "offline" ? "QRIS Static" : "QRIS Dinamis") : "Card / EDC"} - ${selectedPaymentGatewayLabel()}</span>
+        <span>${methodType === "qris" ? ((selectedMethod?.qrisMode === "offline" || isGatewayManual()) ? "QRIS Static" : "QRIS Dinamis") : "Card / EDC"} - ${selectedPaymentGatewayLabel()}</span>
         <strong>${pendingPayment && paymentIntentContext?.orderId === order.id ? `${pendingPayment.status.toUpperCase()} · ${pendingPayment.reference}` : "Belum dibuat"}</strong>
         <small>${pendingPayment && paymentIntentContext?.orderId === order.id ? (pendingPayment.qrPayload || pendingPayment.cardActionMessage || pendingPayment.edcInstruction || "Konfirmasi setelah payment sukses.") : "Payment request dibuat saat konfirmasi bayar."}</small>
       </div>
@@ -1868,7 +1874,7 @@ function updateCashChange(currentTotal = null) {
 
 function qrisModalData(payment = pendingPayment) {
   if (!payment) return null;
-  const staticQris = payment.qrisMode === "offline" || payment.provider === "manual_qris";
+  const staticQris = payment.qrisMode === "offline" || payment.provider === "manual_qris" || isGatewayManual();
   const providerQrImage = payment.provider === "midtrans" && /^https?:\/\//i.test(payment.qrPayload || "");
   const valid = providerQrImage || (typeof payment.qrPayloadValid === "boolean" ? payment.qrPayloadValid : looksLikeQrisPayload(payment.qrPayload));
   const mode = payment.paymentGatewayMode || state.settings?.paymentGateway?.mode || "sandbox";

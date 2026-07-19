@@ -566,6 +566,23 @@ function syncPaymentMethodFields() {
   const type = byId("payment-method-type").value;
   const isCard = type === "card";
   const isQris = type === "qris";
+  
+  // Get active gateway provider configuration
+  const gateway = state.settings.paymentGateway || {};
+  const isManualGateway = !gateway.provider || gateway.provider === "manual";
+  
+  // Find online option elements in QRIS and Card modes
+  const qrisOnlineOpt = byId("payment-qris-mode")?.querySelector('option[value="online"]');
+  const cardOnlineOpt = byId("payment-card-mode")?.querySelector('option[value="online"]');
+  
+  if (qrisOnlineOpt) qrisOnlineOpt.disabled = isManualGateway;
+  if (cardOnlineOpt) cardOnlineOpt.disabled = isManualGateway;
+  
+  if (isManualGateway) {
+    if (byId("payment-qris-mode")) byId("payment-qris-mode").value = "offline";
+    if (byId("payment-card-mode")) byId("payment-card-mode").value = "offline";
+  }
+
   const isOfflineQris = isQris && byId("payment-qris-mode").value === "offline";
   const isOfflineCard = isCard && byId("payment-card-mode").value === "offline";
   byId("payment-qris-mode-field").hidden = !isQris;
