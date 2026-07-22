@@ -30,7 +30,8 @@ import {
   restoreBookInputs,
   snapshotBookInputs,
   destroyFlipbook,
-  initFlipbook
+  initFlipbook,
+  flashPageTurnArrows
 } from "./order-navigation.js";
 import { statusLabel, paymentStatusCode, orderStatusCode } from "../../status-codes.js";
 import { ORDER_STATUS, PAYMENT_STATUS } from "../../status-codes.js";
@@ -480,6 +481,7 @@ export function renderSpread(syncBook = true) {
   }
   bindBookSwipe();
   manageStockRefreshInterval();
+  flashPageTurnArrows();
 }
 
 export function lockAllOrderInputs() {

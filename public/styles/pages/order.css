@@ -796,6 +796,31 @@ body.app-busy .public-order-shell {
   transform: translateY(-50%) scale(1);
 }
 
+.public-book-hit-left.show-hint::before {
+  opacity: 1;
+  left: 18px;
+  transform: translateY(-50%) scale(1);
+  animation: public-arrow-hint-pulse 1.2s ease-in-out infinite alternate;
+}
+
+.public-book-hit-right.show-hint::before {
+  opacity: 1;
+  right: 18px;
+  transform: translateY(-50%) scale(1);
+  animation: public-arrow-hint-pulse 1.2s ease-in-out infinite alternate;
+}
+
+@keyframes public-arrow-hint-pulse {
+  0% {
+    transform: translateY(-50%) scale(0.92);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.25);
+  }
+  100% {
+    transform: translateY(-50%) scale(1.1);
+    box-shadow: 0 6px 20px rgba(110, 58, 22, 0.5);
+  }
+}
+
 #order-book-frame[data-active-spread="cover"] #order-flipbook {
   pointer-events: none;
 }

@@ -281,6 +281,7 @@ export function initFlipbook() {
         state.spread = spreadForPage(page);
         showFeedback("");
         renderSpread(false);
+        flashPageTurnArrows();
       }
     }
   });
@@ -487,5 +488,41 @@ export function syncReceiptBookPages() {
   const backCoverNumber = pageNumberForElement(backCover);
   if (backCoverNumber % 2 === 0) {
     backCover.insertAdjacentHTML("afterend", `<article class="public-book-page public-blank-page public-receipt-spacer-page" data-book-section="receipt" aria-hidden="true"></article>`);
+  }
+}
+
+let arrowHintTimer = null;
+
+export function flashPageTurnArrows(durationMs = 2800) {
+  const prevBtn = document.getElementById("order-book-hit-prev");
+  const nextBtn = document.getElementById("order-book-hit-next");
+
+  if (arrowHintTimer) {
+    clearTimeout(arrowHintTimer);
+    arrowHintTimer = null;
+  }
+
+  if (prevBtn) prevBtn.classList.remove("show-hint");
+  if (nextBtn) nextBtn.classList.remove("show-hint");
+
+  void prevBtn?.offsetWidth;
+  void nextBtn?.offsetWidth;
+
+  const currentPage = currentBookPage();
+  const coverPage = pageForSpread("cover");
+  const receiptPage = receiptStartPage();
+
+  const showPrev = currentPage > coverPage;
+  const showNext = currentPage < receiptPage;
+
+  if (showPrev && prevBtn) prevBtn.classList.add("show-hint");
+  if (showNext && nextBtn) nextBtn.classList.add("show-hint");
+
+  if (showPrev || showNext) {
+    arrowHintTimer = setTimeout(() => {
+      if (prevBtn) prevBtn.classList.remove("show-hint");
+      if (nextBtn) nextBtn.classList.remove("show-hint");
+      arrowHintTimer = null;
+    }, durationMs);
   }
 }
