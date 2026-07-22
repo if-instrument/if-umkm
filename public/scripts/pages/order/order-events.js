@@ -74,17 +74,19 @@ export function bindDynamicFieldListeners() {
       renderSpread(false);
     });
   });
-  optionalById("order-payment-proof-file")?.addEventListener("change", async (event) => {
-    try {
-      state.paymentProof = await readProofFile(event.target.files?.[0] || null);
-      renderPaymentProofInput();
-      renderSpread(false);
-    } catch (error) {
-      state.paymentProof = null;
-      event.target.value = "";
-      renderPaymentProofInput();
-      showFeedback(error.message, true);
-    }
+  ["order-payment-proof-file", "order-modal-payment-proof-file"].forEach((id) => {
+    optionalById(id)?.addEventListener("change", async (event) => {
+      try {
+        state.paymentProof = await readProofFile(event.target.files?.[0] || null);
+        renderPaymentProofInput();
+        renderSpread(false);
+      } catch (error) {
+        state.paymentProof = null;
+        event.target.value = "";
+        renderPaymentProofInput();
+        showFeedback(error.message, true);
+      }
+    });
   });
   optionalById("order-customer-form")?.addEventListener("submit", (event) => event.preventDefault());
   const lookupForm = optionalById("order-status-lookup-form");
@@ -293,27 +295,41 @@ export function registerGlobalClickDispatcher() {
       (async () => {
         setBusy(true, "Memeriksa ketersediaan stok...");
         try {
-          const { refreshMenuStock } = await import("./order-render.js");
-          await Promise.all([
-            refreshMenuStock(),
-            new Promise((resolve) => setTimeout(resolve, 500))
-          ]);
+          const { refreshMenuStock, renderSpread } = await import("./order-render.js");
+          await refreshMenuStock();
           const { validateCartStock } = await import("./pages/page-3-book-menu.js");
           const validation = validateCartStock();
           if (!validation.valid) {
             showFeedback(validation.reason, true);
             return;
           }
+          console.log("[ORDER-DIAGNOSTIC] #order-confirm-cart clicked. Valid cart:", state.cart);
           state.lastOrderNumber = "";
           state.cartConfirmed = true;
           state.spread = "checkout";
           persistOrderSession();
-          const { render } = await import("./order-render.js");
-          const { customerPageNumber, turnToPage } = await import("./order-navigation.js");
-          render();
-          turnToPage(customerPageNumber(), true);
+          console.log("[ORDER-DIAGNOSTIC] Session persisted. State spread:", state.spread, "cartConfirmed:", state.cartConfirmed);
+
+          const { turnNextPage, turnToPage, pageForSpread, flipbook } = await import("./order-navigation.js");
+          renderSpread(false);
+          const book = flipbook();
+          if (book?.length && bookState.flipbookReady) {
+            bookState.forcedBookTurn = true;
+            bookState.syncingFlipbook = true;
+            try {
+              book.turn("next");
+            } finally {
+              setTimeout(() => {
+                bookState.forcedBookTurn = false;
+                bookState.syncingFlipbook = false;
+              }, 800);
+            }
+          } else {
+            turnToPage(pageForSpread("checkout"), true);
+          }
         } catch (err) {
-          console.error(err);
+          console.error("[ORDER-DIAGNOSTIC Error] Error confirming cart:", err);
+          showFeedback("Terjadi kesalahan saat mengonfirmasi pesanan.", true);
         } finally {
           setBusy(false);
         }
@@ -328,14 +344,14 @@ export function registerGlobalClickDispatcher() {
       renderServiceTypes();
       renderTables();
       renderCart();
-      renderSpread();
+      renderSpread(false);
     }
 
     const tableButton = event.target.closest("[data-table-name]");
     if (tableButton) {
       state.tableName = tableButton.dataset.tableName || "";
       renderTables();
-      renderSpread();
+      renderSpread(false);
     }
 
     const categoryButton = event.target.closest("[data-category-id]");
@@ -352,7 +368,40 @@ export function registerGlobalClickDispatcher() {
       if (optionalById("order-payment-proof-file")) byId("order-payment-proof-file").value = "";
       renderPayments();
       renderCart();
-      renderSpread();
+      renderSpread(false);
+    }
+
+    if (event.target.closest("#order-share-qr-btn")) {
+      const qrImg = optionalById("order-inline-qr-image");
+      const qrUrl = qrImg?.src || "";
+      if (!qrUrl) return;
+      if (navigator.share) {
+        navigator.share({
+          title: "QRIS Pembayaran",
+          text: "Scan QRIS untuk menyelesaikan pembayaran pesanan Anda:",
+          url: qrUrl
+        }).catch(() => {});
+      } else {
+        navigator.clipboard.writeText(qrUrl).then(() => {
+          showFeedback("Link QR Code berhasil disalin ke clipboard!");
+        }).catch(() => {
+          showFeedback("Gagal menyalin link QR Code.", true);
+        });
+      }
+    }
+
+    const clickedImg = event.target.closest("#order-inline-qr-image, #order-proof-preview-image, #order-modal-proof-preview-image, #order-payment-modal-qr-image");
+    if (clickedImg && clickedImg.src) {
+      const caption = clickedImg.id.includes("qr") ? "QR Code Pembayaran QRIS" : "Bukti Bayar";
+      import("./pages/page-5-customer-detail.js").then(({ openImageLightbox }) => {
+        openImageLightbox(clickedImg.src, caption);
+      });
+    }
+
+    if (event.target.closest("[data-close-image-lightbox]") || event.target.matches("#order-image-lightbox")) {
+      import("./pages/page-5-customer-detail.js").then(({ closeImageLightbox }) => {
+        closeImageLightbox();
+      });
     }
 
     const memberButton = event.target.closest("[data-member-fill]");
@@ -398,7 +447,7 @@ export function registerGlobalClickDispatcher() {
     }
 
     if (event.target.closest("#order-reset-cover")) resetOrder();
-    if (event.target.closest("#order-submit")) submitOrder();
+    if (event.target.closest("#order-submit") || event.target.closest("#order-modal-submit")) submitOrder();
   });
 
   document.addEventListener("keydown", (event) => {

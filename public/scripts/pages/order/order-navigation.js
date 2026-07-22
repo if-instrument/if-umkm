@@ -33,7 +33,7 @@ export function menuStartPage() {
 }
 
 export function spreadForPage(page) {
-  if (page >= receiptStartPage()) return "receipt";
+  if (state.orderStatus === "ORDER_CREATED" || state.orderResult || page > receiptStartPage()) return "receipt";
   if (page >= checkoutStartPage()) return "checkout";
   if (page >= menuStartPage()) return "menu";
   return "cover";
@@ -86,9 +86,6 @@ export function currentBookPage() {
 }
 
 export function blocksForwardTurnFromPage(page) {
-  if (state.orderStatus === "ORDER_CREATED") {
-    return true;
-  }
   return false;
 }
 
@@ -150,9 +147,10 @@ export function guardNavigation(targetPage) {
   const cartPage = checkoutStartPage();
 
   if (targetPage >= receiptPage) {
-    if (!state.orderResult) {
-      return { allowed: false, redirect: customerPage, reason: "Selesaikan detail data customer dan pembayaran terlebih dahulu." };
+    if (!state.cartConfirmed || !state.cart.length) {
+      return { allowed: false, redirect: menuStartPage(), reason: "Pilih minimal satu menu terlebih dahulu." };
     }
+    return { allowed: true };
   }
 
   if (targetPage === cartPage) {
@@ -185,18 +183,20 @@ export function turnToPage(page, force = false) {
   }
 
   if (bookState.flipbookReady && book?.length) {
-    bookState.syncingFlipbook = true;
     bookState.forcedBookTurn = Boolean(force);
+    bookState.syncingFlipbook = true;
     let safePage = 1;
     try {
       const totalPages = Number(book.turn("pages")) || 1;
       safePage = Number.isFinite(requestedPage) && requestedPage > 0 ? Math.min(requestedPage, totalPages) : 1;
+      state.spread = spreadForPage(safePage);
       book.turn("page", safePage);
     } finally {
-      bookState.forcedBookTurn = false;
-      bookState.syncingFlipbook = false;
+      setTimeout(() => {
+        bookState.forcedBookTurn = false;
+        bookState.syncingFlipbook = false;
+      }, 800);
     }
-    state.spread = spreadForPage(safePage);
     renderSpread(false);
     return;
   }
@@ -210,10 +210,14 @@ export function rebuildFlipbook(targetPage = null) {
   const book = flipbook();
   if (bookState.flipbookReady && book?.length) {
     bookState.forcedBookTurn = true;
+    bookState.syncingFlipbook = true;
     try {
       book.turn("page", Math.min(nextPage, book.turn("pages")));
     } finally {
-      bookState.forcedBookTurn = false;
+      setTimeout(() => {
+        bookState.forcedBookTurn = false;
+        bookState.syncingFlipbook = false;
+      }, 450);
     }
   }
 }
@@ -223,6 +227,8 @@ export function initFlipbook() {
   if (!book?.length || !window.jQuery?.fn?.turn || bookState.flipbookReady) return;
   const size = flipbookSize();
   const startPage = pageForSpread(state.spread);
+  console.log("[ORDER-DIAGNOSTIC] initFlipbook() startPage:", startPage, "state.spread:", state.spread);
+  bookState.syncingFlipbook = true;
   book.turn({
     width: size.width,
     height: size.height,
@@ -235,56 +241,62 @@ export function initFlipbook() {
     display: window.matchMedia("(max-width: 760px)").matches ? "single" : "double",
     when: {
       turning(event, page) {
+        console.log("[ORDER-DIAGNOSTIC event:turning] requested page:", page, "current book page:", book.turn("page"), "syncingFlipbook:", bookState.syncingFlipbook, "forcedBookTurn:", bookState.forcedBookTurn);
+        if (bookState.syncingFlipbook) return;
         syncOrderStatus();
         const currentPage = book.turn("page");
         if (page > currentPage && blocksForwardTurnFromPage(currentPage) && !bookState.forcedBookTurn) {
+          console.log("[ORDER-DIAGNOSTIC event:turning BLOCKED] blocksForwardTurnFromPage is true");
           event.preventDefault();
           showFeedback("Gunakan tombol di halaman ini untuk melanjutkan.", true);
           return;
         }
         if (state.orderStatus === "ORDER_CREATED" && page < receiptStartPage() && !bookState.forcedBookTurn) {
+          console.log("[ORDER-DIAGNOSTIC event:turning BLOCKED] order created backward turn");
           event.preventDefault();
           showFeedback("Gunakan tombol di halaman ini untuk kembali ke cover depan.", true);
           return;
         }
         if (page < pageForSpread("cover")) event.preventDefault();
         if (hasMultipleOutlets() && !hasSelectedOutlet() && page > pageForSpread("cover")) {
+          console.log("[ORDER-DIAGNOSTIC event:turning BLOCKED] outlet not selected");
           event.preventDefault();
           showFeedback("Pilih outlet terlebih dahulu.", true);
           return;
         }
         const guard = guardNavigation(page);
         if (!guard.allowed && !bookState.forcedBookTurn) {
+          console.log("[ORDER-DIAGNOSTIC event:turning BLOCKED] guardNavigation disallowed:", guard.reason);
           event.preventDefault();
           showFeedback(guard.reason, true);
           return;
         }
-        if (shouldSkipServicePage() && menuStartPage() !== 4 && page === 4) {
-          event.preventDefault();
-          setTimeout(() => {
-            const currentPage = book.turn("page");
-            book.turn("page", currentPage < page ? menuStartPage() : pageForSpread("cover"));
-          }, 0);
-        }
       },
       turned(event, page) {
-        if (bookState.syncingFlipbook) return;
-        if (shouldSkipServicePage() && menuStartPage() !== 4 && page === 4) {
-          bookState.syncingFlipbook = true;
-          book.turn("page", menuStartPage());
-          bookState.syncingFlipbook = false;
+        console.log("[ORDER-DIAGNOSTIC event:turned] arrived page:", page, "state.spread before:", state.spread, "syncingFlipbook:", bookState.syncingFlipbook, "forcedBookTurn:", bookState.forcedBookTurn);
+        if (bookState.syncingFlipbook || bookState.forcedBookTurn) return;
+        if ((state.spread === "checkout" || state.cartConfirmed) && page < checkoutStartPage()) {
+          console.log("[ORDER-DIAGNOSTIC event:turned IGNORED] checkout spread page < checkoutStartPage");
           return;
         }
-        if (page < customerPageNumber()) {
+        if ((state.spread === "receipt" || state.orderStatus === "ORDER_CREATED") && page < receiptStartPage()) {
+          console.log("[ORDER-DIAGNOSTIC event:turned IGNORED] receipt spread page < receiptStartPage");
+          return;
+        }
+        if (page < checkoutStartPage()) {
           state.cartConfirmed = false;
         }
         state.spread = spreadForPage(page);
+        console.log("[ORDER-DIAGNOSTIC event:turned] new state.spread:", state.spread);
         showFeedback("");
         renderSpread(false);
         flashPageTurnArrows();
       }
     }
   });
+  setTimeout(() => {
+    bookState.syncingFlipbook = false;
+  }, 500);
   bookState.flipbookReady = true;
 }
 
@@ -361,8 +373,8 @@ export function turnPrevPage() {
   const book = flipbook();
   if (bookState.flipbookReady && book?.length) {
     const currentPage = book.turn("page");
-    if (state.orderStatus === "ORDER_CREATED" && currentPage <= receiptStartPage()) {
-      showFeedback("Gunakan tombol di halaman ini untuk kembali ke cover depan.", true);
+    if (state.orderStatus === "ORDER_CREATED" && currentPage <= receiptStartPage() + 1) {
+      showFeedback("Pesanan telah selesai dibuat. Lanjut ke halaman akhir untuk kembali ke cover depan.", true);
       return;
     }
     const coverPage = pageForSpread("cover");
@@ -475,7 +487,7 @@ export function syncOptionalBookPages() {
   const customerPage = optionalById("order-customer-page");
 
   if (customerPage) {
-      customerPage.hidden = shouldHideCustomerPageOnMobile();
+    customerPage.hidden = false;
   }
 }
 
@@ -510,10 +522,19 @@ export function flashPageTurnArrows(durationMs = 2800) {
 
   const currentPage = currentBookPage();
   const coverPage = pageForSpread("cover");
-  const receiptPage = receiptStartPage();
+  const book = flipbook();
+  const totalPages = book?.length ? (Number(book.turn("pages")) || 1) : 10;
 
-  const showPrev = currentPage > coverPage;
-  const showNext = currentPage < receiptPage;
+  let showPrev = false;
+  let showNext = false;
+
+  if (state.orderStatus === "ORDER_CREATED") {
+    showPrev = false;
+    showNext = currentPage < totalPages;
+  } else {
+    showPrev = currentPage > coverPage;
+    showNext = currentPage < totalPages;
+  }
 
   if (showPrev && prevBtn) prevBtn.classList.add("show-hint");
   if (showNext && nextBtn) nextBtn.classList.add("show-hint");

@@ -31,6 +31,7 @@ import {
   snapshotBookInputs,
   destroyFlipbook,
   initFlipbook,
+  syncOptionalBookPages,
   flashPageTurnArrows
 } from "./order-navigation.js";
 import { statusLabel, paymentStatusCode, orderStatusCode } from "../../status-codes.js";
@@ -45,6 +46,7 @@ import { renderCart } from "./pages/page-4-cart.js";
 import { renderPayments, renderCustomerGate } from "./pages/page-5-customer-detail.js";
 
 export function render() {
+  console.log("[ORDER-DIAGNOSTIC] render() executing. Current state.spread:", state.spread, "cartConfirmed:", state.cartConfirmed);
   syncOrderStatus();
   const { pristineBookTemplate } = bookState;
   if (pristineBookTemplate) {
@@ -76,6 +78,7 @@ export function renderBookStaticContent() {
   renderCategories();
   renderCart();
   renderPayments();
+  syncOptionalBookPages();
   renderCustomerGate();
   renderBill();
 }
@@ -257,9 +260,11 @@ export function receiptTimeline(timeline = [], order = {}) {
 }
 
 export function statusStepMarkup(row, index, totalRows) {
+  const isCancelled = row.state === "cancelled" || orderStatusCode(row.status) === ORDER_STATUS.CANCELLED;
+  const iconSymbol = isCancelled ? "✕" : (row.state === "completed" ? "✓" : "");
   return `
-    <article class="${row.state || "pending"}">
-      <i aria-hidden="true">${row.state === "completed" ? "✓" : ""}</i>
+    <article class="${isCancelled ? "cancelled" : (row.state || "pending")}">
+      <i aria-hidden="true">${iconSymbol}</i>
       <strong>${escapeHtml(row.title)}</strong>
       <span>${escapeHtml(row.createdAt ? receiptShortDateTime(row.createdAt) : "-")}</span>
       <em>${escapeHtml(row.createdAt ? (row.actorName || actorNameForOrderStatus(row.status)) : "-")}</em>
@@ -269,6 +274,7 @@ export function statusStepMarkup(row, index, totalRows) {
 }
 
 export function statusStepBadge(stateValue) {
+  if (stateValue === "cancelled") return "Dibatalkan";
   if (stateValue === "completed") return "Completed";
   if (stateValue === "current") return "In progress";
   return "Pending";
@@ -289,6 +295,60 @@ export function orderStatusSteps(order = {}, timeline = []) {
   const currentStatus = orderStatusCode(order.status || rawRows.at(-1)?.status || ORDER_STATUS.PENDING_CASHIER);
   const currentPayment = paymentStatusCode(order.paymentStatus || rawRows.at(-1)?.paymentStatus || PAYMENT_STATUS.UNPAID);
   const createdAt = order.createdAt || rawRows[0]?.createdAt || new Date().toISOString();
+
+  if (currentStatus === ORDER_STATUS.CANCELLED) {
+    const cancelledEntry = rawRows.find((row) => orderStatusCode(row.status) === ORDER_STATUS.CANCELLED);
+    const cancelledAt = cancelledEntry?.createdAt || order.cancelledAt || order.statusUpdatedAt || createdAt;
+    const cancellationNote = cancelledEntry?.note || order.cancellationReason || "Pesanan dibatalkan.";
+    const cancellationActor = cancelledEntry?.actorName || order.cancelledBy || "Kasir";
+    const confirmedAt = order.paidAt || firstPaidTimelineAt(rawRows) || firstTimelineAt(rawRows, ORDER_STATUS.WAITING);
+
+    const baseSteps = [
+      {
+        title: "Dibuat",
+        status: ORDER_STATUS.PENDING_CASHIER,
+        actorName: order.customerName || "Customer",
+        note: "Order dibuat dari buku menu online.",
+        createdAt,
+        state: "completed",
+        badge: "Completed"
+      },
+      {
+        title: "Menunggu Konfirmasi",
+        status: ORDER_STATUS.PENDING_CASHIER,
+        actorName: "Kasir",
+        note: "Menunggu kasir mengecek pembayaran dan detail order.",
+        createdAt: firstTimelineAt(rawRows, ORDER_STATUS.PENDING_CASHIER) || createdAt,
+        state: "completed",
+        badge: "Completed"
+      }
+    ];
+
+    if (confirmedAt) {
+      baseSteps.push({
+        title: "Dikonfirmasi",
+        status: ORDER_STATUS.WAITING,
+        actorName: "Kasir",
+        note: "Pembayaran dan order sudah dikonfirmasi.",
+        createdAt: confirmedAt,
+        state: "completed",
+        badge: "Completed"
+      });
+    }
+
+    baseSteps.push({
+      title: "Dibatalkan",
+      status: ORDER_STATUS.CANCELLED,
+      actorName: cancellationActor,
+      note: cancellationNote,
+      createdAt: cancelledAt,
+      state: "cancelled",
+      badge: "Dibatalkan"
+    });
+
+    return baseSteps;
+  }
+
   const pendingAt = firstTimelineAt(rawRows, ORDER_STATUS.PENDING_CASHIER) || createdAt;
   const confirmedAt = order.paidAt || firstPaidTimelineAt(rawRows) || firstTimelineAt(rawRows, ORDER_STATUS.WAITING);
   const fulfillmentAt = firstTimelineAt(rawRows, ORDER_STATUS.FULFILLMENT);
@@ -454,30 +514,37 @@ export function receiptShortDateTime(value) {
 }
 
 export function renderSpread(syncBook = true) {
+  console.log("[ORDER-DIAGNOSTIC] renderSpread() called. syncBook:", syncBook, "state.spread:", state.spread, "flipbookReady:", bookState.flipbookReady);
   syncOrderStatus();
   const spreads = spreadOrder();
-  if (!spreads.includes(state.spread)) state.spread = "cover";
+  if (!spreads.includes(state.spread)) {
+    console.warn("[ORDER-DIAGNOSTIC Warning] Invalid spread:", state.spread, "Resetting to cover.");
+    state.spread = "cover";
+  }
   const book = flipbook();
   setText("order-status", `${activeOutletName()} · ${state.serviceType}`);
   if (syncBook && bookState.flipbookReady) {
     const targetPage = pageForSpread(state.spread);
+    console.log("[ORDER-DIAGNOSTIC] Syncing book to targetPage:", targetPage, "current book page:", book?.turn("page"));
     if (book?.length && book.turn("page") !== targetPage) {
       bookState.syncingFlipbook = true;
       bookState.forcedBookTurn = true;
-      try {
-        book.turn("page", targetPage);
-      } finally {
+      book.turn("page", targetPage);
+      setTimeout(() => {
         bookState.forcedBookTurn = false;
         bookState.syncingFlipbook = false;
-      }
+      }, 450);
     }
   }
+  renderCustomerGate();
+  renderBill();
   renderProgress();
   persistOrderSession();
   lockAllOrderInputs();
   const frame = document.getElementById("order-book-frame");
   if (frame) {
     frame.setAttribute("data-active-spread", state.spread);
+    console.log("[ORDER-DIAGNOSTIC] data-active-spread set to:", state.spread);
   }
   bindBookSwipe();
   manageStockRefreshInterval();
@@ -554,30 +621,28 @@ export async function refreshReceiptStatus() {
 }
 
 export function manageStockRefreshInterval() {
-  console.log("manageStockRefreshInterval: active spread is", state.spread, "outletId is", state.outletId);
   if (state.spread === "menu" && state.outletId) {
+    if (receiptIntervalId) {
+      clearInterval(receiptIntervalId);
+      receiptIntervalId = null;
+    }
     if (!stockIntervalId) {
-      console.log("manageStockRefreshInterval: starting stock refresh interval!");
-      refreshMenuStock();
       stockIntervalId = setInterval(refreshMenuStock, 60000);
     }
-  } else {
+  } else if (state.spread === "receipt" && state.lastOrderNumber) {
     if (stockIntervalId) {
-      console.log("manageStockRefreshInterval: clearing stock refresh interval.");
       clearInterval(stockIntervalId);
       stockIntervalId = null;
     }
-  }
-
-  if (state.spread === "receipt" && state.lastOrderNumber) {
     if (!receiptIntervalId) {
-      console.log("manageStockRefreshInterval: starting receipt status refresh interval!");
-      refreshReceiptStatus();
       receiptIntervalId = setInterval(refreshReceiptStatus, 10000);
     }
   } else {
+    if (stockIntervalId) {
+      clearInterval(stockIntervalId);
+      stockIntervalId = null;
+    }
     if (receiptIntervalId) {
-      console.log("manageStockRefreshInterval: clearing receipt status refresh interval.");
       clearInterval(receiptIntervalId);
       receiptIntervalId = null;
     }

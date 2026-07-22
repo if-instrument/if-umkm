@@ -2,6 +2,7 @@ import { state } from "../order-state.js";
 import {
   byId,
   optionalById,
+  setText,
   escapeHtml,
   activePaymentMethods,
   paymentById,
@@ -14,7 +15,7 @@ import {
   setBusy,
   persistOrderSession
 } from "../order-utils.js";
-import { canContinue, validationMessage } from "../order-navigation.js";
+import { canContinue, validationMessage, shouldHideCustomerPageOnMobile } from "../order-navigation.js";
 
 export function renderCustomerGate() {
   const content = optionalById("order-customer-content");
@@ -23,10 +24,9 @@ export function renderCustomerGate() {
     syncSelectedMemberFields();
     return;
   }
-  console.log("Rendering customer gate. Cart confirmed:", state.cartConfirmed, "Cart length:", state.cart.length);
   const visible = Boolean(state.cartConfirmed && state.cart.length);
   content.hidden = !visible;
-  console.log("Customer gate visibility:", visible);
+  page.hidden = false;
   page.classList.toggle("is-blank", !visible);
   syncSelectedMemberFields();
 }
@@ -44,7 +44,6 @@ export function syncSelectedMemberFields() {
   registerLine.hidden = selected;
   if (selected) registerInput.checked = false;
   selectedPanel.hidden = !selected;
-  console.log("Syncing selected member fields. Selected member ID:", state.selectedMemberId, "Selected:", selected);
 }
 
 let memberTimer = null;
@@ -88,11 +87,126 @@ export function renderPayments() {
   `).join("") : `<div class="empty-state compact">Metode pembayaran belum aktif.</div>`;
   const method = paymentById(state.paymentMethodId);
   renderPaymentProofInput(method);
+  
+  const isQris = method && (method.type === "qris" || method.qrisImageUrl);
+  const isGateway = method && (method.type === "card" || method.paymentUrl);
+  const qrImage = method?.qrisImageUrl || method?.qrImage || (isQris ? "/assets/qris-placeholder.png" : "");
+  const paymentUrl = method?.paymentUrl || method?.url || "";
+
+  const previewBox = optionalById("order-payment-preview-box");
+  const inlineQrFrame = optionalById("order-inline-qr-frame");
+  const inlineQrImg = optionalById("order-inline-qr-image");
+  const inlineUrlFrame = optionalById("order-inline-url-frame");
+  const inlineUrlBtn = optionalById("order-inline-url-btn");
+
+  if (previewBox) {
+    let showBox = false;
+    if (isQris && qrImage && inlineQrFrame && inlineQrImg) {
+      inlineQrImg.src = qrImage;
+      inlineQrFrame.hidden = false;
+      showBox = true;
+
+      const downloadBtn = optionalById("order-download-qr-btn");
+      if (downloadBtn) {
+        downloadBtn.href = qrImage;
+        const cleanName = (method?.name || "QRIS").replace(/[^a-zA-Z0-9-_]/g, "_");
+        downloadBtn.download = `QRIS-${cleanName}.png`;
+      }
+    } else if (inlineQrFrame) {
+      inlineQrFrame.hidden = true;
+    }
+
+    if (isGateway && paymentUrl && inlineUrlFrame && inlineUrlBtn) {
+      inlineUrlBtn.href = paymentUrl;
+      inlineUrlFrame.hidden = false;
+      showBox = true;
+    } else if (inlineUrlFrame) {
+      inlineUrlFrame.hidden = true;
+    }
+
+    previewBox.hidden = !showBox;
+  }
+
   byId("order-payment-note").textContent = method?.type === "cash"
     ? "Order akan dibuat dengan status unpaid dan dibayar di kasir."
     : paymentRequiresProof(method)
       ? "Upload bukti bayar agar kasir bisa cek sebelum approve pesanan."
-      : "Order akan dibuat menunggu pembayaran sesuai konfigurasi outlet.";
+      : (isQris || isGateway)
+        ? `Order menggunakan ${method.name}. Silakan gunakan QR Code atau link di atas.`
+        : "Order akan dibuat menunggu pembayaran sesuai konfigurasi outlet.";
+}
+
+export function openPaymentModal(method = paymentById(state.paymentMethodId)) {
+  const modal = optionalById("order-payment-modal");
+  if (!modal || !method) return;
+
+  const isQris = method.type === "qris" || method.qrisImageUrl;
+  const isCardOrGateway = method.type === "card" || method.paymentUrl;
+  
+  const title = isQris ? `Pembayaran QRIS - ${method.name}` : `Pembayaran ${method.name}`;
+  const subtitle = isQris ? "Scan QR Code di bawah ini menggunakan M-Banking atau E-Wallet" : "Selesaikan pembayaran melalui halaman pembayaran gateway";
+
+  const qrImage = method.qrisImageUrl || method.qrImage || (isQris ? "/assets/qris-placeholder.png" : "");
+  const paymentUrl = method.paymentUrl || method.url || "";
+
+  if (optionalById("order-payment-modal-title")) setText("order-payment-modal-title", title);
+  if (optionalById("order-payment-modal-subtitle")) setText("order-payment-modal-subtitle", subtitle);
+
+  const qrFrame = optionalById("order-payment-modal-qr-frame");
+  const qrImg = optionalById("order-payment-modal-qr-image");
+  if (qrFrame && qrImg) {
+    if (qrImage) {
+      qrImg.src = qrImage;
+      qrFrame.hidden = false;
+    } else {
+      qrFrame.hidden = true;
+    }
+  }
+
+  const urlFrame = optionalById("order-payment-modal-url-frame");
+  const urlBtn = optionalById("order-payment-modal-url-btn");
+  if (urlFrame && urlBtn) {
+    if (paymentUrl) {
+      urlBtn.href = paymentUrl;
+      urlFrame.hidden = false;
+    } else {
+      urlFrame.hidden = true;
+    }
+  }
+
+  const note = isQris
+    ? "Scan QRIS menggunakan aplikasi M-Banking atau E-Wallet pilihan Anda (GoPay, OVO, Dana, ShopeePay, BCA, Mandiri, dll)."
+    : "Buka link pembayaran di atas untuk menyelesaikan transaksi Anda secara aman.";
+  if (optionalById("order-payment-modal-note")) setText("order-payment-modal-note", note);
+
+  const modalProofPanel = optionalById("order-modal-payment-proof-panel");
+  if (modalProofPanel) {
+    const required = paymentRequiresProof(method);
+    modalProofPanel.hidden = !required;
+  }
+
+  renderPaymentProofInput(method);
+  modal.hidden = false;
+}
+
+export function closePaymentModal() {
+  const modal = optionalById("order-payment-modal");
+  if (modal) modal.hidden = true;
+}
+
+export function openImageLightbox(imageSrc, caption = "Preview Gambar") {
+  const lightbox = optionalById("order-image-lightbox");
+  const img = optionalById("order-lightbox-img");
+  const cap = optionalById("order-lightbox-caption");
+  if (!lightbox || !img || !imageSrc) return;
+  img.src = imageSrc;
+  if (cap) cap.textContent = caption;
+  lightbox.hidden = false;
+}
+
+export function closeImageLightbox() {
+  const lightbox = optionalById("order-image-lightbox");
+  if (lightbox) lightbox.hidden = true;
 }
 
 export function paymentRequiresProof(method = paymentById(state.paymentMethodId)) {
@@ -102,13 +216,44 @@ export function paymentRequiresProof(method = paymentById(state.paymentMethodId)
 
 export function renderPaymentProofInput(method = paymentById(state.paymentMethodId)) {
   const panel = optionalById("order-payment-proof-panel");
-  if (!panel) return;
+  const modalPanel = optionalById("order-modal-payment-proof-panel");
   const required = paymentRequiresProof(method);
-  panel.hidden = !required;
+  
+  if (panel) panel.hidden = !required;
+  if (modalPanel) modalPanel.hidden = !required;
+  
   optionalById("order-payment-proof-file")?.toggleAttribute("required", required);
+  optionalById("order-modal-payment-proof-file")?.toggleAttribute("required", required);
+  
+  const text = state.paymentProof?.name ? `✓ ${state.paymentProof.name}` : (required ? "Belum ada file dipilih." : "");
+  
   const nameLabel = optionalById("order-payment-proof-name");
-  if (nameLabel) {
-    nameLabel.textContent = state.paymentProof?.name || (required ? "Belum ada file dipilih." : "");
+  if (nameLabel) nameLabel.textContent = text;
+  
+  const modalNameLabel = optionalById("order-modal-payment-proof-name");
+  if (modalNameLabel) modalNameLabel.textContent = text;
+
+  const hasImage = Boolean(state.paymentProof?.dataUrl && state.paymentProof.dataUrl.startsWith("data:image/"));
+  const proofFrame = optionalById("order-proof-preview-frame");
+  const proofImg = optionalById("order-proof-preview-image");
+  if (proofFrame && proofImg) {
+    if (hasImage) {
+      proofImg.src = state.paymentProof.dataUrl;
+      proofFrame.hidden = false;
+    } else {
+      proofFrame.hidden = true;
+    }
+  }
+
+  const modalProofFrame = optionalById("order-modal-proof-preview-frame");
+  const modalProofImg = optionalById("order-modal-proof-preview-image");
+  if (modalProofFrame && modalProofImg) {
+    if (hasImage) {
+      modalProofImg.src = state.paymentProof.dataUrl;
+      modalProofFrame.hidden = false;
+    } else {
+      modalProofFrame.hidden = true;
+    }
   }
 }
 

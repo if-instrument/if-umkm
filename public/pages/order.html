@@ -139,11 +139,27 @@
               </form>
               <div class="payment-methods public-payment-grid" id="order-payments"></div>
               <div class="public-payment-note" id="order-payment-note"></div>
+              <div class="public-inline-payment-preview" id="order-payment-preview-box" hidden>
+                <div class="public-qris-image-frame compact" id="order-inline-qr-frame" hidden style="flex-direction: column; align-items: center;">
+                  <img id="order-inline-qr-image" alt="QR Code Pembayaran" src="" />
+                  <div class="public-qr-action-buttons" style="display: flex; gap: 8px; margin-top: 8px; justify-content: center;">
+                    <a class="ghost-button compact-button" id="order-download-qr-btn" download="QRIS-Pembayaran.png" href="#" target="_blank">⬇ Download QR</a>
+                    <button class="ghost-button compact-button" id="order-share-qr-btn" type="button">🔗 Bagikan QR</button>
+                  </div>
+                </div>
+                <div class="public-payment-url-frame" id="order-inline-url-frame" hidden>
+                  <a class="primary-action wide-action compact-action" id="order-inline-url-btn" target="_blank" rel="noopener noreferrer" href="#">Buka Halaman Pembayaran</a>
+                </div>
+              </div>
               <label class="public-payment-proof" id="order-payment-proof-panel" hidden>
                 Upload Bukti Bayar
                 <input id="order-payment-proof-file" accept="image/png,image/jpeg,image/webp,application/pdf" type="file" />
                 <span id="order-payment-proof-name">Belum ada file dipilih.</span>
               </label>
+              <div class="public-proof-preview-frame" id="order-proof-preview-frame" hidden>
+                <span>Preview Bukti Bayar:</span>
+                <img id="order-proof-preview-image" alt="Preview Bukti Bayar" src="" />
+              </div>
               <button class="primary-action wide-action" id="order-submit" type="button">Buat Order</button>
             </div>
           </article>
@@ -200,6 +216,50 @@
             <p class="public-detail-stock-note" id="order-detail-stock-note"></p>
             <button class="primary-action wide-action" id="order-detail-submit-label" type="submit">Masukkan Cart</button>
           </form>
+        </div>
+      </div>
+
+      <div class="public-menu-detail" id="order-payment-modal" hidden>
+        <div class="public-menu-detail-card public-payment-modal-card">
+          <button class="icon-button" data-close-payment-modal type="button">×</button>
+          <div class="public-payment-modal-header">
+            <h3 id="order-payment-modal-title">Pembayaran QRIS / Gateway</h3>
+            <p id="order-payment-modal-subtitle">Silakan lakukan pembayaran sesuai petunjuk di bawah ini.</p>
+          </div>
+          <div class="public-payment-modal-body">
+            <div class="public-qris-image-frame" id="order-payment-modal-qr-frame">
+              <img id="order-payment-modal-qr-image" alt="QR Code Pembayaran" src="" />
+            </div>
+            <div class="public-payment-url-frame" id="order-payment-modal-url-frame" hidden>
+              <a class="primary-action wide-action" id="order-payment-modal-url-btn" target="_blank" rel="noopener noreferrer" href="#">Buka Halaman Pembayaran</a>
+            </div>
+            <p class="public-payment-modal-note" id="order-payment-modal-note">
+              Scan QRIS menggunakan aplikasi M-Banking atau E-Wallet pilihan Anda (GoPay, OVO, Dana, ShopeePay, BCA, dll).
+            </p>
+            <label class="public-payment-proof" id="order-modal-payment-proof-panel" hidden style="margin-top: 12px; text-align: left;">
+              Upload Bukti Bayar (Maks 3 MB)
+              <input id="order-modal-payment-proof-file" accept="image/png,image/jpeg,image/webp,application/pdf" type="file" />
+              <span id="order-modal-payment-proof-name">Belum ada file dipilih.</span>
+            </label>
+            <div class="public-proof-preview-frame" id="order-modal-proof-preview-frame" hidden style="margin-top: 10px;">
+              <span>Preview Bukti Bayar:</span>
+              <img id="order-modal-proof-preview-image" alt="Preview Bukti Bayar Modal" src="" />
+            </div>
+          </div>
+          <div class="public-payment-modal-footer" style="display: flex; gap: 10px; margin-top: 16px;">
+            <button class="ghost-button wide-action" data-close-payment-modal type="button">Tutup</button>
+            <button class="primary-action wide-action" id="order-modal-submit" type="button">Buat Order</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="public-menu-detail" id="order-image-lightbox" hidden>
+        <div class="public-menu-detail-card public-lightbox-card">
+          <button class="icon-button" data-close-image-lightbox type="button">×</button>
+          <div class="public-lightbox-body">
+            <img id="order-lightbox-img" alt="Preview Gambar Besar" src="" />
+            <p id="order-lightbox-caption"></p>
+          </div>
         </div>
       </div>
 

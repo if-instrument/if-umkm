@@ -113,7 +113,7 @@ export function groupedProducts(products) {
 
 export function renderProductBookPages(products) {
   const book = byId("order-flipbook");
-  const currentPage = bookState.flipbookReady ? (flipbook()?.turn("page") || pageForSpread(state.spread)) : pageForSpread(state.spread);
+  const currentPage = pageForSpread(state.spread);
   const capacity = menuPageCapacity();
   const layoutClass = menuLayoutClass();
   
