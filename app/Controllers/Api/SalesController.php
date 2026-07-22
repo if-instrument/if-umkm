@@ -11,10 +11,10 @@ class SalesController extends BaseController
     private SalesService $sales;
     private PaymentGatewayService $payments;
 
-    public function __construct()
+    public function __construct(?SalesService $sales = null, ?PaymentGatewayService $payments = null)
     {
-        $this->sales = new SalesService();
-        $this->payments = new PaymentGatewayService();
+        $this->sales = $sales ?? service('salesService');
+        $this->payments = $payments ?? service('paymentGatewayService');
     }
 
     public function listOrders()
@@ -55,6 +55,13 @@ class SalesController extends BaseController
         $payload = $this->payload();
         [$companyId, $outletId] = $this->scope($payload);
         return $this->jsonAction(fn () => $this->sales->readyItems($id, $payload['readyItemKeys'] ?? [], $companyId, $outletId));
+    }
+
+    public function fulfilledPoKeys(string $id)
+    {
+        $payload = $this->payload();
+        [$companyId, $outletId] = $this->scope($payload);
+        return $this->jsonAction(fn () => $this->sales->fulfilledPoKeys($id, $payload['fulfilledPoKeys'] ?? [], $companyId, $outletId));
     }
 
     public function settle(string $id)
@@ -113,7 +120,8 @@ class SalesController extends BaseController
 
     public function xenditWebhook()
     {
-        return $this->jsonAction(fn () => $this->payments->handleXenditWebhook($this->payload()));
+        $token = $this->request->getHeaderLine('x-callback-token');
+        return $this->jsonAction(fn () => $this->payments->handleXenditWebhook($this->payload(), $token));
     }
 
     public function publicCardPayment(string $reference)
@@ -140,10 +148,10 @@ class SalesController extends BaseController
 
     private function scope(array $payload = []): array
     {
-        return [
-            (int) ($payload['company_id'] ?? $this->request->getGet('company_id') ?? 1),
-            (int) ($payload['outlet_id'] ?? $this->request->getGet('outlet_id') ?? 1),
-        ];
+        $companyId = (int) ($payload['company_id'] ?? $this->request->getGet('company_id') ?? 1);
+        $outletId = (int) ($payload['outlet_id'] ?? $this->request->getGet('outlet_id') ?? 1);
+        $this->validateScope($companyId, $outletId);
+        return [$companyId, $outletId];
     }
 
     private function jsonAction(callable $action)

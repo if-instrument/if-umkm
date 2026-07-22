@@ -139,6 +139,7 @@ $routes->group('api', ['namespace' => 'App\Controllers\Api', 'filter' => 'jwt-au
     $routes->put('order/(:segment)', 'SalesController::updateOrder/$1');
     $routes->put('order/(:segment)/status', 'SalesController::status/$1');
     $routes->put('order/(:segment)/ready-items', 'SalesController::readyItems/$1');
+    $routes->put('order/(:segment)/fulfilled-po-keys', 'SalesController::fulfilledPoKeys/$1');
     $routes->put('order/(:segment)/settle', 'SalesController::settle/$1');
     $routes->put('order/(:segment)/approve', 'SalesController::approve/$1');
     $routes->put('order/(:segment)/move-table', 'SalesController::moveTable/$1');

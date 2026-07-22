@@ -15,6 +15,20 @@ class InventoryPageController extends BaseController
         'finished-products' => 'finished-products.html',
     ];
 
+    private TenantDatabaseService $tenantDb;
+    private InventoryApiService $inventoryApi;
+    private InventoryPagePresenter $presenter;
+
+    public function __construct(
+        ?TenantDatabaseService $tenantDb = null,
+        ?InventoryApiService $inventoryApi = null,
+        ?InventoryPagePresenter $presenter = null
+    ) {
+        $this->tenantDb = $tenantDb ?? service('tenantDatabaseService');
+        $this->inventoryApi = $inventoryApi ?? service('inventoryApiService');
+        $this->presenter = $presenter ?? service('inventoryPagePresenter');
+    }
+
     public function show(string $page)
     {
         return $this->renderPage($page);
@@ -22,7 +36,7 @@ class InventoryPageController extends BaseController
 
     public function tenant(string $slug, string $page)
     {
-        $company = (new TenantDatabaseService())->companyBySlug($slug);
+        $company = $this->tenantDb->companyBySlug($slug);
         if (! $company) {
             return $this->response->setStatusCode(404)->setBody('Company route tidak ditemukan.');
         }
@@ -34,11 +48,11 @@ class InventoryPageController extends BaseController
     {
         [$companyId, $outletId] = $this->scope();
         $view = trim((string) ($this->request->getGet('view') ?? 'overview'));
-        $data = (new InventoryApiService())->pageData($companyId, $outletId, $this->request->getGet());
+        $data = $this->inventoryApi->pageData($companyId, $outletId, $this->request->getGet());
 
         return $this->response->setJSON([
             'ok' => true,
-            'data' => (new InventoryPagePresenter())->bootstrap($data, ['view' => $view]),
+            'data' => $this->presenter->bootstrap($data, ['view' => $view]),
         ]);
     }
 

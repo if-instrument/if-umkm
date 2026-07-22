@@ -7,6 +7,7 @@ use Config\Database;
 
 class AuthService
 {
+    use \App\Services\Shared\MappingHelperTrait;
     public function login(string $email, string $password, string $companySlug = ''): ?array
     {
         $email = strtolower(trim($email));
@@ -100,20 +101,6 @@ class AuthService
         ];
     }
 
-    private function companyCode(int $id): string
-    {
-        return $id === 1 ? 'company-main' : 'company-' . $id;
-    }
-
-    private function outletCode(int $id): string
-    {
-        return match ($id) {
-            1 => 'outlet-main',
-            2 => 'outlet-north',
-            3 => 'outlet-south',
-            default => 'outlet-' . $id,
-        };
-    }
 
     private function defaultOutletId($db, int $companyId, array $outletRows, string $scope): string
     {
@@ -142,15 +129,22 @@ class AuthService
 
     private function roleCode(string $name): string
     {
-        return match ($name) {
-            'Area Manager' => 'role-area-manager',
-            'Outlet Manager' => 'role-outlet-manager',
-            'Kasir' => 'role-kasir',
-            'Kitchen' => 'role-kitchen',
-            'Inventory Staff' => 'role-inventory',
-            'Company Admin' => 'role-company-admin',
-            default => 'role-company-admin',
-        };
+        switch ($name) {
+            case 'Area Manager':
+                return 'role-area-manager';
+            case 'Outlet Manager':
+                return 'role-outlet-manager';
+            case 'Kasir':
+                return 'role-kasir';
+            case 'Kitchen':
+                return 'role-kitchen';
+            case 'Inventory Staff':
+                return 'role-inventory';
+            case 'Company Admin':
+                return 'role-company-admin';
+            default:
+                return 'role-company-admin';
+        }
     }
 
     private function accessContext($db, $centralDb, string $authType, int $companyId, string $scope, array $outletRows): array
@@ -286,15 +280,22 @@ class AuthService
 
     private function roleCodeFromRow(array $row): string
     {
-        return match ($row['name'] ?? '') {
-            'Area Manager' => 'role-area-manager',
-            'Outlet Manager' => 'role-outlet-manager',
-            'Kasir' => 'role-kasir',
-            'Kitchen' => 'role-kitchen',
-            'Inventory Staff' => 'role-inventory',
-            'Company Admin' => (int) ($row['id'] ?? 0) === 1 ? 'role-company-admin' : 'role-' . ($row['id'] ?? 'company-admin'),
-            default => 'role-' . ($row['id'] ?? uniqid()),
-        };
+        switch ($row['name'] ?? '') {
+            case 'Area Manager':
+                return 'role-area-manager';
+            case 'Outlet Manager':
+                return 'role-outlet-manager';
+            case 'Kasir':
+                return 'role-kasir';
+            case 'Kitchen':
+                return 'role-kitchen';
+            case 'Inventory Staff':
+                return 'role-inventory';
+            case 'Company Admin':
+                return (int) ($row['id'] ?? 0) === 1 ? 'role-company-admin' : 'role-' . ($row['id'] ?? 'company-admin');
+            default:
+                return 'role-' . ($row['id'] ?? uniqid());
+        }
     }
 
     private function firstValue(array $rows, string $matchField, $matchValue, string $returnField)
@@ -327,17 +328,5 @@ class AuthService
         return null;
     }
 
-    private function userCode(array $row): string
-    {
-        return match ($row['email'] ?? '') {
-            'superadmin@app.test' => 'usr-super-admin',
-            'admin@ifresso.id' => 'usr-company-admin',
-            'area@ifresso.id' => 'usr-area-manager',
-            'manager@ifresso.id' => 'usr-outlet-manager',
-            'kasir@ifresso.id' => 'usr-kasir',
-            'kitchen@ifresso.id' => 'usr-kitchen',
-            'inventory@ifresso.id' => 'usr-inventory',
-            default => 'usr-' . ($row['id'] ?? uniqid()),
-        };
-    }
+
 }

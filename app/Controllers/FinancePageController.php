@@ -16,6 +16,20 @@ class FinancePageController extends BaseController
         'gateway-logs' => 'payment-gateway-logs.html',
     ];
 
+    private TenantDatabaseService $tenantDb;
+    private FinanceApiService $financeApi;
+    private FinancePagePresenter $presenter;
+
+    public function __construct(
+        ?TenantDatabaseService $tenantDb = null,
+        ?FinanceApiService $financeApi = null,
+        ?FinancePagePresenter $presenter = null
+    ) {
+        $this->tenantDb = $tenantDb ?? service('tenantDatabaseService');
+        $this->financeApi = $financeApi ?? service('financeApiService');
+        $this->presenter = $presenter ?? service('financePagePresenter');
+    }
+
     public function show(string $page)
     {
         return $this->renderPage($page);
@@ -23,7 +37,7 @@ class FinancePageController extends BaseController
 
     public function tenant(string $slug, string $page)
     {
-        $company = (new TenantDatabaseService())->companyBySlug($slug);
+        $company = $this->tenantDb->companyBySlug($slug);
         if (! $company) {
             return $this->response->setStatusCode(404)->setBody('Company route tidak ditemukan.');
         }
@@ -42,11 +56,11 @@ class FinancePageController extends BaseController
                 'message' => 'Log payment gateway hanya bisa dilihat admin perusahaan.',
             ]);
         }
-        $data = (new FinanceApiService())->pageData($companyId, $outletId, $this->request->getGet());
+        $data = $this->financeApi->pageData($companyId, $outletId, $this->request->getGet());
 
         return $this->response->setJSON([
             'ok' => true,
-            'data' => (new FinancePagePresenter())->bootstrap($data, ['view' => $view]),
+            'data' => $this->presenter->bootstrap($data, ['view' => $view]),
         ]);
     }
 

@@ -6,6 +6,13 @@ use App\Services\TenantDatabaseService;
 
 class AppPageController extends BaseController
 {
+    private TenantDatabaseService $tenantDb;
+
+    public function __construct(?TenantDatabaseService $tenantDb = null)
+    {
+        $this->tenantDb = $tenantDb ?? service('tenantDatabaseService');
+    }
+
     public function dashboard()
     {
         return $this->renderHtml('index.html');
@@ -42,7 +49,7 @@ class AppPageController extends BaseController
 
     private function renderTenantHtml(string $slug, string $path): \CodeIgniter\HTTP\ResponseInterface
     {
-        $company = (new TenantDatabaseService())->companyBySlug($slug);
+        $company = $this->tenantDb->companyBySlug($slug);
         if (! $company) {
             return $this->response->setStatusCode(404)->setBody('Company route tidak ditemukan.');
         }

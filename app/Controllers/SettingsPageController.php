@@ -9,6 +9,23 @@ use App\Services\TenantDatabaseService;
 
 class SettingsPageController extends BaseController
 {
+    private TenantDatabaseService $tenantDb;
+    private SettingsApiService $settingsApi;
+    private AccessApiService $accessApi;
+    private SettingsPagePresenter $presenter;
+
+    public function __construct(
+        ?TenantDatabaseService $tenantDb = null,
+        ?SettingsApiService $settingsApi = null,
+        ?AccessApiService $accessApi = null,
+        ?SettingsPagePresenter $presenter = null
+    ) {
+        $this->tenantDb = $tenantDb ?? service('tenantDatabaseService');
+        $this->settingsApi = $settingsApi ?? service('settingsApiService');
+        $this->accessApi = $accessApi ?? service('accessApiService');
+        $this->presenter = $presenter ?? service('settingsPagePresenter');
+    }
+
     public function show()
     {
         return $this->renderPage();
@@ -16,7 +33,7 @@ class SettingsPageController extends BaseController
 
     public function tenant(string $slug)
     {
-        $company = (new TenantDatabaseService())->companyBySlug($slug);
+        $company = $this->tenantDb->companyBySlug($slug);
         if (! $company) {
             return $this->response->setStatusCode(404)->setBody('Company route tidak ditemukan.');
         }
@@ -27,12 +44,12 @@ class SettingsPageController extends BaseController
     public function bootstrap()
     {
         [$companyId, $outletId] = $this->scope();
-        $settingsPage = (new SettingsApiService())->pageData($companyId, $outletId, $this->request->getGet());
-        $accessData = (new AccessApiService())->pageData($companyId, false);
+        $settingsPage = $this->settingsApi->pageData($companyId, $outletId, $this->request->getGet());
+        $accessData = $this->accessApi->pageData($companyId, false);
 
         return $this->response->setJSON([
             'ok' => true,
-            'data' => (new SettingsPagePresenter())->bootstrap(
+            'data' => $this->presenter->bootstrap(
                 $accessData,
                 $settingsPage['settings'] ?? [],
                 $settingsPage['ingredients'] ?? []

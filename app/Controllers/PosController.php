@@ -10,6 +10,26 @@ use App\Services\TenantDatabaseService;
 
 class PosController extends BaseController
 {
+    private PosApiService $posApi;
+    private ProductApiService $productApi;
+    private SettingsApiService $settingsApi;
+    private TenantDatabaseService $tenantDb;
+    private PosPagePresenter $presenter;
+
+    public function __construct(
+        ?PosApiService $posApi = null,
+        ?ProductApiService $productApi = null,
+        ?SettingsApiService $settingsApi = null,
+        ?TenantDatabaseService $tenantDb = null,
+        ?PosPagePresenter $presenter = null
+    ) {
+        $this->posApi = $posApi ?? service('posApiService');
+        $this->productApi = $productApi ?? service('productApiService');
+        $this->settingsApi = $settingsApi ?? service('settingsApiService');
+        $this->tenantDb = $tenantDb ?? service('tenantDatabaseService');
+        $this->presenter = $presenter ?? service('posPagePresenter');
+    }
+
     public function show()
     {
         return $this->renderPosPage();
@@ -17,7 +37,7 @@ class PosController extends BaseController
 
     public function tenant(string $slug)
     {
-        $company = (new TenantDatabaseService())->companyBySlug($slug);
+        $company = $this->tenantDb->companyBySlug($slug);
         if (! $company) {
             return $this->response->setStatusCode(404)->setBody('Company route tidak ditemukan.');
         }
@@ -32,9 +52,9 @@ class PosController extends BaseController
         $date = trim((string) ($filters['date'] ?? '')) ?: date('Y-m-d');
         $perPage = min(200, max(25, (int) ($filters['per_page'] ?? $filters['perPage'] ?? 100)));
 
-        $settingsData = (new SettingsApiService())->outletContext($companyId, $outletId);
-        $productData = (new ProductApiService())->outletCatalog($companyId, $outletId);
-        $orders = (new PosApiService())->activeOrders($companyId, $outletId, [
+        $settingsData = $this->settingsApi->outletContext($companyId, $outletId);
+        $productData = $this->productApi->outletCatalog($companyId, $outletId);
+        $orders = $this->posApi->activeOrders($companyId, $outletId, [
             'date' => $date,
             'include_open' => true,
             'per_page' => $perPage,
@@ -42,7 +62,7 @@ class PosController extends BaseController
 
         return $this->response->setJSON([
             'ok' => true,
-            'data' => (new PosPagePresenter())->bootstrap($settingsData, $productData, $orders, [
+            'data' => $this->presenter->bootstrap($settingsData, $productData, $orders, [
                 'date' => $date,
             ]),
         ]);

@@ -33,7 +33,7 @@ import {
 } from "./order-navigation.js";
 import { statusLabel, paymentStatusCode, orderStatusCode } from "../../status-codes.js";
 import { ORDER_STATUS, PAYMENT_STATUS } from "../../status-codes.js";
-import { bindDynamicFieldListeners } from "./order-events.js";
+import { bindDynamicFieldListeners, bindBookSwipe } from "./order-events.js";
 
 // Page renderings
 import { renderOutletChoices } from "./pages/page-1-select-outlet.js";
@@ -52,6 +52,7 @@ export function render() {
     book.innerHTML = pristineBookTemplate;
     restoreBookInputs(snapshot);
     bindDynamicFieldListeners();
+    bindBookSwipe();
     renderBookStaticContent();
     renderProducts();
     renderSpread();
@@ -475,6 +476,7 @@ export function renderSpread(syncBook = true) {
   if (frame) {
     frame.setAttribute("data-active-spread", state.spread);
   }
+  bindBookSwipe();
   manageStockRefreshInterval();
 }
 

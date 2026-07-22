@@ -8,6 +8,7 @@ use Config\Database;
 
 class PublicOrderService
 {
+    use \App\Services\Shared\MappingHelperTrait;
     private $db;
 
     public function __construct()
@@ -141,52 +142,60 @@ class PublicOrderService
             throw new \InvalidArgumentException('Upload bukti bayar wajib untuk metode pembayaran offline ini.');
         }
         $customer = $this->customerPayload($payload);
-        $memberId = $this->resolveMemberId($payload, $customer, $companyId, $outletId);
+        $this->db->transStart();
+        try {
+            $memberId = $this->resolveMemberId($payload, $customer, $companyId, $outletId);
 
-        $productData = (new ProductSuiteService())->data($companyId, $outletId);
-        $reservations = $this->pendingReservations($companyId, $outletId, $productData['products'] ?? []);
-        $products = array_map(fn ($product) => $this->productPublicPayload($product, $reservations, $productData['ingredients'] ?? []), $productData['products'] ?? []);
-        $ingredients = $productData['ingredients'] ?? [];
-        $modifiers = $productData['modifiers'] ?? [];
-        $orderItems = $this->orderItems($payload['items'] ?? [], $products, $ingredients, $modifiers);
-        if (! $orderItems) {
-            throw new \InvalidArgumentException('Keranjang masih kosong.');
+            $productData = (new ProductSuiteService())->data($companyId, $outletId);
+            $reservations = $this->pendingReservations($companyId, $outletId, $productData['products'] ?? []);
+            $products = array_map(fn ($product) => $this->productPublicPayload($product, $reservations, $productData['ingredients'] ?? []), $productData['products'] ?? []);
+            $ingredients = $productData['ingredients'] ?? [];
+            $modifiers = $productData['modifiers'] ?? [];
+            $orderItems = $this->orderItems($payload['items'] ?? [], $products, $ingredients, $modifiers);
+            if (! $orderItems) {
+                throw new \InvalidArgumentException('Keranjang masih kosong.');
+            }
+
+            $packaging = $this->packagingItems($serviceType, array_sum(array_map(fn ($item) => (float) $item['qty'], $orderItems)), $settings['packagingRules'] ?? [], $ingredients);
+            $items = array_merge($orderItems, $packaging['items']);
+            $totals = $this->totals($orderItems, $packaging['items'], $settings, $serviceType, $paymentMethod);
+            $orderNumber = $this->nextPublicOrderNumber($companyId, $outletId);
+            $isCash = ($paymentMethod['type'] ?? '') === 'cash';
+
+            $order = (new SalesService())->saveOrder([
+                'orderNumber' => $orderNumber,
+                'serviceType' => $serviceType,
+                'customerName' => $customer['name'],
+                'customerEmail' => $customer['email'],
+                'customerPhone' => $customer['phone'],
+                'customerMemberId' => $memberId ?: null,
+                'tableName' => $this->tableName($payload, $settings, $serviceType),
+                'tableFlow' => $serviceType === 'Dine In' ? ($settings['tableServiceMode'] ?? 'public_order') : 'public_order',
+                'initialStatus' => SalesService::STATUS_PENDING_CASHIER,
+                'paymentStatus' => StatusCodeService::PAYMENT_UNPAID,
+                'paymentMethod' => $paymentMethod['name'] ?? 'Cash',
+                'paymentProofPath' => $paymentProofPath,
+                'paymentProofNote' => $this->paymentProofNote($paymentMethod),
+                'productRevenue' => $totals['productRevenue'],
+                'packagingFee' => $totals['packagingFee'],
+                'paymentFee' => $totals['paymentFee'],
+                'paymentFeePayer' => $totals['paymentFeePayer'],
+                'tax' => $totals['tax'],
+                'total' => $totals['total'],
+                'cogs' => $totals['cogs'],
+                'profit' => $totals['profit'],
+                'packagingSource' => $packaging['source'],
+                'packagingNote' => $packaging['note'],
+                'items' => $items,
+            ], $companyId, $outletId);
+
+            $this->sendReceiptNotification((string) ($order['id'] ?? ''));
+
+            $this->db->transComplete();
+        } catch (\Throwable $e) {
+            $this->db->transRollback();
+            throw $e;
         }
-
-        $packaging = $this->packagingItems($serviceType, array_sum(array_map(fn ($item) => (float) $item['qty'], $orderItems)), $settings['packagingRules'] ?? [], $ingredients);
-        $items = array_merge($orderItems, $packaging['items']);
-        $totals = $this->totals($orderItems, $packaging['items'], $settings, $serviceType, $paymentMethod);
-        $orderNumber = $this->nextPublicOrderNumber($companyId, $outletId);
-        $isCash = ($paymentMethod['type'] ?? '') === 'cash';
-
-        $order = (new SalesService())->saveOrder([
-            'orderNumber' => $orderNumber,
-            'serviceType' => $serviceType,
-            'customerName' => $customer['name'],
-            'customerEmail' => $customer['email'],
-            'customerPhone' => $customer['phone'],
-            'customerMemberId' => $memberId ?: null,
-            'tableName' => $this->tableName($payload, $settings, $serviceType),
-            'tableFlow' => $serviceType === 'Dine In' ? ($settings['tableServiceMode'] ?? 'public_order') : 'public_order',
-            'initialStatus' => SalesService::STATUS_PENDING_CASHIER,
-            'paymentStatus' => StatusCodeService::PAYMENT_UNPAID,
-            'paymentMethod' => $paymentMethod['name'] ?? 'Cash',
-            'paymentProofPath' => $paymentProofPath,
-            'paymentProofNote' => $this->paymentProofNote($paymentMethod),
-            'productRevenue' => $totals['productRevenue'],
-            'packagingFee' => $totals['packagingFee'],
-            'paymentFee' => $totals['paymentFee'],
-            'paymentFeePayer' => $totals['paymentFeePayer'],
-            'tax' => $totals['tax'],
-            'total' => $totals['total'],
-            'cogs' => $totals['cogs'],
-            'profit' => $totals['profit'],
-            'packagingSource' => $packaging['source'],
-            'packagingNote' => $packaging['note'],
-            'items' => $items,
-        ], $companyId, $outletId);
-
-        $this->sendReceiptNotification((string) ($order['id'] ?? ''));
 
         return [
             'order' => $order,
@@ -232,12 +241,21 @@ class PublicOrderService
             throw new \InvalidArgumentException('Ukuran bukti bayar maksimal 3 MB.');
         }
 
-        $extension = match ($matches[1]) {
-            'image/png' => 'png',
-            'image/jpeg', 'image/jpg' => 'jpg',
-            'image/webp' => 'webp',
-            default => 'pdf',
-        };
+        switch ($matches[1]) {
+            case 'image/png':
+                $extension = 'png';
+                break;
+            case 'image/jpeg':
+            case 'image/jpg':
+                $extension = 'jpg';
+                break;
+            case 'image/webp':
+                $extension = 'webp';
+                break;
+            default:
+                $extension = 'pdf';
+                break;
+        }
         $dir = FCPATH . 'uploads/payment-proofs';
         if (! is_dir($dir)) {
             mkdir($dir, 0775, true);
@@ -255,7 +273,7 @@ class PublicOrderService
         if ($orderId <= 0) return;
         try {
             (new OrderNotificationService())->sendOrderReceiptEmail($orderId, 'Receipt order diterima');
-        } catch (\Throwable) {
+        } catch (\Throwable $e) {
             // Email receipt tidak boleh menggagalkan order customer.
         }
     }
@@ -675,14 +693,17 @@ class PublicOrderService
             throw new \InvalidArgumentException($serviceType . ' belum aktif untuk outlet ini.');
         }
     }
-
     private function serviceType(string $value): string
     {
-        return match (strtolower(str_replace(['_', '-'], ' ', trim($value)))) {
-            'dine in', 'dinein' => 'Dine In',
-            'delivery' => 'Delivery',
-            default => 'Take Away',
-        };
+        switch (strtolower(str_replace(['_', '-'], ' ', trim($value)))) {
+            case 'dine in':
+            case 'dinein':
+                return 'Dine In';
+            case 'delivery':
+                return 'Delivery';
+            default:
+                return 'Take Away';
+        }
     }
 
     private function selectedModifierOptions(array $product, array $modifiers, array $modifierIds): array
@@ -829,7 +850,7 @@ class PublicOrderService
         return $prefix . str_pad((string) ($builder->countAllResults() + 1), 4, '0', STR_PAD_LEFT);
     }
 
-    private function numericId(string|int|null $value): int
+    private function numericId($value): int
     {
         if (! $value) return 0;
         if (is_numeric($value)) return (int) $value;
@@ -839,20 +860,6 @@ class PublicOrderService
         return 0;
     }
 
-    private function companyCode(int $id): string
-    {
-        return $id === 1 ? 'company-main' : 'company-' . $id;
-    }
-
-    private function outletCode(int $id): string
-    {
-        return match ($id) {
-            1 => 'outlet-main',
-            2 => 'outlet-north',
-            3 => 'outlet-south',
-            default => 'outlet-' . $id,
-        };
-    }
 
     private function hasCompanyColumn(string $table): bool
     {

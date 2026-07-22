@@ -9,48 +9,55 @@ class ReportController extends BaseController
 {
     private ProfitLossService $profitLoss;
 
-    public function __construct()
+    public function __construct(?ProfitLossService $profitLoss = null)
     {
-        $this->profitLoss = new ProfitLossService();
+        $this->profitLoss = $profitLoss ?? service('profitLossService');
     }
 
     public function profitLoss()
     {
-        return $this->response->setJSON([
-            'ok' => true,
-            'data' => $this->profitLoss->report([
-                'company_id' => (int) ($this->request->getGet('company_id') ?? 1),
-                'outlet_id' => (int) ($this->request->getGet('outlet_id') ?? 1),
-                'period' => $this->request->getGet('period') ?: 'daily',
-                'anchor_date' => $this->request->getGet('anchor_date') ?: date('Y-m-d'),
-            ]),
-        ]);
+        try {
+            [$companyId, $outletId] = $this->scope();
+            return $this->response->setJSON([
+                'ok' => true,
+                'data' => $this->profitLoss->report([
+                    'company_id' => $companyId,
+                    'outlet_id' => $outletId,
+                    'period' => $this->request->getGet('period') ?: 'daily',
+                    'anchor_date' => $this->request->getGet('anchor_date') ?: date('Y-m-d'),
+                ]),
+            ]);
+        } catch (\Throwable $exception) {
+            return $this->response->setStatusCode(422)->setJSON(['ok' => false, 'message' => $exception->getMessage()]);
+        }
     }
 
     public function listOperatingExpenses()
     {
-        return $this->response->setJSON([
-            'ok' => true,
-            'data' => $this->profitLoss->expensePage([
-                'company_id' => (int) ($this->request->getGet('company_id') ?? 1),
-                'outlet_id' => (int) ($this->request->getGet('outlet_id') ?? 1),
-                'period' => $this->request->getGet('period') ?: 'daily',
-                'anchor_date' => $this->request->getGet('anchor_date') ?: date('Y-m-d'),
-            ]),
-        ]);
+        try {
+            [$companyId, $outletId] = $this->scope();
+            return $this->response->setJSON([
+                'ok' => true,
+                'data' => $this->profitLoss->expensePage([
+                    'company_id' => $companyId,
+                    'outlet_id' => $outletId,
+                    'period' => $this->request->getGet('period') ?: 'daily',
+                    'anchor_date' => $this->request->getGet('anchor_date') ?: date('Y-m-d'),
+                ]),
+            ]);
+        } catch (\Throwable $exception) {
+            return $this->response->setStatusCode(422)->setJSON(['ok' => false, 'message' => $exception->getMessage()]);
+        }
     }
 
     public function operatingExpense()
     {
         try {
             $payload = (array) ($this->request->getJSON(true) ?: $this->request->getPost());
+            [$companyId, $outletId] = $this->scope($payload);
             return $this->response->setJSON([
                 'ok' => true,
-                'data' => $this->profitLoss->saveExpense(
-                    $payload,
-                    (int) ($payload['company_id'] ?? $payload['companyId'] ?? 1),
-                    (int) ($payload['outlet_id'] ?? $payload['outletId'] ?? 1)
-                ),
+                'data' => $this->profitLoss->saveExpense($payload, $companyId, $outletId),
             ]);
         } catch (\Throwable $exception) {
             return $this->response->setStatusCode(422)->setJSON([
@@ -65,13 +72,10 @@ class ReportController extends BaseController
         try {
             $payload = (array) ($this->request->getJSON(true) ?: []);
             $payload['id'] = $id;
+            [$companyId, $outletId] = $this->scope($payload);
             return $this->response->setJSON([
                 'ok' => true,
-                'data' => $this->profitLoss->saveExpense(
-                    $payload,
-                    (int) ($payload['company_id'] ?? $payload['companyId'] ?? 1),
-                    (int) ($payload['outlet_id'] ?? $payload['outletId'] ?? 1)
-                ),
+                'data' => $this->profitLoss->saveExpense($payload, $companyId, $outletId),
             ]);
         } catch (\Throwable $exception) {
             return $this->response->setStatusCode(422)->setJSON([
@@ -85,13 +89,10 @@ class ReportController extends BaseController
     {
         try {
             $payload = (array) ($this->request->getJSON(true) ?: []);
+            [$companyId, $outletId] = $this->scope($payload);
             return $this->response->setJSON([
                 'ok' => true,
-                'data' => $this->profitLoss->voidExpense(
-                    $id,
-                    (int) ($payload['company_id'] ?? $payload['companyId'] ?? $this->request->getGet('company_id') ?? 1),
-                    (int) ($payload['outlet_id'] ?? $payload['outletId'] ?? $this->request->getGet('outlet_id') ?? 1)
-                ),
+                'data' => $this->profitLoss->voidExpense($id, $companyId, $outletId),
             ]);
         } catch (\Throwable $exception) {
             return $this->response->setStatusCode(422)->setJSON([
@@ -99,5 +100,13 @@ class ReportController extends BaseController
                 'message' => $exception->getMessage(),
             ]);
         }
+    }
+
+    private function scope(array $payload = []): array
+    {
+        $companyId = (int) ($payload['company_id'] ?? $payload['companyId'] ?? $this->request->getGet('company_id') ?? 1);
+        $outletId = (int) ($payload['outlet_id'] ?? $payload['outletId'] ?? $this->request->getGet('outlet_id') ?? 1);
+        $this->validateScope($companyId, $outletId);
+        return [$companyId, $outletId];
     }
 }

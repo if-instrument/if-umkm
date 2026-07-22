@@ -9,9 +9,9 @@ class AccessController extends BaseController
 {
     private AccessManagementService $access;
 
-    public function __construct()
+    public function __construct(?AccessManagementService $access = null)
     {
-        $this->access = new AccessManagementService();
+        $this->access = $access ?? service('accessManagementService');
     }
 
     public function listCompanies()
@@ -39,6 +39,8 @@ class AccessController extends BaseController
     public function updateCompany(string $id)
     {
         try {
+            $companyId = $this->numericCompanyId($id);
+            $this->validateScope($companyId, -1);
             return $this->response->setJSON(['ok' => true, 'data' => $this->access->saveCompany(['id' => $id] + $this->payload())]);
         } catch (\Throwable $exception) {
             return $this->response->setStatusCode(422)->setJSON([
@@ -50,102 +52,212 @@ class AccessController extends BaseController
 
     public function deleteCompany(string $id)
     {
-        return $this->response->setJSON(['ok' => true, 'data' => $this->access->deactivateCompany($id)]);
+        try {
+            $companyId = $this->numericCompanyId($id);
+            $this->validateScope($companyId, -1);
+            return $this->response->setJSON(['ok' => true, 'data' => $this->access->deactivateCompany($id)]);
+        } catch (\Throwable $exception) {
+            return $this->response->setStatusCode(422)->setJSON(['ok' => false, 'message' => $exception->getMessage()]);
+        }
     }
 
     public function resendCompanyAdminInvitation(string $id)
     {
-        return $this->jsonAction(fn () => $this->access->resendCompanyAdminInvitation($id));
+        try {
+            $companyId = $this->numericCompanyId($id);
+            $this->validateScope($companyId, -1);
+            return $this->jsonAction(fn () => $this->access->resendCompanyAdminInvitation($id));
+        } catch (\Throwable $exception) {
+            return $this->response->setStatusCode(422)->setJSON(['ok' => false, 'message' => $exception->getMessage()]);
+        }
     }
 
     public function outlet()
     {
-        return $this->response->setJSON(['ok' => true, 'data' => $this->access->saveOutlet($this->payload())]);
+        try {
+            $payload = $this->payload();
+            $companyId = (int) ($payload['company_id'] ?? 1);
+            $this->validateScope($companyId, -1);
+            return $this->response->setJSON(['ok' => true, 'data' => $this->access->saveOutlet($payload)]);
+        } catch (\Throwable $exception) {
+            return $this->response->setStatusCode(422)->setJSON(['ok' => false, 'message' => $exception->getMessage()]);
+        }
     }
 
     public function listOutlets()
     {
-        $companyId = $this->request->getGet('companyId') ?: $this->request->getGet('company_id');
-        $outlets = $this->access->data()['outlets'] ?? [];
-        if ($companyId) {
-            $legacyCompanyId = is_numeric($companyId) ? ((int) $companyId === 1 ? 'company-main' : 'company-' . $companyId) : (string) $companyId;
-            $outlets = array_values(array_filter($outlets, fn ($outlet) => $outlet['companyId'] === $legacyCompanyId));
+        try {
+            $companyId = (int) ($this->request->getGet('companyId') ?: $this->request->getGet('company_id') ?: 1);
+            $this->validateScope($companyId, -1);
+            $outlets = $this->access->data()['outlets'] ?? [];
+            if ($companyId) {
+                $legacyCompanyId = $companyId === 1 ? 'company-main' : 'company-' . $companyId;
+                $outlets = array_values(array_filter($outlets, fn ($outlet) => $outlet['companyId'] === $legacyCompanyId));
+            }
+            return $this->response->setJSON(['ok' => true, 'data' => $this->arrayPage($outlets, $this->request->getGet())]);
+        } catch (\Throwable $exception) {
+            return $this->response->setStatusCode(422)->setJSON(['ok' => false, 'message' => $exception->getMessage()]);
         }
-        return $this->response->setJSON(['ok' => true, 'data' => $this->arrayPage($outlets, $this->request->getGet())]);
     }
 
     public function updateOutlet(string $id)
     {
-        return $this->response->setJSON(['ok' => true, 'data' => $this->access->saveOutlet(['id' => $id] + $this->payload())]);
+        try {
+            $payload = $this->payload();
+            $companyId = (int) ($payload['company_id'] ?? 1);
+            $this->validateScope($companyId, (int) $id);
+            return $this->response->setJSON(['ok' => true, 'data' => $this->access->saveOutlet(['id' => $id] + $payload)]);
+        } catch (\Throwable $exception) {
+            return $this->response->setStatusCode(422)->setJSON(['ok' => false, 'message' => $exception->getMessage()]);
+        }
     }
 
     public function getOutlet(string $id)
     {
-        return $this->jsonAction(fn () => $this->access->outletDetail($id));
+        try {
+            $outlet = $this->access->outletDetail($id);
+            $companyId = $this->numericCompanyId($outlet['companyId'] ?? '');
+            $this->validateScope($companyId, (int) $id);
+            return $this->response->setJSON(['ok' => true, 'data' => $outlet]);
+        } catch (\Throwable $exception) {
+            return $this->response->setStatusCode(422)->setJSON(['ok' => false, 'message' => $exception->getMessage()]);
+        }
     }
 
     public function deleteOutlet(string $id)
     {
-        return $this->response->setJSON(['ok' => true, 'data' => $this->access->deactivateOutlet($id)]);
+        try {
+            $outlet = $this->access->outletDetail($id);
+            $companyId = $this->numericCompanyId($outlet['companyId'] ?? '');
+            $this->validateScope($companyId, (int) $id);
+            return $this->response->setJSON(['ok' => true, 'data' => $this->access->deactivateOutlet($id)]);
+        } catch (\Throwable $exception) {
+            return $this->response->setStatusCode(422)->setJSON(['ok' => false, 'message' => $exception->getMessage()]);
+        }
     }
 
     public function role()
     {
-        return $this->response->setJSON(['ok' => true, 'data' => $this->access->saveRole($this->payload())]);
+        try {
+            $payload = $this->payload();
+            $companyId = (int) ($payload['company_id'] ?? 1);
+            $this->validateScope($companyId, -1);
+            return $this->response->setJSON(['ok' => true, 'data' => $this->access->saveRole($payload)]);
+        } catch (\Throwable $exception) {
+            return $this->response->setStatusCode(422)->setJSON(['ok' => false, 'message' => $exception->getMessage()]);
+        }
     }
 
     public function listRoles()
     {
-        $companyId = $this->request->getGet('companyId') ?: $this->request->getGet('company_id');
-        $roles = $this->access->data()['companyRoles'] ?? [];
-        if ($companyId) {
-            $legacyCompanyId = is_numeric($companyId) ? ((int) $companyId === 1 ? 'company-main' : 'company-' . $companyId) : (string) $companyId;
-            $roles = array_values(array_filter($roles, fn ($role) => $role['companyId'] === $legacyCompanyId));
+        try {
+            $companyId = (int) ($this->request->getGet('companyId') ?: $this->request->getGet('company_id') ?: 1);
+            $this->validateScope($companyId, -1);
+            $roles = $this->access->data()['companyRoles'] ?? [];
+            if ($companyId) {
+                $legacyCompanyId = $companyId === 1 ? 'company-main' : 'company-' . $companyId;
+                $roles = array_values(array_filter($roles, fn ($role) => $role['companyId'] === $legacyCompanyId));
+            }
+            return $this->response->setJSON(['ok' => true, 'data' => $this->arrayPage($roles, $this->request->getGet())]);
+        } catch (\Throwable $exception) {
+            return $this->response->setStatusCode(422)->setJSON(['ok' => false, 'message' => $exception->getMessage()]);
         }
-        return $this->response->setJSON(['ok' => true, 'data' => $this->arrayPage($roles, $this->request->getGet())]);
     }
 
     public function updateRole(string $id)
     {
-        return $this->response->setJSON(['ok' => true, 'data' => $this->access->saveRole(['id' => $id] + $this->payload())]);
+        try {
+            $payload = $this->payload();
+            $companyId = (int) ($payload['company_id'] ?? 1);
+            $this->validateScope($companyId, -1);
+            return $this->response->setJSON(['ok' => true, 'data' => $this->access->saveRole(['id' => $id] + $payload)]);
+        } catch (\Throwable $exception) {
+            return $this->response->setStatusCode(422)->setJSON(['ok' => false, 'message' => $exception->getMessage()]);
+        }
     }
 
     public function getRole(string $id)
     {
-        return $this->jsonAction(fn () => $this->access->roleDetail($id));
+        try {
+            $role = $this->access->roleDetail($id);
+            $companyId = $this->numericCompanyId($role['companyId'] ?? '');
+            $this->validateScope($companyId, -1);
+            return $this->response->setJSON(['ok' => true, 'data' => $role]);
+        } catch (\Throwable $exception) {
+            return $this->response->setStatusCode(422)->setJSON(['ok' => false, 'message' => $exception->getMessage()]);
+        }
     }
 
     public function deleteRole(string $id)
     {
-        return $this->response->setJSON(['ok' => true, 'data' => $this->access->deactivateRole($id)]);
+        try {
+            $role = $this->access->roleDetail($id);
+            $companyId = $this->numericCompanyId($role['companyId'] ?? '');
+            $this->validateScope($companyId, -1);
+            return $this->response->setJSON(['ok' => true, 'data' => $this->access->deactivateRole($id)]);
+        } catch (\Throwable $exception) {
+            return $this->response->setStatusCode(422)->setJSON(['ok' => false, 'message' => $exception->getMessage()]);
+        }
     }
 
     public function user()
     {
-        return $this->jsonAction(fn () => $this->access->saveUser($this->payload()));
+        try {
+            $payload = $this->payload();
+            $companyId = (int) ($payload['company_id'] ?? 1);
+            $this->validateScope($companyId, -1);
+            return $this->response->setJSON(['ok' => true, 'data' => $this->access->saveUser($payload)]);
+        } catch (\Throwable $exception) {
+            return $this->response->setStatusCode(422)->setJSON(['ok' => false, 'message' => $exception->getMessage()]);
+        }
     }
 
     public function listUsers()
     {
-        return $this->response->setJSON([
-            'ok' => true,
-            'data' => $this->access->userPage($this->companyId(), $this->request->getGet()),
-        ]);
+        try {
+            $companyId = $this->companyId();
+            $this->validateScope($companyId, -1);
+            return $this->response->setJSON([
+                'ok' => true,
+                'data' => $this->access->userPage($companyId, $this->request->getGet()),
+            ]);
+        } catch (\Throwable $exception) {
+            return $this->response->setStatusCode(422)->setJSON(['ok' => false, 'message' => $exception->getMessage()]);
+        }
     }
 
     public function getUser(string $id)
     {
-        return $this->jsonAction(fn () => $this->access->userDetail($id, $this->companyId()));
+        try {
+            $companyId = $this->companyId();
+            $this->validateScope($companyId, -1);
+            return $this->response->setJSON(['ok' => true, 'data' => $this->access->userDetail($id, $companyId)]);
+        } catch (\Throwable $exception) {
+            return $this->response->setStatusCode(422)->setJSON(['ok' => false, 'message' => $exception->getMessage()]);
+        }
     }
 
     public function updateUser(string $id)
     {
-        return $this->jsonAction(fn () => $this->access->saveUser(['id' => $id] + $this->payload()));
+        try {
+            $payload = $this->payload();
+            $companyId = (int) ($payload['company_id'] ?? 1);
+            $this->validateScope($companyId, -1);
+            return $this->response->setJSON(['ok' => true, 'data' => $this->access->saveUser(['id' => $id] + $payload)]);
+        } catch (\Throwable $exception) {
+            return $this->response->setStatusCode(422)->setJSON(['ok' => false, 'message' => $exception->getMessage()]);
+        }
     }
 
     public function resendUserInvitation(string $id)
     {
-        return $this->jsonAction(fn () => $this->access->resendUserInvitation($id, $this->companyId()));
+        try {
+            $companyId = $this->companyId();
+            $this->validateScope($companyId, -1);
+            return $this->jsonAction(fn () => $this->access->resendUserInvitation($id, $companyId));
+        } catch (\Throwable $exception) {
+            return $this->response->setStatusCode(422)->setJSON(['ok' => false, 'message' => $exception->getMessage()]);
+        }
     }
 
     public function uploadLogo()
@@ -188,7 +300,13 @@ class AccessController extends BaseController
 
     public function deleteUser(string $id)
     {
-        return $this->response->setJSON(['ok' => true, 'data' => $this->access->deactivateUser($id)]);
+        try {
+            $companyId = $this->companyId();
+            $this->validateScope($companyId, -1);
+            return $this->response->setJSON(['ok' => true, 'data' => $this->access->deactivateUser($id)]);
+        } catch (\Throwable $exception) {
+            return $this->response->setStatusCode(422)->setJSON(['ok' => false, 'message' => $exception->getMessage()]);
+        }
     }
 
     private function payload(): array
@@ -198,7 +316,9 @@ class AccessController extends BaseController
 
     private function companyId(): int
     {
-        return (int) ($this->request->getGet('company_id') ?? $this->payload()['company_id'] ?? 1);
+        $companyId = (int) ($this->request->getGet('company_id') ?? $this->payload()['company_id'] ?? 1);
+        $this->validateScope($companyId, -1);
+        return $companyId;
     }
 
     private function jsonAction(callable $action)

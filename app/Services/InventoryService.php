@@ -11,6 +11,7 @@ use Config\Database;
 
 class InventoryService
 {
+    use \App\Services\Shared\MappingHelperTrait;
     private BaseConnection $db;
     private IngredientModel $ingredients;
     private IngredientTemplateModel $templates;
@@ -502,7 +503,7 @@ class InventoryService
         return 'ING-' . str_pad((string) ($count + 1), 4, '0', STR_PAD_LEFT);
     }
 
-    private function ingredientId(string|int|null $legacyId): ?int
+    private function ingredientId($legacyId): ?int
     {
         if (! $legacyId) return null;
         if (is_numeric($legacyId)) return (int) $legacyId;
@@ -693,7 +694,7 @@ class InventoryService
         return (int) $this->templates->getInsertID();
     }
 
-    private function templateId(string|int|null $value, int $companyId): ?int
+    private function templateId($value, int $companyId): ?int
     {
         if (! $value || $value === 'new') return null;
         if (is_numeric($value)) {
@@ -735,11 +736,6 @@ class InventoryService
         return $code;
     }
 
-    private function companyCode(int $id): string
-    {
-        return $id === 1 ? 'company-main' : 'company-' . $id;
-    }
-
     private function templateCodeExists(string $code, int $companyId): bool
     {
         $builder = $this->templates->where('code', $code);
@@ -749,24 +745,18 @@ class InventoryService
         return (bool) $builder->first();
     }
 
-    private function outletCode(int $id): string
-    {
-        return match ($id) {
-            1 => 'outlet-main',
-            2 => 'outlet-north',
-            3 => 'outlet-south',
-            default => 'outlet-' . $id,
-        };
-    }
-
     private function uiMovementType(string $type): string
     {
-        return match ($type) {
-            'opening_balance' => 'opening',
-            'pos_usage' => 'sale',
-            'production_usage' => 'production',
-            default => $type,
-        };
+        switch ($type) {
+            case 'opening_balance':
+                return 'opening';
+            case 'pos_usage':
+                return 'sale';
+            case 'production_usage':
+                return 'production';
+            default:
+                return $type;
+        }
     }
 
     private function dateOrNull(?string $value): ?string
@@ -795,10 +785,5 @@ class InventoryService
         }
 
         return $data;
-    }
-
-    private function rowBelongsToCompany(array $row, int $companyId): bool
-    {
-        return ! array_key_exists('company_id', $row) || (int) $row['company_id'] === $companyId;
     }
 }

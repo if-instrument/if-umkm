@@ -8,6 +8,20 @@ use App\Services\TenantDatabaseService;
 
 class OnlineOrderController extends BaseController
 {
+    private TenantDatabaseService $tenantDb;
+    private OnlineOrderApiService $onlineOrderApi;
+    private OnlineOrderPagePresenter $presenter;
+
+    public function __construct(
+        ?TenantDatabaseService $tenantDb = null,
+        ?OnlineOrderApiService $onlineOrderApi = null,
+        ?OnlineOrderPagePresenter $presenter = null
+    ) {
+        $this->tenantDb = $tenantDb ?? service('tenantDatabaseService');
+        $this->onlineOrderApi = $onlineOrderApi ?? service('onlineOrderApiService');
+        $this->presenter = $presenter ?? service('onlineOrderPagePresenter');
+    }
+
     public function show()
     {
         return $this->renderOrderPage();
@@ -15,7 +29,7 @@ class OnlineOrderController extends BaseController
 
     public function tenant(string $slug)
     {
-        $company = (new TenantDatabaseService())->companyBySlug($slug);
+        $company = $this->tenantDb->companyBySlug($slug);
         if (! $company) {
             return $this->response->setStatusCode(404)->setBody('Company route tidak ditemukan.');
         }
@@ -25,24 +39,24 @@ class OnlineOrderController extends BaseController
 
     public function bootstrap()
     {
-        return $this->jsonAction(fn () => (new OnlineOrderPagePresenter())->bootstrap(
-            (new OnlineOrderApiService())->bootstrap($this->request->getGet())
+        return $this->jsonAction(fn () => $this->presenter->bootstrap(
+            $this->onlineOrderApi->bootstrap($this->request->getGet())
         ));
     }
 
     public function member()
     {
-        return $this->jsonAction(fn () => (new OnlineOrderApiService())->member($this->request->getGet()));
+        return $this->jsonAction(fn () => $this->onlineOrderApi->member($this->request->getGet()));
     }
 
     public function status()
     {
-        return $this->jsonAction(fn () => (new OnlineOrderApiService())->status($this->request->getGet()));
+        return $this->jsonAction(fn () => $this->onlineOrderApi->status($this->request->getGet()));
     }
 
     public function submit()
     {
-        return $this->jsonAction(fn () => (new OnlineOrderApiService())->submit($this->request->getJSON(true) ?: []));
+        return $this->jsonAction(fn () => $this->onlineOrderApi->submit($this->request->getJSON(true) ?: []));
     }
 
     private function renderOrderPage(string $companySlug = ''): \CodeIgniter\HTTP\ResponseInterface

@@ -8,6 +8,20 @@ use App\Services\TenantDatabaseService;
 
 class UserRoleController extends BaseController
 {
+    private TenantDatabaseService $tenantDb;
+    private AccessApiService $accessApi;
+    private UserRolePagePresenter $presenter;
+
+    public function __construct(
+        ?TenantDatabaseService $tenantDb = null,
+        ?AccessApiService $accessApi = null,
+        ?UserRolePagePresenter $presenter = null
+    ) {
+        $this->tenantDb = $tenantDb ?? service('tenantDatabaseService');
+        $this->accessApi = $accessApi ?? service('accessApiService');
+        $this->presenter = $presenter ?? service('userRolePagePresenter');
+    }
+
     public function show()
     {
         return $this->renderPage();
@@ -15,7 +29,7 @@ class UserRoleController extends BaseController
 
     public function tenant(string $slug)
     {
-        $company = (new TenantDatabaseService())->companyBySlug($slug);
+        $company = $this->tenantDb->companyBySlug($slug);
         if (! $company) {
             return $this->response->setStatusCode(404)->setBody('Company route tidak ditemukan.');
         }
@@ -28,11 +42,11 @@ class UserRoleController extends BaseController
         $claims = (array) ($this->request->jwt ?? []);
         $isSuperAdmin = ($claims['authType'] ?? '') === 'super_admin';
         $companyId = $this->numericCompanyId((string) ($claims['companyId'] ?? $this->request->getGet('company_id') ?? 'company-main'));
-        $data = (new AccessApiService())->pageData($companyId, $isSuperAdmin);
+        $data = $this->accessApi->pageData($companyId, $isSuperAdmin);
 
         return $this->response->setJSON([
             'ok' => true,
-            'data' => (new UserRolePagePresenter())->bootstrap($data),
+            'data' => $this->presenter->bootstrap($data),
         ]);
     }
 

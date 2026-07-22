@@ -11,9 +11,9 @@ class ProductSuiteController extends BaseController
 {
     private ProductSuiteService $products;
 
-    public function __construct()
+    public function __construct(?ProductSuiteService $products = null)
     {
-        $this->products = new ProductSuiteService();
+        $this->products = $products ?? service('productSuiteService');
     }
 
     public function listProducts()
@@ -228,10 +228,11 @@ class ProductSuiteController extends BaseController
         $requestedCompanyId = (int) ($payload['company_id'] ?? $this->request->getGet('company_id') ?? 1);
         $companyId = ($claims['authType'] ?? '') !== 'super_admin' && $claimCompanyId ? $claimCompanyId : $requestedCompanyId;
         $requestedOutletId = (int) ($payload['outlet_id'] ?? $this->request->getGet('outlet_id') ?? 1);
+        $this->validateScope($companyId, $requestedOutletId);
         return [$companyId, $this->authorizedOutletId($claims, $companyId, $requestedOutletId)];
     }
 
-    private function numericScopeId(string|int|null $value, string $type): int
+    private function numericScopeId($value, string $type): int
     {
         if (is_numeric($value)) return (int) $value;
         if ($type === 'company' && $value === 'company-main') return 1;

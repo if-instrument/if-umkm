@@ -17,6 +17,20 @@ class ProductPageController extends BaseController
         'ingredient-templates' => 'ingredient-templates.html',
     ];
 
+    private TenantDatabaseService $tenantDb;
+    private ProductApiService $productApi;
+    private ProductPagePresenter $presenter;
+
+    public function __construct(
+        ?TenantDatabaseService $tenantDb = null,
+        ?ProductApiService $productApi = null,
+        ?ProductPagePresenter $presenter = null
+    ) {
+        $this->tenantDb = $tenantDb ?? service('tenantDatabaseService');
+        $this->productApi = $productApi ?? service('productApiService');
+        $this->presenter = $presenter ?? service('productPagePresenter');
+    }
+
     public function show(string $page)
     {
         return $this->renderPage($page);
@@ -24,7 +38,7 @@ class ProductPageController extends BaseController
 
     public function tenant(string $slug, string $page)
     {
-        $company = (new TenantDatabaseService())->companyBySlug($slug);
+        $company = $this->tenantDb->companyBySlug($slug);
         if (! $company) {
             return $this->response->setStatusCode(404)->setBody('Company route tidak ditemukan.');
         }
@@ -36,11 +50,11 @@ class ProductPageController extends BaseController
     {
         [$companyId, $outletId] = $this->scope();
         $view = trim((string) ($this->request->getGet('view') ?? 'products'));
-        $data = (new ProductApiService())->pageData($companyId, $outletId, $this->request->getGet());
+        $data = $this->productApi->pageData($companyId, $outletId, $this->request->getGet());
 
         return $this->response->setJSON([
             'ok' => true,
-            'data' => (new ProductPagePresenter())->bootstrap($data, ['view' => $view]),
+            'data' => $this->presenter->bootstrap($data, ['view' => $view]),
         ]);
     }
 

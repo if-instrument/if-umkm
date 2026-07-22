@@ -8,6 +8,7 @@ use Config\Database;
 
 class ProfitLossService
 {
+    use \App\Services\Shared\MappingHelperTrait;
     private ReportModel $reports;
     private OperatingExpenseModel $expenses;
 
@@ -333,12 +334,16 @@ class ProfitLossService
 
     private function movementLabel(string $type): string
     {
-        return match ($type) {
-            'expired' => 'Expired',
-            'waste' => 'Waste / Terbuang',
-            'adjustment' => 'Koreksi Stok',
-            default => $type,
-        };
+        switch ($type) {
+            case 'expired':
+                return 'Expired';
+            case 'waste':
+                return 'Waste / Terbuang';
+            case 'adjustment':
+                return 'Koreksi Stok';
+            default:
+                return $type;
+        }
     }
 
     private function modifierNames(?string $json): array
@@ -390,7 +395,7 @@ class ProfitLossService
         return $value ? date(DATE_ATOM, strtotime($value)) : date(DATE_ATOM);
     }
 
-    private function numericId(string|int|null $value): ?int
+    private function numericId($value): ?int
     {
         if (! $value) return null;
         if (is_numeric($value)) return (int) $value;
@@ -415,8 +420,5 @@ class ProfitLossService
         return $data;
     }
 
-    private function rowBelongsToCompany(array $row, int $companyId): bool
-    {
-        return ! array_key_exists('company_id', $row) || (int) $row['company_id'] === $companyId;
-    }
+
 }

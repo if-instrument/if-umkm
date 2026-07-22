@@ -96,7 +96,7 @@ function resetDataTable(table) {
 }
 
 export function enhanceAllDataTables(scope = document) {
-  scope.querySelectorAll("table").forEach((table) => {
+  scope.querySelectorAll("table:not(.no-enhance)").forEach((table) => {
     const heading = table.closest(".workspace-panel, .modal-dialog")?.querySelector("h3")?.textContent || document.title;
     enhanceDataTable(table, { title: heading });
   });

@@ -14,6 +14,7 @@ use Config\Database;
 
 class PaymentGatewayService
 {
+    use \App\Services\Shared\MappingHelperTrait;
     private PaymentTransactionModel $transactions;
     private PaymentTransactionLogModel $transactionLogs;
     private const XENDIT_PAYMENT_REQUEST_URL = 'https://api.xendit.co/v3/payment_requests';
@@ -270,10 +271,27 @@ class PaymentGatewayService
         return $this->transactionPayload($this->transactions->find((int) $row['id']));
     }
 
-    public function handleXenditWebhook(array $payload): array
+    public function handleXenditWebhook(array $payload, string $callbackHeaderToken = ''): array
     {
         $event = (string) ($payload['event'] ?? '');
         $data = $payload['data'] ?? [];
+
+        // 1. Switch Database context if company_slug is sent in metadata (for dedicated tenants)
+        $companySlug = (string) ($data['metadata']['company_slug'] ?? $payload['metadata']['company_slug'] ?? '');
+        $companyId = (int) ($data['metadata']['company_id'] ?? $payload['metadata']['company_id'] ?? 1);
+        if ($companySlug !== '') {
+            (new TenantDatabaseService())->activateForCompanySlug($companySlug);
+        }
+
+        // 2. Fetch expected callback token
+        $settings = $this->gatewaySettings($companyId, 0);
+        $expectedToken = $this->credential('XENDIT_CALLBACK_TOKEN', $settings['xenditCallbackToken'] ?? '');
+
+        // 3. Verify callback token
+        if ($expectedToken !== '' && $callbackHeaderToken !== $expectedToken) {
+            throw new \RuntimeException('Akses tidak sah: Token callback Xendit tidak valid.', 401);
+        }
+
         $paymentReference = (string) ($data['payment_request_id'] ?? $data['external_id'] ?? $payload['external_id'] ?? '');
         if ($paymentReference === '') {
             throw new \InvalidArgumentException('Webhook Xendit tidak memiliki payment reference.');
@@ -484,6 +502,8 @@ class PaymentGatewayService
 
     private function createXenditQris(array $method, array $settings, string $reference, float $amount, string $orderNo): array
     {
+        $companyId = (int) ($method['company_id'] ?? 1);
+        $companySlug = $this->companySlug($companyId);
         $payload = [
             'reference_id' => $reference,
             'type' => 'PAY',
@@ -498,6 +518,8 @@ class PaymentGatewayService
                 'order_no' => $orderNo,
                 'payment_method_id' => (string) ($method['id'] ?? ''),
                 'outlet_terminal' => (string) ($method['terminal_id'] ?? ''),
+                'company_id' => (string) $companyId,
+                'company_slug' => $companySlug,
             ],
         ];
         $secret = $this->credential('XENDIT_SECRET_KEY', $settings['xenditSecretKey'] ?? '');
@@ -557,6 +579,8 @@ class PaymentGatewayService
 
     private function xenditCustomerCardLink(array $method, array $settings, string $reference, float $amount, string $orderNo): array
     {
+        $companyId = (int) ($method['company_id'] ?? 1);
+        $companySlug = $this->companySlug($companyId);
         $target = $this->customerCardUrl($reference);
         $secret = $this->credential('XENDIT_SECRET_KEY', $settings['xenditSecretKey'] ?? '');
         $payload = [
@@ -570,6 +594,13 @@ class PaymentGatewayService
             'fees' => [],
             'customer' => [
                 'given_names' => 'POS Customer',
+            ],
+            'metadata' => [
+                'order_no' => $orderNo,
+                'payment_method_id' => (string) ($method['id'] ?? ''),
+                'outlet_terminal' => (string) ($method['terminal_id'] ?? ''),
+                'company_id' => (string) $companyId,
+                'company_slug' => $companySlug,
             ],
         ];
         if ($secret === '') {
@@ -903,13 +934,20 @@ class PaymentGatewayService
 
     private function midtransLocalStatus(string $status): string
     {
-        return match (strtolower($status)) {
-            'capture', 'settlement' => StatusCodeService::PAYMENT_PAID,
-            'deny', 'failure' => StatusCodeService::PAYMENT_FAILED,
-            'cancel' => StatusCodeService::PAYMENT_CANCELLED,
-            'expire' => StatusCodeService::PAYMENT_EXPIRED,
-            default => StatusCodeService::PAYMENT_UNPAID,
-        };
+        switch (strtolower($status)) {
+            case 'capture':
+            case 'settlement':
+                return StatusCodeService::PAYMENT_PAID;
+            case 'deny':
+            case 'failure':
+                return StatusCodeService::PAYMENT_FAILED;
+            case 'cancel':
+                return StatusCodeService::PAYMENT_CANCELLED;
+            case 'expire':
+                return StatusCodeService::PAYMENT_EXPIRED;
+            default:
+                return StatusCodeService::PAYMENT_UNPAID;
+        }
     }
 
     private function offlineGatewayResponse(string $provider, string $type, array $method, array $settings, string $reference, float $amount, string $orderNo, array $extra = []): array
@@ -986,13 +1024,18 @@ class PaymentGatewayService
 
     private function edcAdapter(string $channel): ?EdcTerminalAdapter
     {
-        return match (strtoupper(trim($channel))) {
-            'BCA' => new BcaEdcAdapter(),
-            'BRI' => new BriEdcAdapter(),
-            'BNI' => new BniEdcAdapter(),
-            'MANDIRI' => new MandiriEdcAdapter(),
-            default => null,
-        };
+        switch (strtoupper(trim($channel))) {
+            case 'BCA':
+                return new BcaEdcAdapter();
+            case 'BRI':
+                return new BriEdcAdapter();
+            case 'BNI':
+                return new BniEdcAdapter();
+            case 'MANDIRI':
+                return new MandiriEdcAdapter();
+            default:
+                return null;
+        }
     }
 
     private function edcTerminalLog(array $result): array
@@ -1092,13 +1135,22 @@ class PaymentGatewayService
 
     private function initialTransactionStatus(string $gatewayStatus): string
     {
-        return match ($gatewayStatus) {
-            StatusCodeService::PAYMENT_PAID, 'paid' => StatusCodeService::PAYMENT_PAID,
-            StatusCodeService::PAYMENT_FAILED, 'failed' => StatusCodeService::PAYMENT_FAILED,
-            StatusCodeService::PAYMENT_CANCELLED, 'cancelled' => StatusCodeService::PAYMENT_CANCELLED,
-            StatusCodeService::PAYMENT_EXPIRED, 'expired' => StatusCodeService::PAYMENT_EXPIRED,
-            default => StatusCodeService::PAYMENT_UNPAID,
-        };
+        switch ($gatewayStatus) {
+            case StatusCodeService::PAYMENT_PAID:
+            case 'paid':
+                return StatusCodeService::PAYMENT_PAID;
+            case StatusCodeService::PAYMENT_FAILED:
+            case 'failed':
+                return StatusCodeService::PAYMENT_FAILED;
+            case StatusCodeService::PAYMENT_CANCELLED:
+            case 'cancelled':
+                return StatusCodeService::PAYMENT_CANCELLED;
+            case StatusCodeService::PAYMENT_EXPIRED:
+            case 'expired':
+                return StatusCodeService::PAYMENT_EXPIRED;
+            default:
+                return StatusCodeService::PAYMENT_UNPAID;
+        }
     }
 
     private function writeGatewayLogs(int $paymentTransactionId, int $companyId, int $outletId, array $logs): void
@@ -1139,13 +1191,27 @@ class PaymentGatewayService
         if (preg_match('/^\d{2}$/', $value)) {
             return $value;
         }
-        return match ($value) {
-            'success', 'ok', 'paid', 'succeeded', 'settled' => StatusCodeService::PAYMENT_PAID,
-            'failed', 'failure', 'error', 'configuration_required', 'send_failed' => StatusCodeService::PAYMENT_FAILED,
-            'expired' => StatusCodeService::PAYMENT_EXPIRED,
-            'cancelled', 'canceled' => StatusCodeService::PAYMENT_CANCELLED,
-            default => StatusCodeService::PAYMENT_UNPAID,
-        };
+        switch ($value) {
+            case 'success':
+            case 'ok':
+            case 'paid':
+            case 'succeeded':
+            case 'settled':
+                return StatusCodeService::PAYMENT_PAID;
+            case 'failed':
+            case 'failure':
+            case 'error':
+            case 'configuration_required':
+            case 'send_failed':
+                return StatusCodeService::PAYMENT_FAILED;
+            case 'expired':
+                return StatusCodeService::PAYMENT_EXPIRED;
+            case 'cancelled':
+            case 'canceled':
+                return StatusCodeService::PAYMENT_CANCELLED;
+            default:
+                return StatusCodeService::PAYMENT_UNPAID;
+        }
     }
 
     private function gatewayProvider(array $settings, string $type, array $method = []): string
@@ -1176,6 +1242,12 @@ class PaymentGatewayService
         return trim((string) ($databaseValue ?: env($name) ?: getenv($name) ?: ''));
     }
 
+    private function companySlug(int $companyId): string
+    {
+        $company = Database::connect()->table('companies')->where('id', $companyId)->get()->getRowArray();
+        return (string) ($company['route_slug'] ?? '');
+    }
+
     private function gatewaySettings(int $companyId, int $outletId): array
     {
         $builder = Database::connect()
@@ -1194,6 +1266,7 @@ class PaymentGatewayService
                 'payment_gateway_timeout',
                 'xendit_secret_key',
                 'midtrans_server_key',
+                'xendit_callback_token',
             ])
             ->get()
             ->getResultArray();
@@ -1207,6 +1280,7 @@ class PaymentGatewayService
             'timeout' => (int) ($map['payment_gateway_timeout'] ?? 15),
             'xenditSecretKey' => trim((string) ($map['xendit_secret_key'] ?? '')),
             'midtransServerKey' => trim((string) ($map['midtrans_server_key'] ?? '')),
+            'xenditCallbackToken' => trim((string) ($map['xendit_callback_token'] ?? '')),
         ];
     }
 
@@ -1227,10 +1301,6 @@ class PaymentGatewayService
         return $data;
     }
 
-    private function rowBelongsToCompany(array $row, int $companyId): bool
-    {
-        return ! array_key_exists('company_id', $row) || (int) $row['company_id'] === $companyId;
-    }
 
     private function midtransQrActionUrl(array $body): ?string
     {
@@ -1307,22 +1377,32 @@ class PaymentGatewayService
 
     private function xenditLocalStatus(string $status): string
     {
-        return match (strtoupper($status)) {
-            'SUCCEEDED' => StatusCodeService::PAYMENT_PAID,
-            'FAILED' => StatusCodeService::PAYMENT_FAILED,
-            'CANCELED', 'CANCELLED' => StatusCodeService::PAYMENT_CANCELLED,
-            'EXPIRED' => StatusCodeService::PAYMENT_EXPIRED,
-            default => StatusCodeService::PAYMENT_UNPAID,
-        };
+        switch (strtoupper($status)) {
+            case 'SUCCEEDED':
+                return StatusCodeService::PAYMENT_PAID;
+            case 'FAILED':
+                return StatusCodeService::PAYMENT_FAILED;
+            case 'CANCELED':
+            case 'CANCELLED':
+                return StatusCodeService::PAYMENT_CANCELLED;
+            case 'EXPIRED':
+                return StatusCodeService::PAYMENT_EXPIRED;
+            default:
+                return StatusCodeService::PAYMENT_UNPAID;
+        }
     }
 
     private function xenditInvoiceStatus(string $status): string
     {
-        return match (strtoupper($status)) {
-            'PAID', 'SETTLED' => StatusCodeService::PAYMENT_PAID,
-            'EXPIRED' => StatusCodeService::PAYMENT_EXPIRED,
-            default => StatusCodeService::PAYMENT_UNPAID,
-        };
+        switch (strtoupper($status)) {
+            case 'PAID':
+            case 'SETTLED':
+                return StatusCodeService::PAYMENT_PAID;
+            case 'EXPIRED':
+                return StatusCodeService::PAYMENT_EXPIRED;
+            default:
+                return StatusCodeService::PAYMENT_UNPAID;
+        }
     }
 
     private function xenditWebhookStatus(string $event, string $status): string
@@ -1349,7 +1429,7 @@ class PaymentGatewayService
         return $response[$key] ?? null;
     }
 
-    private function numericId(string|int|null $value): ?int
+    private function numericId($value): ?int
     {
         if (! $value) return null;
         if (is_numeric($value)) return (int) $value;

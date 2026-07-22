@@ -129,25 +129,44 @@ export function bindDynamicFieldListeners() {
 }
 
 export function bindBookSwipe() {
-  if (bookState.flipbookReady) return;
   const frame = byId("order-book-frame");
+  if (!frame || frame.dataset.swipeBound === "true") return;
+  frame.dataset.swipeBound = "true";
+
   let startX = 0;
   let startY = 0;
+  let currentX = 0;
+  let currentY = 0;
   let tracking = false;
 
   const start = (clientX, clientY, target) => {
     if (interactiveSwipeTarget(target)) return;
     startX = clientX;
     startY = clientY;
+    currentX = clientX;
+    currentY = clientY;
     tracking = true;
+  };
+
+  const move = (clientX, clientY, event) => {
+    if (!tracking) return;
+    currentX = clientX;
+    currentY = clientY;
+    const deltaX = currentX - startX;
+    const deltaY = currentY - startY;
+    if (Math.abs(deltaX) > Math.abs(deltaY) * 1.1 && Math.abs(deltaX) > 10) {
+      if (event && event.cancelable) {
+        event.preventDefault();
+      }
+    }
   };
 
   const finish = (clientX, clientY) => {
     if (!tracking) return;
     tracking = false;
-    const deltaX = clientX - startX;
-    const deltaY = clientY - startY;
-    if (Math.abs(deltaX) < 48 || Math.abs(deltaX) < Math.abs(deltaY) * 1.15) return;
+    const deltaX = (clientX || currentX) - startX;
+    const deltaY = (clientY || currentY) - startY;
+    if (Math.abs(deltaX) < 32 || Math.abs(deltaX) < Math.abs(deltaY) * 1.1) return;
     const isForwardSwipe = deltaX < 0;
     if (isForwardSwipe && !canFreeTurnToPage(currentBookPage() + 1)) {
       showFeedback("Gunakan tombol di halaman ini untuk melanjutkan.", true);
@@ -157,39 +176,45 @@ export function bindBookSwipe() {
     else turnPrevPage();
   };
 
+  frame.addEventListener("touchstart", (event) => {
+    const touch = event.touches?.[0];
+    if (!touch) return;
+    start(touch.clientX, touch.clientY, event.target);
+  }, { passive: true });
+
+  frame.addEventListener("touchmove", (event) => {
+    const touch = event.touches?.[0];
+    if (!touch) return;
+    move(touch.clientX, touch.clientY, event);
+  }, { passive: false });
+
+  frame.addEventListener("touchend", (event) => {
+    const touch = event.changedTouches?.[0];
+    finish(touch ? touch.clientX : currentX, touch ? touch.clientY : currentY);
+  }, { passive: true });
+
+  frame.addEventListener("touchcancel", () => {
+    tracking = false;
+  }, { passive: true });
+
   frame.addEventListener("pointerdown", (event) => {
+    if (event.pointerType === "touch") return; // Touch handled by touchstart
     start(event.clientX, event.clientY, event.target);
   });
 
   frame.addEventListener("pointerup", (event) => {
+    if (event.pointerType === "touch") return;
     finish(event.clientX, event.clientY);
   });
 
   frame.addEventListener("pointercancel", () => {
     tracking = false;
   });
-
-  frame.addEventListener("touchstart", (event) => {
-    if (window.PointerEvent) return;
-    const touch = event.changedTouches?.[0];
-    if (!touch) return;
-    start(touch.clientX, touch.clientY, event.target);
-  }, { passive: true });
-
-  frame.addEventListener("touchend", (event) => {
-    if (window.PointerEvent) return;
-    const touch = event.changedTouches?.[0];
-    if (!touch) return;
-    finish(touch.clientX, touch.clientY);
-  }, { passive: true });
-
-  frame.addEventListener("touchcancel", () => {
-    tracking = false;
-  }, { passive: true });
 }
 
 export function interactiveSwipeTarget(target) {
-  return Boolean(target.closest("button, input, textarea, select, label, form, .public-menu-detail, .public-order-tabs"));
+  if (!target) return false;
+  return Boolean(target.closest("button, input:not([type='hidden']), textarea, select, a, [role='button']"));
 }
 
 export function registerGlobalClickDispatcher() {

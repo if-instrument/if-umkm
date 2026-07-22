@@ -8,6 +8,20 @@ use App\Services\TenantDatabaseService;
 
 class LoginController extends BaseController
 {
+    private TenantDatabaseService $tenantDb;
+    private AuthApiService $authApi;
+    private LoginPagePresenter $presenter;
+
+    public function __construct(
+        ?TenantDatabaseService $tenantDb = null,
+        ?AuthApiService $authApi = null,
+        ?LoginPagePresenter $presenter = null
+    ) {
+        $this->tenantDb = $tenantDb ?? service('tenantDatabaseService');
+        $this->authApi = $authApi ?? service('authApiService');
+        $this->presenter = $presenter ?? service('loginPagePresenter');
+    }
+
     public function show()
     {
         return $this->renderLoginPage();
@@ -15,7 +29,7 @@ class LoginController extends BaseController
 
     public function tenant(string $slug)
     {
-        $company = (new TenantDatabaseService())->companyBySlug($slug);
+        $company = $this->tenantDb->companyBySlug($slug);
         if (! $company) {
             return $this->response->setStatusCode(404)->setBody('Company route tidak ditemukan.');
         }
@@ -27,7 +41,7 @@ class LoginController extends BaseController
     {
         return $this->jsonAction(function () {
             $slug = trim((string) ($this->request->getGet('companySlug') ?? $this->request->getGet('company') ?? ''));
-            $data = (new AuthApiService())->bootstrap($slug);
+            $data = $this->authApi->bootstrap($slug);
             if ($slug !== '' && ! $data['company']) {
                 return $this->response->setStatusCode(404)->setJSON([
                     'ok' => false,
@@ -35,14 +49,14 @@ class LoginController extends BaseController
                 ]);
             }
 
-            return (new LoginPagePresenter())->bootstrap($data);
+            return $this->presenter->bootstrap($data);
         });
     }
 
     public function submit()
     {
         $payload = $this->request->getJSON(true) ?: [];
-        $result = (new AuthApiService())->login(
+        $result = $this->authApi->login(
             (string) ($payload['email'] ?? ''),
             (string) ($payload['password'] ?? ''),
             (string) ($payload['companySlug'] ?? '')

@@ -370,6 +370,7 @@ function openPosItemStockModal(item, product, order, itemKey, itemIndex, onSucce
   const shelfLifeDays = Number(product?.shelfLifeDays || 0);
   const autoExpiry = shelfLifeDays > 0 ? (() => { const d = new Date(`${today}T00:00:00`); d.setDate(d.getDate() + shelfLifeDays); return d.toISOString().slice(0, 10); })() : "";
 
+  const isPreorder = Boolean(product?.isPreorder || product?.is_preorder);
   dialog.innerHTML = `
     <header class="modal-header">
       <div>
@@ -383,7 +384,7 @@ function openPosItemStockModal(item, product, order, itemKey, itemIndex, onSucce
         <input type="text" value="${escapeHtml(product?.name || item.name)} · ${isRetail ? "Barang Dagang" : "Produk Produksi"}" disabled style="width:100%;" />
       </label>
       <label><span id="pis-qty-label">${isRetail ? "Qty Beli" : "Qty Produksi"}</span>
-        <input id="pis-qty" min="1" step="1" type="number" required value="${Number(item.qty)}" ${!isRetail && readiness.ready ? `max="${readiness.maxQty}"` : ""} />
+        <input id="pis-qty" min="1" step="1" type="number" required value="${Number(item.qty)}" ${!isRetail && !isPreorder && readiness.ready ? `max="${readiness.maxQty}"` : ""} />
       </label>
       ${isRetail ? `
         <label id="pis-total-cost-field">Total Harga Beli <input id="pis-total-cost" min="1" step="1" type="number" required /></label>
@@ -395,7 +396,7 @@ function openPosItemStockModal(item, product, order, itemKey, itemIndex, onSucce
         <div class="form-preview full-row" id="pis-expired-preview">${autoExpiry ? `Expired otomatis: ${autoExpiry} (${shelfLifeDays} hari setelah produksi)` : "Produk ini tidak memakai expired otomatis karena shelf life belum diisi."}</div>
       `}
       <label class="full-row">Catatan <input id="pis-note" autocomplete="off" placeholder="Contoh: pembelian supplier / produksi pagi" type="text" value="Fulfillment preorder #${order.orderNumber}" /></label>
-      <p class="form-preview full-row" id="pis-preview">${!isRetail && !readiness.ready ? readiness.message : (isRetail ? `Stok masuk ${Number(item.qty)} unit.` : `Maksimal produksi ${formatQty(readiness.maxQty)} unit. Stok saat ini ${formatQty(product?.finishedStock || 0)} unit.`)}</p>
+      <p class="form-preview full-row" id="pis-preview">${!isRetail && !isPreorder && !readiness.ready ? readiness.message : (isRetail ? `Stok masuk ${Number(item.qty)} unit.` : (isPreorder ? `Stok masuk preorder ${Number(item.qty)} unit. (Bahan baku dipotong saat proses kitchen)` : `Maksimal produksi ${formatQty(readiness.maxQty)} unit. Stok saat ini ${formatQty(product?.finishedStock || 0)} unit.`))}</p>
       <div class="modal-actions full-row">
         <button class="ghost-button" data-close-pos-item-stock type="button">Batal</button>
         <button class="primary-button" id="pis-submit" type="submit">${isRetail ? "Simpan Pembelian" : "Simpan Produksi"}</button>
@@ -418,23 +419,28 @@ function openPosItemStockModal(item, product, order, itemKey, itemIndex, onSucce
     submitBtn.disabled = false;
 
     if (!isRetail) {
-      const currentReadiness = posItemProductionReadiness(product);
-      if (!currentReadiness.ready) {
-        feedback.textContent = `Bahan kurang: ${currentReadiness.message}`;
-        feedback.classList.add("show");
-        submitBtn.disabled = true;
-        preview.textContent = currentReadiness.message;
-        return;
+      if (!isPreorder) {
+        const currentReadiness = posItemProductionReadiness(product);
+        if (!currentReadiness.ready) {
+          feedback.textContent = `Bahan kurang: ${currentReadiness.message}`;
+          feedback.classList.add("show");
+          submitBtn.disabled = true;
+          preview.textContent = currentReadiness.message;
+          return;
+        }
+        qtyInput.max = currentReadiness.maxQty;
+        if (qty > currentReadiness.maxQty) {
+          feedback.textContent = `Bahan kurang. Qty produksi maksimal ${formatQty(currentReadiness.maxQty)} unit.`;
+          feedback.classList.add("show");
+          submitBtn.disabled = true;
+          preview.textContent = currentReadiness.message;
+          return;
+        }
+        preview.textContent = `Maksimal produksi ${formatQty(currentReadiness.maxQty)} unit. Stok saat ini ${formatQty(product?.finishedStock || 0)} unit.`;
+      } else {
+        qtyInput.max = "";
+        preview.textContent = `Stok masuk preorder ${qty} unit. (Bahan baku dipotong saat proses kitchen)`;
       }
-      qtyInput.max = currentReadiness.maxQty;
-      if (qty > currentReadiness.maxQty) {
-        feedback.textContent = `Bahan kurang. Qty produksi maksimal ${formatQty(currentReadiness.maxQty)} unit.`;
-        feedback.classList.add("show");
-        submitBtn.disabled = true;
-        preview.textContent = currentReadiness.message;
-        return;
-      }
-      preview.textContent = `Maksimal produksi ${formatQty(currentReadiness.maxQty)} unit. Stok saat ini ${formatQty(product?.finishedStock || 0)} unit.`;
     } else {
       const totalCost = Number(totalCostInput?.value || 0);
       if (qty > 0 && totalCost > 0) {
@@ -468,7 +474,7 @@ function openPosItemStockModal(item, product, order, itemKey, itemIndex, onSucce
     const manufacturedAt = dialog.querySelector("#pis-manufactured-at").value;
     const note = dialog.querySelector("#pis-note").value.trim() || `Fulfillment preorder #${order.orderNumber}`;
     if (qty <= 0) { feedback.textContent = "Qty wajib lebih dari 0."; feedback.classList.add("show"); return; }
-    if (!isRetail) {
+    if (!isRetail && !isPreorder) {
       const currentReadiness = posItemProductionReadiness(product);
       if (!currentReadiness.ready) {
         feedback.textContent = `Bahan kurang: ${currentReadiness.message}`;
@@ -497,13 +503,14 @@ function openPosItemStockModal(item, product, order, itemKey, itemIndex, onSucce
         const res = apiPost(scopedApiUrl(`/api/product/${product.id}/produce`, state, session), scopedPayload(payload, state, session));
         if (!res || !res.ok) throw new Error(res?.message || "Gagal menyimpan stok produk.");
         
-        // Mark this item as ready in the database
-        const nextReadyItemKeys = [...(order.readyItemKeys || [])];
-        if (!nextReadyItemKeys.includes(itemKey)) {
-          nextReadyItemKeys.push(itemKey);
+        // Mark this item's PO stock as disiapkan in database
+        const nextFulfilledPoKeys = [...(order.fulfilledPoKeys || [])];
+        if (!nextFulfilledPoKeys.includes(itemKey)) {
+          nextFulfilledPoKeys.push(itemKey);
         }
+        order.fulfilledPoKeys = nextFulfilledPoKeys;
         
-        const response = apiPut(scopedApiUrl(`/api/order/${order.id}/ready-items`, state, session), scopedPayload({ readyItemKeys: nextReadyItemKeys }, state, session));
+        const response = apiPut(scopedApiUrl(`/api/order/${order.id}/fulfilled-po-keys`, state, session), scopedPayload({ fulfilledPoKeys: nextFulfilledPoKeys }, state, session));
         if (!response || !response.ok) throw new Error(response?.message || "Gagal menyimpan status pemenuhan ke pesanan.");
         
         closePosItemStockModal();
@@ -549,7 +556,7 @@ function renderPreorders() {
       const poItems = order.items.filter((item) => Boolean(item.isPreorder || item.is_preorder));
       const allPoFulfilled = poItems.length > 0 && poItems.every((item, i) => {
         const globalIdx = order.items.indexOf(item);
-        return (order.readyItemKeys || []).includes(posOrderItemKey(item, globalIdx >= 0 ? globalIdx : i));
+        return (order.fulfilledPoKeys || []).includes(posOrderItemKey(item, globalIdx >= 0 ? globalIdx : i));
       });
 
       return `
@@ -562,12 +569,10 @@ function renderPreorders() {
             <div class="preorder-items-detail" style="line-height: 1.4;">
               ${order.items.map((item, index) => {
                 const itemKey = posOrderItemKey(item, index);
-                const checked = (order.readyItemKeys || []).includes(itemKey);
+                const checked = (order.fulfilledPoKeys || []).includes(itemKey);
                 const isPo = Boolean(item.isPreorder || item.is_preorder);
-                const product = productById(state, item.productId);
-                const readyStock = product ? realProductAvailability(state, product, []) : 0;
                 const badge = isPo
-                  ? ` <span class="status-pill status-empty" style="font-size: 8px; padding: 1px 4px; margin-left: 4px; display: inline-block;">Preorder (PO)</span> <span style="font-size: 10px; color: var(--text-secondary); margin-left: 4px;">(Ready: ${readyStock})</span>`
+                  ? ` <span class="status-pill status-empty" style="font-size: 8px; padding: 1px 4px; margin-left: 4px; display: inline-block;">Preorder (PO)</span>`
                   : ` <span class="status-pill status-ok" style="font-size: 8px; padding: 1px 4px; margin-left: 4px; display: inline-block;">Ready Stok</span>`;
                 
                 const fulfillButton = isPo 
@@ -665,6 +670,7 @@ function renderInventory() {
             <td>-</td>
             <td>-</td>
             <td>-</td>
+            <td>-</td>
             <td><span class="status-pill status-low">Perlu dibuat outlet</span></td>
             <td>
               <div class="row-actions">
@@ -683,6 +689,15 @@ function renderInventory() {
       const toggleButton = cannotDeactivate
         ? `<button class="ghost-button compact-button" disabled title="Stok harus habis dulu sebelum bahan dinonaktifkan" type="button">Nonaktif</button>`
         : `<button class="ghost-button compact-button" data-toggle-ingredient="${item.id}" data-permission="inventory.ingredients:delete" type="button">${isInactiveStatus(item.status) ? "Aktifkan" : "Nonaktif"}</button>`;
+      
+      const isCritical = !isInactiveStatus(item.status) && (Number(item.stock || 0) <= Number(item.minStock || 0));
+      const gap = isCritical ? reorderGap(item) : 0;
+      const restockLabel = isInactiveStatus(item.status)
+        ? `<span class="status-pill status-low">-</span>`
+        : (isCritical
+            ? `<span class="status-pill status-empty">Butuh ${formatQty(gap)} ${item.unit}</span>`
+            : `<span class="status-pill status-ok">Aman</span>`);
+
       return `
         <tr>
           <td><strong>${item.name}</strong><br><small>${item.templateName ? `Template: ${item.templateName} · ` : "Belum terhubung template · "}${item.category || item.templateCategory || ""} · ${item.unit}</small></td>
@@ -692,6 +707,7 @@ function renderInventory() {
           <td>${money(value)}</td>
           <td>${lot.manufacturedAt || "-"}</td>
           <td>${lot.expiredAt || "-"}</td>
+          <td>${restockLabel}</td>
           <td><span class="status-pill ${isInactiveStatus(item.status) ? "status-empty" : lotStatus.className}">${isInactiveStatus(item.status) ? "Nonaktif" : lotStatus.label}</span></td>
           <td>
             <div class="row-actions">
@@ -705,7 +721,7 @@ function renderInventory() {
         </tr>
       `;
     })
-    .join("") || `<tr><td colspan="9">Belum ada stok bahan. Tambahkan bahan outlet atau catat stok masuk.</td></tr>`);
+    .join("") || `<tr><td colspan="10">Belum ada stok bahan. Tambahkan bahan outlet atau catat stok masuk.</td></tr>`);
 
   const filteredMovements = filteredStockMovements();
   writeText("movement-summary", `${filteredMovements.length} transaksi kartu stok sesuai filter.`);
@@ -1266,7 +1282,7 @@ if (exists("preorder-fulfillment-list")) {
         const product = item ? productById(state, item.productId) : null;
         if (item) {
           openPosItemStockModal(item, product, order, fulfillItemBtn.dataset.fulfillPoItem, itemIndex, () => {
-            state = loadState();
+            refreshInventory();
             renderPreorders();
             renderInventory();
           });
@@ -1286,23 +1302,14 @@ if (exists("preorder-fulfillment-list")) {
       btn.disabled = true;
       btn.textContent = "Memproses...";
       
-      const poItems = order.items.filter((oi) => Boolean(oi.isPreorder || oi.is_preorder));
-      const hasFinishedGood = poItems.some((oi) => {
-        const p = productById(state, oi.productId);
-        const t = p ? (p.inventoryType || p.inventory_type || "made_to_order") : "made_to_order";
-        return t === "finished_good" || t === "made_to_order";
-      });
-      const nextStatus = hasFinishedGood ? ORDER_STATUS.WAITING : ORDER_STATUS.READY;
+      const nextStatus = ORDER_STATUS.WAITING;
 
       setTimeout(() => {
         try {
           const response = apiPut(scopedApiUrl(`/api/order/${orderId}/status`, state, session), scopedPayload({ status: nextStatus }, state, session));
           if (response?.ok) {
-            showAlert(nextStatus === ORDER_STATUS.READY 
-              ? `Stok pesanan #${orderNo} dikonfirmasi siap (Barang Dagang)!`
-              : `Stok pesanan #${orderNo} dikonfirmasi siap! Dikirim ke dapur.`
-            );
-            state = loadState();
+            showAlert(`Stok pesanan #${orderNo} dikonfirmasi siap! Dikirim ke antrian dapur untuk diproses.`);
+            refreshInventory();
             renderPreorders();
             renderInventory();
           } else {
@@ -1332,10 +1339,11 @@ if (onboardingParams.get("onboarding") === "1" && onboardingParams.get("create")
   openModal("ingredient-modal");
 }
 
-setInterval(() => {
-  const res = refreshInventory();
-  if (res?.ok) {
-    state = loadState();
-    renderInventory();
-  }
-}, 30000);
+if (inventoryView !== "list") {
+  setInterval(() => {
+    const res = refreshInventory();
+    if (res?.ok) {
+      renderInventory();
+    }
+  }, 30000);
+}

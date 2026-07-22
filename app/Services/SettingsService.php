@@ -11,6 +11,7 @@ use Config\Database;
 
 class SettingsService
 {
+    use \App\Services\Shared\MappingHelperTrait;
     public function data(int $companyId = 1, int $outletId = 1): array
     {
         $db = Database::connect();
@@ -558,8 +559,5 @@ class SettingsService
         return $db->tableExists($table) && $db->fieldExists('company_id', $table);
     }
 
-    private function rowBelongsToCompany(array $row, int $companyId): bool
-    {
-        return ! array_key_exists('company_id', $row) || (int) $row['company_id'] === $companyId;
-    }
+
 }

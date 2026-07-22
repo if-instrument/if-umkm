@@ -16,6 +16,7 @@ use Config\Database;
 
 class ProductSuiteService
 {
+    use \App\Services\Shared\MappingHelperTrait;
     private $db;
     private ProductSuiteModel $suite;
     private CategoryModel $categories;
@@ -526,6 +527,11 @@ class ProductSuiteService
         return $this->arrayPage($items, $filters);
     }
 
+    public function recipeForProduct(int $companyId, int $productId): array
+    {
+        return array_values(array_filter($this->suite->recipeRows($companyId), fn ($line) => (int) $line['product_id'] === $productId));
+    }
+
     public function produceProductBatch(string $legacyProductId, array $payload, int $companyId, int $outletId): array
     {
         $productId = $this->productId($legacyProductId ?: ($payload['productId'] ?? ''));
@@ -551,52 +557,68 @@ class ProductSuiteService
             $this->db->transStart();
             return $this->createProductBatch($product, $qty, $totalCost, $companyId, $outletId, $manufacturedAt, $expiredAt, $payload, 'purchase', 'Stok masuk barang dagang ');
         }
-
         $recipe = array_values(array_filter($this->suite->recipeRows($companyId), fn ($line) => (int) $line['product_id'] === $productId));
         if (! $recipe) throw new \InvalidArgumentException('Recipe produk belum tersedia.');
         $ingredients = $this->ingredientsWithMappings($companyId, $outletId);
-        $capacity = null;
-        foreach ($recipe as $line) {
-            $qtyPerUnit = (float) ($line['qty'] ?? 0);
-            if ($qtyPerUnit <= 0) continue;
-            $ingredient = $this->ingredientForTemplate($ingredients, (int) $line['template_id']);
-            if (! $ingredient || StatusCodeService::isInactive($ingredient['status'] ?? '')) {
-                throw new \InvalidArgumentException('Mapping bahan outlet belum lengkap untuk produksi batch.');
-            }
-            $lineCapacity = (int) floor(((float) ($ingredient['stock_qty'] ?? 0)) / $qtyPerUnit);
-            $capacity = $capacity === null ? $lineCapacity : min($capacity, $lineCapacity);
-            if ($lineCapacity < 1) {
-                throw new \InvalidArgumentException('Stok bahan ' . $ingredient['name'] . ' tidak ready untuk produksi batch.');
-            }
-        }
-        if ($capacity === null) throw new \InvalidArgumentException('Qty recipe produk belum lengkap.');
-        if ($qty > $capacity) {
-            throw new \InvalidArgumentException('Qty produksi melebihi kapasitas bahan. Maksimal produksi ' . $capacity . ' unit.');
-        }
-        $inventory = new InventoryService();
+        
+        $isPreorder = ! empty($product['is_preorder']);
         $totalCost = 0;
-
-        $this->db->transStart();
-        foreach ($recipe as $line) {
-            if ((float) ($line['qty'] ?? 0) <= 0) continue;
-            $ingredient = $this->ingredientForTemplate($ingredients, (int) $line['template_id']);
-            if (! $ingredient) throw new \InvalidArgumentException('Mapping bahan outlet belum lengkap untuk produksi batch.');
-            $ingredientId = $this->ingredientId($this->ingredientCode($ingredient));
-            $requiredQty = (float) $line['qty'] * $qty;
-            if ((float) $ingredient['stock_qty'] < $requiredQty) {
-                throw new \InvalidArgumentException('Stok bahan ' . $ingredient['name'] . ' tidak cukup untuk produksi batch.');
+        
+        if (! $isPreorder) {
+            $capacity = null;
+            foreach ($recipe as $line) {
+                $qtyPerUnit = (float) ($line['qty'] ?? 0);
+                if ($qtyPerUnit <= 0) continue;
+                $ingredient = $this->ingredientForTemplate($ingredients, (int) $line['template_id']);
+                if (! $ingredient || StatusCodeService::isInactive($ingredient['status'] ?? '')) {
+                    throw new \InvalidArgumentException('Mapping bahan outlet belum lengkap untuk produksi batch.');
+                }
+                $lineCapacity = (int) floor(((float) ($ingredient['stock_qty'] ?? 0)) / $qtyPerUnit);
+                $capacity = $capacity === null ? $lineCapacity : min($capacity, $lineCapacity);
+                if ($lineCapacity < 1) {
+                    throw new \InvalidArgumentException('Stok bahan ' . $ingredient['name'] . ' tidak ready untuk produksi batch.');
+                }
             }
-            $unitCost = (float) ($ingredient['average_cost'] ?? 0);
-            $totalCost += $requiredQty * $unitCost;
-            $inventory->reduceStock([
-                'company_id' => $companyId,
-                'outlet_id' => $outletId,
-                'outlet_ingredient_id' => $ingredientId,
-                'qty' => $requiredQty,
-                'movement_type' => 'production_usage',
-                'reference_type' => 'product_batch',
-                'notes' => 'Produksi batch produk ' . ($product['name'] ?? ''),
-            ]);
+            if ($capacity === null) throw new \InvalidArgumentException('Qty recipe produk belum lengkap.');
+            if ($qty > $capacity) {
+                throw new \InvalidArgumentException('Qty produksi melebihi kapasitas bahan. Maksimal produksi ' . $capacity . ' unit.');
+            }
+            
+            $inventory = new InventoryService();
+            $this->db->transStart();
+            foreach ($recipe as $line) {
+                if ((float) ($line['qty'] ?? 0) <= 0) continue;
+                $ingredient = $this->ingredientForTemplate($ingredients, (int) $line['template_id']);
+                if (! $ingredient) throw new \InvalidArgumentException('Mapping bahan outlet belum lengkap untuk produksi batch.');
+                $ingredientId = $this->ingredientId($this->ingredientCode($ingredient));
+                $requiredQty = (float) $line['qty'] * $qty;
+                if ((float) $ingredient['stock_qty'] < $requiredQty) {
+                    throw new \InvalidArgumentException('Stok bahan ' . $ingredient['name'] . ' tidak cukup untuk produksi batch.');
+                }
+                $unitCost = (float) ($ingredient['average_cost'] ?? 0);
+                $totalCost += $requiredQty * $unitCost;
+                $inventory->reduceStock([
+                    'company_id' => $companyId,
+                    'outlet_id' => $outletId,
+                    'outlet_ingredient_id' => $ingredientId,
+                    'qty' => $requiredQty,
+                    'movement_type' => 'production_usage',
+                    'reference_type' => 'product_batch',
+                    'notes' => 'Produksi batch produk ' . ($product['name'] ?? ''),
+                ]);
+            }
+        } else {
+            // For preorder products, calculate totalCost (HPP) but DO NOT check or reduce stock
+            $this->db->transStart();
+            foreach ($recipe as $line) {
+                if ((float) ($line['qty'] ?? 0) <= 0) continue;
+                $ingredient = $this->ingredientForTemplate($ingredients, (int) $line['template_id']);
+                if ($ingredient) {
+                    $requiredQty = (float) $line['qty'] * $qty;
+                    $unitCost = (float) ($ingredient['average_cost'] ?? 0);
+                    $totalCost += $requiredQty * $unitCost;
+                }
+            }
         }
 
         return $this->createProductBatch($product, $qty, $totalCost, $companyId, $outletId, $manufacturedAt, $expiredAt, $payload, 'production', 'Produksi batch produk ');
@@ -698,7 +720,7 @@ class ProductSuiteService
         return $this->productDetail((string) $batch['product_id'], $companyId, $outletId);
     }
 
-    private function ingredientsWithMappings(int $companyId, int $outletId): array
+    public function ingredientsWithMappings(int $companyId, int $outletId): array
     {
         $ingredients = $this->suite->ingredients($companyId, $outletId);
         $mappings = $this->suite->ingredientMappings($companyId, $outletId);
@@ -910,7 +932,7 @@ class ProductSuiteService
         return 'PRD-' . str_pad((string) ($count + 1), 4, '0', STR_PAD_LEFT);
     }
 
-    private function categoryId(string|int|null $value): ?int
+    private function categoryId($value): ?int
     {
         if (! $value) return null;
         if (is_numeric($value)) return (int) $value;
@@ -941,7 +963,7 @@ class ProductSuiteService
             : $this->productCategories->insert($row);
     }
 
-    private function productId(string|int|null $value): ?int
+    private function productId($value): ?int
     {
         if (! $value) return null;
         if (is_numeric($value)) return (int) $value;
@@ -950,7 +972,7 @@ class ProductSuiteService
         return $known[$value] ?? null;
     }
 
-    private function productBatchId(string|int|null $value): ?int
+    private function productBatchId($value): ?int
     {
         if (! $value) return null;
         if (is_numeric($value)) return (int) $value;
@@ -958,7 +980,7 @@ class ProductSuiteService
         return null;
     }
 
-    private function modifierId(string|int|null $value): ?int
+    private function modifierId($value): ?int
     {
         if (! $value) return null;
         if (is_numeric($value)) return (int) $value;
@@ -967,7 +989,7 @@ class ProductSuiteService
         return $known[$value] ?? null;
     }
 
-    private function modifierOptionId(string|int|null $value): ?int
+    private function modifierOptionId($value): ?int
     {
         if (! $value) return null;
         if (is_numeric($value)) return (int) $value;
@@ -975,7 +997,7 @@ class ProductSuiteService
         return null;
     }
 
-    private function ingredientId(string|int|null $value): ?int
+    private function ingredientId($value): ?int
     {
         if (! $value) return null;
         if (is_numeric($value)) return (int) $value;
@@ -999,10 +1021,9 @@ class ProductSuiteService
     private function modifierCode(array $row): string { return 'mod-' . $row['id']; }
     private function ingredientCode(array $row): string { return 'ing-' . ($row['id'] ?? uniqid()); }
     private function templateCode(array $row): string { return $row['code'] ?? ('tpl-' . ($row['id'] ?? uniqid())); }
-    private function companyCode(int $id): string { return $id === 1 ? 'company-main' : 'company-' . $id; }
-    private function outletCode(int $id): string { return match ($id) { 1 => 'outlet-main', 2 => 'outlet-north', 3 => 'outlet-south', default => 'outlet-' . $id }; }
 
-    private function templateId(string|int|null $value, int $companyId): ?int
+
+    private function templateId($value, int $companyId): ?int
     {
         if (! $value) return null;
         if (is_numeric($value)) return (int) $value;
@@ -1033,7 +1054,7 @@ class ProductSuiteService
         ];
     }
 
-    private function ingredientForTemplate(array $ingredients, int $templateId): ?array
+    public function ingredientForTemplate(array $ingredients, int $templateId): ?array
     {
         foreach ($ingredients as $ingredient) {
             if ((int) ($ingredient['template_id'] ?? 0) === $templateId) return $ingredient;
@@ -1132,7 +1153,7 @@ class ProductSuiteService
         return $templateId ? $this->ingredientForTemplate($ingredients, $templateId) : null;
     }
 
-    private function templateIdFromRule(string|int|null $value, array $ingredients): ?int
+    private function templateIdFromRule($value, array $ingredients): ?int
     {
         if (! $value) return null;
         if (is_numeric($value)) return (int) $value;
@@ -1185,7 +1206,7 @@ class ProductSuiteService
         return $template ? ['code' => $template['code'], 'name' => $template['name']] : [];
     }
 
-    private function ingredientByRuleName(array $ingredients, string|null $name): ?array
+    private function ingredientByRuleName(array $ingredients, ?string $name): ?array
     {
         $needle = strtolower(trim((string) $name));
         if ($needle === '') return null;
@@ -1243,7 +1264,6 @@ class ProductSuiteService
         $builder = $this->db->table('product_batches')
             ->where('outlet_id', $outletId)
             ->where('product_id', $productId)
-            ->where('qty_remaining >', 0)
             ->orderBy('expired_at IS NULL', 'ASC', false)
             ->orderBy('expired_at', 'ASC');
         if ($this->hasCompanyColumn('product_batches')) {
@@ -1320,8 +1340,5 @@ class ProductSuiteService
         return $data;
     }
 
-    private function rowBelongsToCompany(array $row, int $companyId): bool
-    {
-        return ! array_key_exists('company_id', $row) || (int) $row['company_id'] === $companyId;
-    }
+
 }

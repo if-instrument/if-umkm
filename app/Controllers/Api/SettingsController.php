@@ -9,9 +9,9 @@ class SettingsController extends BaseController
 {
     private SettingsService $settings;
 
-    public function __construct()
+    public function __construct(?SettingsService $settings = null)
     {
-        $this->settings = new SettingsService();
+        $this->settings = $settings ?? service('settingsService');
     }
 
     public function general()
@@ -159,10 +159,10 @@ class SettingsController extends BaseController
 
     private function scope(array $payload = []): array
     {
-        return [
-            (int) ($payload['company_id'] ?? $this->request->getGet('company_id') ?? 1),
-            (int) ($payload['outlet_id'] ?? $this->request->getGet('outlet_id') ?? 1),
-        ];
+        $companyId = (int) ($payload['company_id'] ?? $this->request->getGet('company_id') ?? 1);
+        $outletId = (int) ($payload['outlet_id'] ?? $this->request->getGet('outlet_id') ?? 1);
+        $this->validateScope($companyId, $outletId);
+        return [$companyId, $outletId];
     }
 
     private function jsonAction(callable $action)

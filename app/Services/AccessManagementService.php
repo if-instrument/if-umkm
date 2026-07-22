@@ -10,6 +10,8 @@ use Config\Database;
 
 class AccessManagementService
 {
+    use \App\Services\Shared\MappingHelperTrait;
+
     public function data(): array
     {
         $db = Database::connect();
@@ -676,10 +678,26 @@ class AccessManagementService
     }
 
     private function companyId(string $legacyId): int { return $this->numericId($legacyId) ?: 1; }
-    private function companyCode(int $id): string { return $id === 1 ? 'company-main' : 'company-' . $id; }
-    private function outletCode(int $id): string { return match ($id) { 1 => 'outlet-main', 2 => 'outlet-north', 3 => 'outlet-south', default => 'outlet-' . $id }; }
-    private function roleCode(array $row): string { return match ($row['name'] ?? '') { 'Area Manager' => 'role-area-manager', 'Outlet Manager' => 'role-outlet-manager', 'Kasir' => 'role-kasir', 'Kitchen' => 'role-kitchen', 'Inventory Staff' => 'role-inventory', 'Company Admin' => (int) $row['id'] === 1 ? 'role-company-admin' : 'role-' . $row['id'], default => 'role-' . ($row['id'] ?? uniqid()) }; }
-    private function userCode(array $row): string { return match ($row['email'] ?? '') { 'superadmin@app.test' => 'usr-super-admin', 'admin@ifresso.id' => 'usr-company-admin', 'area@ifresso.id' => 'usr-area-manager', 'manager@ifresso.id' => 'usr-outlet-manager', 'kasir@ifresso.id' => 'usr-kasir', 'kitchen@ifresso.id' => 'usr-kitchen', 'inventory@ifresso.id' => 'usr-inventory', default => 'usr-' . ($row['id'] ?? uniqid()) }; }
+    
+    private function roleCode(array $row): string
+    {
+        switch ($row['name'] ?? '') {
+            case 'Area Manager':
+                return 'role-area-manager';
+            case 'Outlet Manager':
+                return 'role-outlet-manager';
+            case 'Kasir':
+                return 'role-kasir';
+            case 'Kitchen':
+                return 'role-kitchen';
+            case 'Inventory Staff':
+                return 'role-inventory';
+            case 'Company Admin':
+                return (int) $row['id'] === 1 ? 'role-company-admin' : 'role-' . $row['id'];
+            default:
+                return 'role-' . ($row['id'] ?? uniqid());
+        }
+    }
 
     private function findById(array $rows, mixed $id): ?array
     {
@@ -695,15 +713,22 @@ class AccessManagementService
 
     private function defaultResponsibility(string $role): string
     {
-        return match ($role) {
-            'Company Admin' => 'Mengelola perusahaan, outlet, user, role, branding, dan seluruh data operasional perusahaan.',
-            'Area Manager' => 'Monitoring beberapa outlet dan melihat laporan lintas outlet.',
-            'Outlet Manager' => 'Mengelola operasional dan staff di outlet yang ditugaskan.',
-            'Kasir' => 'Menjalankan POS dan transaksi pada outlet tugas.',
-            'Kitchen' => 'Melihat dan memproses antrian produksi/pesanan di outlet tugas.',
-            'Inventory Staff' => 'Mengelola stok bahan, penerimaan stok, waste, dan kartu stok outlet tugas.',
-            default => 'Akses operasional perusahaan.',
-        };
+        switch ($role) {
+            case 'Company Admin':
+                return 'Mengelola perusahaan, outlet, user, role, branding, dan seluruh data operasional perusahaan.';
+            case 'Area Manager':
+                return 'Monitoring beberapa outlet dan melihat laporan lintas outlet.';
+            case 'Outlet Manager':
+                return 'Mengelola operasional dan staff di outlet yang ditugaskan.';
+            case 'Kasir':
+                return 'Menjalankan POS dan transaksi pada outlet tugas.';
+            case 'Kitchen':
+                return 'Melihat dan memproses antrian produksi/pesanan di outlet tugas.';
+            case 'Inventory Staff':
+                return 'Mengelola stok bahan, penerimaan stok, waste, dan kartu stok outlet tugas.';
+            default:
+                return 'Akses operasional perusahaan.';
+        }
     }
 
     private function assertUniqueCompanySlug(string $slug, int $companyId = 0): void
@@ -742,11 +767,6 @@ class AccessManagementService
             unset($data['company_id']);
         }
         return $data;
-    }
-
-    private function rowBelongsToCompany(array $row, int $companyId): bool
-    {
-        return ! array_key_exists('company_id', $row) || (int) $row['company_id'] === $companyId;
     }
 
     private function rolesForCompany(int $companyId): array

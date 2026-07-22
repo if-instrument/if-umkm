@@ -10,6 +10,7 @@ use Config\Database;
 
 class SalesService
 {
+    use \App\Services\Shared\MappingHelperTrait;
     public const STATUS_PENDING_CASHIER = StatusCodeService::ORDER_PENDING_CASHIER;
     public const STATUS_WAITING = StatusCodeService::ORDER_WAITING;
     public const STATUS_FULFILLMENT = StatusCodeService::ORDER_FULFILLMENT;
@@ -111,9 +112,16 @@ class SalesService
         if ($previousStatus === self::STATUS_PENDING_CASHIER && in_array($status, [self::STATUS_WAITING, self::STATUS_FULFILLMENT], true)) {
             throw new \InvalidArgumentException('Approve pesanan online wajib melalui proses pembayaran kasir.');
         }
-        if ($previousStatus === self::STATUS_FULFILLMENT && in_array($status, [self::STATUS_WAITING, self::STATUS_PREPARING, self::STATUS_READY, self::STATUS_COMPLETED], true)) {
-            $items = $this->orderItemPayloads($this->orderItems->where('order_id', $orderId)->findAll());
-            $this->consumePreorderProductItems($items, $companyId, $outletId, $orderId, $order['order_no']);
+
+        $this->db->transStart();
+
+        // Deduct preorder stocks and ingredients ONLY after kitchen processing is complete (reaching READY or COMPLETED)
+        if (in_array($status, [self::STATUS_READY, self::STATUS_COMPLETED], true)) {
+            if (in_array($previousStatus, [self::STATUS_FULFILLMENT, self::STATUS_WAITING, self::STATUS_PREPARING], true)) {
+                $items = $this->orderItemPayloads($this->orderItems->where('order_id', $orderId)->findAll());
+                $this->consumePreorderProductItems($items, $companyId, $outletId, $orderId, $order['order_no']);
+                $this->consumePreorderIngredients($items, $companyId, $outletId, $orderId, $order['order_no']);
+            }
         }
         $data = [
             'status' => $status,
@@ -127,6 +135,8 @@ class SalesService
             ? ['inventory', 'Inventory']
             : $this->actorForStatus($status);
         $this->recordStatusLog($orderId, $companyId, $outletId, $status, (string) ($order['payment_status'] ?? ''), $actorType, $actorName, 'Status pesanan diperbarui.');
+
+        $this->db->transComplete();
 
         return $this->orderDetail((string) $orderId, $companyId, $outletId);
     }
@@ -143,6 +153,34 @@ class SalesService
         return $this->orderDetail((string) $orderId, $companyId, $outletId);
     }
 
+    private function ensureFulfilledPoColumn(): void
+    {
+        if (! $this->db->fieldExists('fulfilled_po_keys', 'orders')) {
+            $forge = Database::forge();
+            $forge->addColumn('orders', [
+                'fulfilled_po_keys' => [
+                    'type' => 'TEXT',
+                    'null' => true,
+                ],
+            ]);
+        }
+    }
+
+    public function fulfilledPoKeys(string $legacyId, array $keys, int $companyId, int $outletId): array
+    {
+        $orderId = $this->orderId($legacyId);
+        $order = $orderId ? $this->orders->find($orderId) : null;
+        if (! $order || ! $this->rowBelongsToCompany($order, $companyId) || (int) $order['outlet_id'] !== $outletId) {
+            throw new \InvalidArgumentException('Pesanan tidak ditemukan.');
+        }
+        $this->ensureFulfilledPoColumn();
+        $this->db->table('orders')
+            ->where('id', $orderId)
+            ->update(['fulfilled_po_keys' => json_encode(array_values($keys))]);
+
+        return $this->orderDetail((string) $orderId, $companyId, $outletId);
+    }
+
     public function settle(string $legacyId, string $paymentMethod, int $companyId, int $outletId, array $payment = []): array
     {
         $orderId = $this->orderId($legacyId);
@@ -154,13 +192,17 @@ class SalesService
         $now = date('Y-m-d H:i:s');
         $previousStatus = $this->normalizeStatus((string) ($order['status'] ?? ''));
 
+        $this->db->transStart();
+
         if ($previousStatus === self::STATUS_PENDING_CASHIER) {
             $items = $this->orderItemPayloads($this->orderItems->where('order_id', $orderId)->findAll());
             $this->applyUsageDiff([], $items, $companyId, $outletId, $orderId, $order['order_no']);
             $this->consumePreorderProductItems($items, $companyId, $outletId, $orderId, $order['order_no']);
-        } elseif ($previousStatus === self::STATUS_FULFILLMENT) {
+            $this->consumePreorderIngredients($items, $companyId, $outletId, $orderId, $order['order_no']);
+        } elseif (in_array($previousStatus, [self::STATUS_FULFILLMENT, self::STATUS_WAITING, self::STATUS_PREPARING], true)) {
             $items = $this->orderItemPayloads($this->orderItems->where('order_id', $orderId)->findAll());
             $this->consumePreorderProductItems($items, $companyId, $outletId, $orderId, $order['order_no']);
+            $this->consumePreorderIngredients($items, $companyId, $outletId, $orderId, $order['order_no']);
         }
         $this->orders->update($orderId, [
             'payment_status' => StatusCodeService::PAYMENT_PAID,
@@ -177,6 +219,8 @@ class SalesService
         if (! empty($payment['transactionId'])) {
             $this->payments->attachOrder((string) $payment['transactionId'], $orderId, $companyId, $outletId);
         }
+
+        $this->db->transComplete();
 
         $detail = $this->orderDetail((string) $orderId, $companyId, $outletId);
         $this->notifyPaidOrder($orderId);
@@ -503,6 +547,7 @@ class SalesService
     {
         $usage = [];
         foreach ($items as $item) {
+            if (! empty($item['isPreorder'])) continue;
             $productId = $this->productId($item['productId'] ?? null);
             if ($productId && $this->isStockedProduct($productId, $companyId, $outletId)) continue;
             foreach (($item['recipeUsage'] ?? []) as $line) {
@@ -551,6 +596,72 @@ class SalesService
     {
         foreach ($this->preorderProductUsageMap($items, $companyId, $outletId) as $productId => $qty) {
             $this->consumeProductBatches((int) $productId, $companyId, $outletId, (float) $qty, $orderId, $orderNo);
+        }
+    }
+
+    private function consumePreorderIngredients(array $items, int $companyId, int $outletId, int $orderId, string $orderNo): void
+    {
+        $ingredients = null;
+        $inventory = null;
+        
+        // 1. Consume MTO preorder ingredients
+        foreach ($items as $item) {
+            if (empty($item['isPreorder'])) continue;
+            $productId = $this->productId($item['productId'] ?? null);
+            if ($productId && $this->isStockedProduct($productId, $companyId, $outletId)) continue;
+            // It's MTO preorder! Reduce recipeUsage ingredients
+            foreach (($item['recipeUsage'] ?? []) as $line) {
+                $ingredientId = $this->ingredientId($line['ingredientId'] ?? '');
+                if (! $ingredientId) continue;
+                $qty = (float) ($line['qty'] ?? 0);
+                if ($qty <= 0) continue;
+                $this->inventory->reduceStock([
+                    'company_id' => $companyId,
+                    'outlet_id' => $outletId,
+                    'outlet_ingredient_id' => $ingredientId,
+                    'qty' => $qty,
+                    'movement_type' => 'pos_usage',
+                    'reference_type' => 'order',
+                    'reference_id' => $orderId,
+                    'notes' => 'Pemakaian bahan preorder POS #' . $orderNo,
+                ]);
+            }
+        }
+        
+        // 2. Consume finished good preorder ingredients
+        foreach ($items as $item) {
+            if (empty($item['isPreorder'])) continue;
+            $productId = $this->productId($item['productId'] ?? null);
+            if (! $productId || ! $this->isStockedProduct($productId, $companyId, $outletId)) continue;
+            
+            // It's finished good preorder! Load recipe and consume ingredients
+            $recipe = $this->products->recipeForProduct($companyId, $productId);
+            if ($recipe) {
+                if ($ingredients === null) {
+                    $ingredients = $this->products->ingredientsWithMappings($companyId, $outletId);
+                }
+                if ($inventory === null) {
+                    $inventory = new InventoryService();
+                }
+                foreach ($recipe as $line) {
+                    if ((float) ($line['qty'] ?? 0) <= 0) continue;
+                    $ingredient = $this->products->ingredientForTemplate($ingredients, (int) $line['template_id']);
+                    if (! $ingredient) continue;
+                    $ingredientId = $this->ingredientId('ing-' . ($ingredient['id'] ?? ''));
+                    if (! $ingredientId) continue;
+                    $requiredQty = (float) $line['qty'] * (float) ($item['qty'] ?? 0);
+                    $inventory->reduceStock([
+                        'company_id' => $companyId,
+                        'outlet_id' => $outletId,
+                        'outlet_ingredient_id' => $ingredientId,
+                        'qty' => $requiredQty,
+                        'movement_type' => 'production_usage',
+                        'reference_type' => 'order',
+                        'reference_id' => $orderId,
+                        'notes' => 'Pemakaian bahan preorder untuk order #' . $orderNo,
+                    ]);
+                }
+            }
         }
     }
 
@@ -738,6 +849,7 @@ class SalesService
             'statusUpdatedAt' => $this->isoDate($order['status_updated_at'] ?? $order['updated_at'] ?? $order['created_at']),
             'status' => $status,
             'readyItemKeys' => json_decode($order['ready_item_keys'] ?: '[]', true) ?: [],
+            'fulfilledPoKeys' => json_decode(($order['fulfilled_po_keys'] ?? '[]') ?: '[]', true) ?: [],
             'serviceType' => $order['service_type'],
             'tableFlow' => $order['table_flow'] ?: '',
             'tableName' => $order['table_name'] ?: '-',
@@ -899,12 +1011,6 @@ class SalesService
     }
 
     private function productCode(int $id): string { return 'prd-' . $id; }
-    private function companyCode(int $id): string { return $id === 1 ? 'company-main' : 'company-' . $id; }
-    private function outletCode(int $id): string
-    {
-        $map = [1 => 'outlet-main', 2 => 'outlet-north', 3 => 'outlet-south'];
-        return $map[$id] ?? 'outlet-' . $id;
-    }
     private function isoDate(?string $value): string { return $value ? date(DATE_ATOM, strtotime($value)) : ''; }
 
     private function hasCompanyColumn(string $table): bool
@@ -920,11 +1026,6 @@ class SalesService
             unset($data['company_id']);
         }
         return $data;
-    }
-
-    private function rowBelongsToCompany(array $row, int $companyId): bool
-    {
-        return ! array_key_exists('company_id', $row) || (int) $row['company_id'] === $companyId;
     }
 
     private function arrayPage(array $items, array $filters = []): array
