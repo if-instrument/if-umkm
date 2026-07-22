@@ -168,10 +168,6 @@ export function bindBookSwipe() {
     const deltaY = (clientY || currentY) - startY;
     if (Math.abs(deltaX) < 32 || Math.abs(deltaX) < Math.abs(deltaY) * 1.1) return;
     const isForwardSwipe = deltaX < 0;
-    if (isForwardSwipe && !canFreeTurnToPage(currentBookPage() + 1)) {
-      showFeedback("Gunakan tombol di halaman ini untuk melanjutkan.", true);
-      return;
-    }
     if (isForwardSwipe) turnNextPage();
     else turnPrevPage();
   };
@@ -287,6 +283,8 @@ export function registerGlobalClickDispatcher() {
       return;
     }
 
+
+
     if (event.target.closest("#order-confirm-cart")) {
       if (!state.cart.length) {
         showFeedback("Pilih minimal satu menu terlebih dahulu.", true);
@@ -311,7 +309,9 @@ export function registerGlobalClickDispatcher() {
           state.spread = "checkout";
           persistOrderSession();
           const { render } = await import("./order-render.js");
+          const { customerPageNumber, turnToPage } = await import("./order-navigation.js");
           render();
+          turnToPage(customerPageNumber(), true);
         } catch (err) {
           console.error(err);
         } finally {
@@ -386,7 +386,15 @@ export function registerGlobalClickDispatcher() {
     const jumpButton = event.target.closest("[data-jump-spread]");
     if (jumpButton && canJumpTo(jumpButton.dataset.jumpSpread)) {
       state.spread = jumpButton.dataset.jumpSpread;
-      renderSpread();
+      if (state.spread !== "checkout") {
+        state.cartConfirmed = false;
+      }
+      import("./order-navigation.js").then(({ pageForSpread, turnToPage }) => {
+        turnToPage(pageForSpread(state.spread), true);
+        import("./order-render.js").then(({ renderSpread }) => {
+          renderSpread();
+        });
+      });
     }
 
     if (event.target.closest("#order-reset-cover")) resetOrder();

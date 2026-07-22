@@ -86,10 +86,10 @@ export function currentBookPage() {
 }
 
 export function blocksForwardTurnFromPage(page) {
-  if (page === checkoutStartPage()) {
-    return !state.cartConfirmed;
+  if (state.orderStatus === "ORDER_CREATED") {
+    return true;
   }
-  return isCheckoutPageNumber(page);
+  return false;
 }
 
 export function canFreeTurnToPage(targetPage) {
@@ -155,19 +155,15 @@ export function guardNavigation(targetPage) {
     }
   }
 
-  if (targetPage === customerPage) {
-    if (!state.cart.length) {
-      return { allowed: false, redirect: menuStartPage(), reason: "Pilih minimal satu menu terlebih dahulu." };
-    }
-    if (!state.cartConfirmed) {
-      return { allowed: false, redirect: cartPage, reason: "Konfirmasi cart terlebih dahulu." };
-    }
+  if (targetPage === cartPage) {
+    return { allowed: true };
   }
 
-  if (targetPage === cartPage) {
+  if (targetPage >= customerPage && targetPage < receiptPage) {
     if (!state.cart.length) {
       return { allowed: false, redirect: menuStartPage(), reason: "Pilih minimal satu menu terlebih dahulu." };
     }
+    state.cartConfirmed = true;
   }
 
   return { allowed: true };
@@ -314,10 +310,8 @@ export function resizeFlipbook() {
 
 export function turnNextPage() {
   syncOrderStatus();
-  const currentPage = currentBookPage();
-  if (!canFreeTurnToPage(currentPage + 1)) {
-    showFeedback("Gunakan tombol di halaman ini untuk melanjutkan.", true);
-    return;
+  if (document.activeElement && typeof document.activeElement.blur === "function") {
+    document.activeElement.blur();
   }
   if (state.spread === "cover" && hasMultipleOutlets() && !hasSelectedOutlet()) {
     showFeedback("Pilih outlet terlebih dahulu.", true);
@@ -359,6 +353,10 @@ export function turnNextPage() {
 }
 
 export function turnPrevPage() {
+  syncOrderStatus();
+  if (document.activeElement && typeof document.activeElement.blur === "function") {
+    document.activeElement.blur();
+  }
   const book = flipbook();
   if (bookState.flipbookReady && book?.length) {
     const currentPage = book.turn("page");
@@ -366,18 +364,42 @@ export function turnPrevPage() {
       showFeedback("Gunakan tombol di halaman ini untuk kembali ke cover depan.", true);
       return;
     }
-    if (book.turn("page") <= pageForSpread("cover")) return;
-    if (shouldSkipServicePage() && book.turn("page") <= menuStartPage()) {
-      book.turn("page", pageForSpread("cover"));
-      return;
+    const coverPage = pageForSpread("cover");
+    if (currentPage <= coverPage) return;
+
+    const isDouble = book.turn("display") === "double";
+    let targetPage = currentPage - (isDouble ? 2 : 1);
+    
+    if (shouldSkipServicePage() && targetPage === 4 && menuStartPage() !== 4) {
+      targetPage = coverPage;
     }
-    book.turn("previous");
+    targetPage = Math.max(coverPage, targetPage);
+
+    if (targetPage < customerPageNumber()) {
+      state.cartConfirmed = false;
+    }
+
+    bookState.syncingFlipbook = true;
+    bookState.forcedBookTurn = true;
+    try {
+      book.turn("page", targetPage);
+    } finally {
+      bookState.forcedBookTurn = false;
+      bookState.syncingFlipbook = false;
+    }
+    state.spread = spreadForPage(targetPage);
+    showFeedback("");
+    renderSpread(false);
     return;
   }
+  showFeedback("");
   const spreads = spreadOrder();
   const index = spreads.indexOf(state.spread);
   if (index > 0) {
     state.spread = spreads[index - 1];
+    if (state.spread !== "checkout") {
+      state.cartConfirmed = false;
+    }
     showFeedback("");
     renderSpread();
   }

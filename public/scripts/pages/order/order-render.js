@@ -29,7 +29,8 @@ import {
   flipbook,
   restoreBookInputs,
   snapshotBookInputs,
-  destroyFlipbook
+  destroyFlipbook,
+  initFlipbook
 } from "./order-navigation.js";
 import { statusLabel, paymentStatusCode, orderStatusCode } from "../../status-codes.js";
 import { ORDER_STATUS, PAYMENT_STATUS } from "../../status-codes.js";
@@ -55,6 +56,7 @@ export function render() {
     bindBookSwipe();
     renderBookStaticContent();
     renderProducts();
+    initFlipbook();
     renderSpread();
   } else {
     renderBookStaticContent();

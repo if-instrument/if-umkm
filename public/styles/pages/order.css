@@ -762,24 +762,38 @@ body.app-busy .public-order-shell {
   background-size: 20px;
 }
 
-.public-book-hit-left:hover::before {
+@media (hover: hover) {
+  .public-book-hit-left:hover::before {
+    opacity: 1;
+    left: 20px;
+    transform: translateY(-50%) scale(1);
+  }
+
+  .public-book-hit-right:hover::before {
+    opacity: 1;
+    right: 20px;
+    transform: translateY(-50%) scale(1);
+  }
+
+  .public-book-hit-zone:hover {
+    background: linear-gradient(90deg, rgba(var(--order-accent-deep-rgb, 110, 58, 22), 0.06), transparent);
+  }
+
+  .public-book-hit-right:hover {
+    background: linear-gradient(270deg, rgba(var(--order-accent-deep-rgb, 110, 58, 22), 0.06), transparent);
+  }
+}
+
+.public-book-hit-left:active::before {
   opacity: 1;
   left: 20px;
   transform: translateY(-50%) scale(1);
 }
 
-.public-book-hit-right:hover::before {
+.public-book-hit-right:active::before {
   opacity: 1;
   right: 20px;
   transform: translateY(-50%) scale(1);
-}
-
-.public-book-hit-zone:hover {
-  background: linear-gradient(90deg, rgba(var(--order-accent-deep-rgb, 110, 58, 22), 0.06), transparent);
-}
-
-.public-book-hit-right:hover {
-  background: linear-gradient(270deg, rgba(var(--order-accent-deep-rgb, 110, 58, 22), 0.06), transparent);
 }
 
 #order-book-frame[data-active-spread="cover"] #order-flipbook {
