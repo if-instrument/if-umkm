@@ -1,4 +1,4 @@
-import { renderLayout } from "../layout.js?v=coffee-v151";
+import { applyBrandTheme, renderLayout } from "../layout.js?v=coffee-v151";
 import { apiDelete, apiGet, apiPost, apiPut, apiUpload, applyPermissionControls, canUsePermission, loadSession, loadState, scopedPayload } from "../store.js?v=coffee-v151";
 import { formatQty, money } from "../format.js";
 import { byId, setText, showAlert, showFeedback } from "../dom.js";
@@ -185,13 +185,14 @@ function paymentTypeLabel(type) {
   const labels = {
     cash: "Cash (Tunai)",
     qris: "QRIS",
-    edc: "EDC Kasir",
-    card: "Card Online",
-    transfer: "Transfer / E-Wallet",
+    card: "Card / EDC",
+    va: "VA (Virtual Account)",
     ewallet: "E-Wallet",
+    edc: "Card / EDC",
+    transfer: "VA / E-Wallet",
     other: "Lainnya"
   };
-  return labels[type] || type || "Lainnya";
+  return labels[type] || type || "Cash (Tunai)";
 }
 
 function paymentGatewayLabel(provider) {
@@ -262,8 +263,57 @@ function renderPaymentMethods() {
   `).join("") : `<tr><td colspan="8">Belum ada metode bayar.</td></tr>`;
 }
 
+function isSuperAdminUser() {
+  if (!session) return false;
+  if (session.authType === "super_admin") return true;
+  if (session.role === "Super Admin" || session.user?.role === "Super Admin") return true;
+  if (session.user?.authType === "super_admin") return true;
+  if (session.userType === "super_admin" || session.user?.userType === "super_admin") return true;
+  return false;
+}
+
 function renderPaymentGateway() {
+  const isSuperAdmin = isSuperAdminUser();
+  if (byId("central-master-gateway-panel")) {
+    byId("central-master-gateway-panel").hidden = !isSuperAdmin;
+  }
+
   const gateway = state.settings.paymentGateway || {};
+  const master = gateway.centralMasterGateway || {};
+  const xenditMaster = master.xendit || { status: "active", qrisRate: 0.7, cardRate: 2.0, vaFee: 4500, ewalletRate: 1.5 };
+  const midtransMaster = master.midtrans || { status: "active", qrisRate: 0.7, cardRate: 1.9, vaFee: 4000, ewalletRate: 1.7 };
+  
+  if (byId("central-xendit-status")) byId("central-xendit-status").checked = xenditMaster.status === "active";
+  if (byId("central-xendit-secret")) byId("central-xendit-secret").value = xenditMaster.apiKey || "";
+  if (byId("central-xendit-qris-rate")) byId("central-xendit-qris-rate").value = xenditMaster.qrisRate;
+  if (byId("central-xendit-card-rate")) byId("central-xendit-card-rate").value = xenditMaster.cardRate;
+  if (byId("central-xendit-va-fee")) byId("central-xendit-va-fee").value = xenditMaster.vaFee;
+  if (byId("central-xendit-ewallet-rate")) byId("central-xendit-ewallet-rate").value = xenditMaster.ewalletRate;
+
+  if (byId("central-midtrans-status")) byId("central-midtrans-status").checked = midtransMaster.status === "active";
+  if (byId("central-midtrans-server-key")) byId("central-midtrans-server-key").value = midtransMaster.apiKey || "";
+  if (byId("central-midtrans-qris-rate")) byId("central-midtrans-qris-rate").value = midtransMaster.qrisRate;
+  if (byId("central-midtrans-card-rate")) byId("central-midtrans-card-rate").value = midtransMaster.cardRate;
+  if (byId("central-midtrans-va-fee")) byId("central-midtrans-va-fee").value = midtransMaster.vaFee;
+  if (byId("central-midtrans-ewallet-rate")) byId("central-midtrans-ewallet-rate").value = midtransMaster.ewalletRate;
+
+  const activeProviders = gateway.centralActiveProviders || ["manual", "central_xendit", "central_midtrans", "direct_xendit", "direct_midtrans"];
+  const providerSelect = byId("payment-gateway-provider");
+  if (providerSelect) {
+    const centralXenditOpt = providerSelect.querySelector('option[value="central_xendit"]');
+    const centralMidtransOpt = providerSelect.querySelector('option[value="central_midtrans"]');
+    if (centralXenditOpt) {
+      const isOk = activeProviders.includes("central_xendit");
+      centralXenditOpt.disabled = !isOk;
+      centralXenditOpt.textContent = isOk ? "Xendit (Gateway Pusat)" : "Xendit (Belum diaktifkan Pusat)";
+    }
+    if (centralMidtransOpt) {
+      const isOk = activeProviders.includes("central_midtrans");
+      centralMidtransOpt.disabled = !isOk;
+      centralMidtransOpt.textContent = isOk ? "Midtrans (Gateway Pusat)" : "Midtrans (Belum diaktifkan Pusat)";
+    }
+  }
+
   byId("payment-gateway-provider").value = gateway.provider || "manual";
   byId("payment-gateway-mode").value = gateway.mode || "sandbox";
   byId("payment-gateway-timeout").value = gateway.timeout || 15;
@@ -273,6 +323,66 @@ function renderPaymentGateway() {
   const midtrans = gateway.midtransServerKeySet ? "Midtrans key tersimpan" : "Midtrans key belum diset";
   setText("payment-gateway-status", `${paymentGatewayLabel(gateway.provider || "manual")} aktif. ${xendit}. ${midtrans}.`);
   syncGatewayFields();
+}
+
+function saveCentralMasterGateway(event) {
+  event.preventDefault();
+  const payload = {
+    xendit: {
+      status: byId("central-xendit-status")?.checked ? "active" : "inactive",
+      secretKey: byId("central-xendit-secret")?.value.trim() || "",
+      qrisRate: Number(byId("central-xendit-qris-rate")?.value || 0.7),
+      cardRate: Number(byId("central-xendit-card-rate")?.value || 2.0),
+      vaFee: Number(byId("central-xendit-va-fee")?.value || 4500),
+      ewalletRate: Number(byId("central-xendit-ewallet-rate")?.value || 1.5)
+    },
+    midtrans: {
+      status: byId("central-midtrans-status")?.checked ? "active" : "inactive",
+      serverKey: byId("central-midtrans-server-key")?.value.trim() || "",
+      qrisRate: Number(byId("central-midtrans-qris-rate")?.value || 0.7),
+      cardRate: Number(byId("central-midtrans-card-rate")?.value || 1.9),
+      vaFee: Number(byId("central-midtrans-va-fee")?.value || 4000),
+      ewalletRate: Number(byId("central-midtrans-ewallet-rate")?.value || 1.7)
+    }
+  };
+  if (!putSetting("/api/setting/central-gateway-master", payload)) {
+    showFeedback("central-master-gateway-feedback", "Gagal menyimpan Pengaturan Master Gateway Pusat.");
+    return;
+  }
+  showFeedback("central-master-gateway-feedback", "Pengaturan Master Gateway Pusat & Central API Keys berhasil disimpan.");
+  renderSettings();
+}
+
+function syncGatewayFields() {
+  const provider = byId("payment-gateway-provider").value;
+  const isGateway = provider !== "manual";
+  const isCentral = provider === "central_xendit" || provider === "central_midtrans";
+  const isDirectXendit = provider === "direct_xendit";
+  const isDirectMidtrans = provider === "direct_midtrans";
+
+  byId("payment-gateway-mode-field").hidden = !isGateway;
+  byId("payment-gateway-timeout-field").hidden = !isGateway;
+  byId("payment-gateway-xendit-secret-field").hidden = !isDirectXendit;
+  byId("payment-gateway-midtrans-secret-field").hidden = !isDirectMidtrans;
+
+  const infoBox = byId("central-gateway-rates-info");
+  const ratesGrid = byId("central-gateway-rates-grid");
+  if (infoBox && ratesGrid) {
+    if (isCentral) {
+      infoBox.hidden = false;
+      const gatewayKey = provider === "central_xendit" ? "xendit" : "midtrans";
+      const master = state.settings.paymentGateway?.centralMasterGateway || {};
+      const rates = master[gatewayKey] || (gatewayKey === "xendit" ? { qrisRate: 0.7, cardRate: 2.0, vaFee: 4500, ewalletRate: 1.5 } : { qrisRate: 0.7, cardRate: 1.9, vaFee: 4000, ewalletRate: 1.7 });
+      ratesGrid.innerHTML = `
+        <span class="central-rate-badge"><strong>QRIS:</strong> ${rates.qrisRate}%</span>
+        <span class="central-rate-badge"><strong>Card:</strong> ${rates.cardRate}%</span>
+        <span class="central-rate-badge"><strong>Virtual Account:</strong> ${money(rates.vaFee)}</span>
+        <span class="central-rate-badge"><strong>E-Wallet:</strong> ${rates.ewalletRate}%</span>
+      `;
+    } else {
+      infoBox.hidden = true;
+    }
+  }
 }
 
 function renderPackagingRules() {
@@ -294,7 +404,7 @@ function renderCompany() {
   byId("company-name").value = company.name || "";
   byId("company-route-slug").value = company.routeSlug || slugify(company.name || "");
   setLogoValue("company-logo-url", "company-logo-preview", company.logoUrl || "", (company.name || "IF").slice(0, 2).toUpperCase());
-  byId("company-theme-color").value = company.themeColor || "#6e3a16";
+  byId("company-theme-color").value = company.themeColor || "#3B1F8C";
   byId("company-default-outlet").innerHTML = activeOutlets().map((outlet) => `<option value="${outlet.id}">${outlet.name}</option>`).join("");
   const current = state.outlets.find((outlet) => outlet.name === state.settings.outletName)?.id || activeOutlets()[0]?.id || "";
   byId("company-default-outlet").value = current;
@@ -673,15 +783,6 @@ function savePaymentGateway(event) {
   }
 }
 
-function syncGatewayFields() {
-  const provider = byId("payment-gateway-provider").value;
-  const isGateway = provider !== "manual";
-  byId("payment-gateway-mode-field").hidden = !isGateway;
-  byId("payment-gateway-timeout-field").hidden = !isGateway;
-  byId("payment-gateway-xendit-secret-field").hidden = provider !== "xendit";
-  byId("payment-gateway-midtrans-secret-field").hidden = provider !== "midtrans";
-}
-
 function toggleSecret(inputId) {
   const input = byId(inputId);
   if (!input) return;
@@ -927,7 +1028,7 @@ byId("company-form").addEventListener("submit", (event) => {
   }
   refreshSettingsData();
   renderSettings();
-  document.documentElement.style.setProperty("--brand", payload.themeColor);
+  if (payload.themeColor) applyBrandTheme(payload.themeColor);
   const brandMark = document.querySelector(".brand-mark");
   const brandTitle = document.querySelector(".brand h1");
   if (brandMark) brandMark.innerHTML = payload.logoUrl ? `<img src="${payload.logoUrl}" alt="${payload.name}">` : payload.name.slice(0, 2).toUpperCase();
@@ -1023,8 +1124,11 @@ byId("company-logo-file").addEventListener("change", (event) => {
   uploadLogo(event.target.files?.[0]);
 });
 byId("payment-method-type")?.addEventListener("change", () => {
-  if (byId("payment-method-type").value === "qris" && !byId("payment-method-channel").value.trim()) byId("payment-method-channel").value = "QRIS";
-  if (byId("payment-method-type").value === "card" && !byId("payment-method-channel").value.trim()) byId("payment-method-channel").value = "CARDS";
+  const val = byId("payment-method-type").value;
+  if (val === "qris" && !byId("payment-method-channel").value.trim()) byId("payment-method-channel").value = "QRIS";
+  if (val === "card" && !byId("payment-method-channel").value.trim()) byId("payment-method-channel").value = "CARDS";
+  if (val === "va" && !byId("payment-method-channel").value.trim()) byId("payment-method-channel").value = "VA";
+  if (val === "ewallet" && !byId("payment-method-channel").value.trim()) byId("payment-method-channel").value = "EWALLET";
   syncPaymentMethodFields();
 });
 byId("payment-card-mode")?.addEventListener("change", syncPaymentMethodFields);
@@ -1032,5 +1136,6 @@ byId("payment-qris-mode")?.addEventListener("change", syncPaymentMethodFields);
 byId("payment-qris-image-file")?.addEventListener("change", (event) => uploadQrisImage(event.target.files?.[0]));
 byId("payment-card-acquirer")?.addEventListener("change", syncPaymentMethodFields);
 byId("payment-edc-mode")?.addEventListener("change", syncPaymentMethodFields);
+byId("central-master-gateway-form")?.addEventListener("submit", saveCentralMasterGateway);
 
 renderSettings();

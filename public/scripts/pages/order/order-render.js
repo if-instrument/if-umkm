@@ -86,7 +86,7 @@ export function renderBookStaticContent() {
 export function renderBrand() {
   const companyName = state.company.name || state.settings.companyName || "IF Instrument";
   const logoUrl = state.company.logoUrl || state.settings.companyLogoUrl || "/assets/if-instrument-logo.jpg";
-  const themeColor = state.company.themeColor || state.settings.themeColor || "#6e3a16";
+  const themeColor = state.company.themeColor || state.settings.themeColor || "#3B1F8C";
   const themeRgb = hexToRgb(themeColor);
   const darkRgb = mixRgb(themeRgb, { r: 18, g: 10, b: 6 }, 0.62);
   const deepRgb = mixRgb(themeRgb, { r: 0, g: 0, b: 0 }, 0.78);

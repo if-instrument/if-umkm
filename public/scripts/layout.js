@@ -96,7 +96,13 @@ function activeCompany(state, session) {
 
 function navMarkup(currentPage, session, state) {
   const groups = session?.authType === "super_admin"
-    ? [{ title: "SaaS", items: [{ page: "users", icon: "U", label: "Perusahaan", href: "/pages/users.html" }] }]
+    ? [{
+        title: "SaaS",
+        items: [
+          { page: "users", icon: "🏢", label: "Perusahaan", href: "/pages/users.html" },
+          { page: "central-payment-gateway", icon: "💳", label: "Payment Gateway", href: "/pages/central-payment-gateway.html" }
+        ]
+      }]
     : navGroups
         .map((group) => ({
           ...group,
@@ -146,7 +152,8 @@ export function renderLayout() {
     window.location.href = appPath(currentPath);
     return;
   }
-  if (session?.authType === "super_admin" && document.body.dataset.page !== "users") {
+  const allowedSuperAdminPages = ["users", "central-payment-gateway"];
+  if (session?.authType === "super_admin" && !allowedSuperAdminPages.includes(document.body.dataset.page)) {
     window.location.href = "/pages/users.html";
     return;
   }
@@ -176,8 +183,9 @@ export function renderLayout() {
   const company = activeCompany(state, session);
   const companyName = company.name || state.settings.companyName || APP_NAME;
   const companyLogoUrl = company.logoUrl || state.settings.companyLogoUrl || "";
-  const companyThemeColor = company.themeColor || state.settings.themeColor || "#6e3a16";
-  if (companyThemeColor) document.documentElement.style.setProperty("--brand", companyThemeColor);
+  const isSuperAdmin = session?.authType === "super_admin";
+  const companyThemeColor = isSuperAdmin ? "#3B1F8C" : (company.themeColor || state.settings.themeColor || "#3B1F8C");
+  applyBrandTheme(companyThemeColor);
   const page = document.body.dataset.page || "dashboard";
   const title = document.body.dataset.title || "Dashboard";
   const eyebrow = document.body.dataset.eyebrow || "Operasional hari ini";
@@ -206,7 +214,6 @@ export function renderLayout() {
               <strong>${selectedOutlet?.name || state.settings.outletName}</strong>
             </div>
         `;
-  const isSuperAdmin = session?.authType === "super_admin";
   const brandMark = isSuperAdmin
     ? `<span class="brand-mark app-brand-logo"><img src="${APP_LOGO}" alt="${APP_NAME}" /></span>`
     : `<span class="brand-mark">${companyLogoUrl ? `<img src="${companyLogoUrl}" alt="${companyName}" />` : companyName.slice(0, 2).toUpperCase()}</span>`;
@@ -336,4 +343,77 @@ export function renderLayout() {
 
   const firstField = document.querySelector("main input, main select");
   if (firstField) setTimeout(() => firstField.focus(), 80);
+}
+
+/**
+ * Apply brand theme hex color to CSS variables.
+ * Default color for Super Admin is derived from app logo (#3B1F8C).
+ * For company, calculates 5 distinct intensity levels based on company's themeColor:
+ * 1. --brand (base accent)
+ * 2. --brand-strong (deep/dark intensity)
+ * 3. --brand-hover (interactive hover intensity)
+ * 4. --brand-soft (pastel/light tint)
+ * 5. --sidebar-bg (deep dark hue derived from company theme hue & saturation)
+ * 6. --brand-rgb (RGB triplet for opacity)
+ */
+export function applyBrandTheme(hex) {
+  if (!hex || !hex.startsWith("#")) hex = "#3B1F8C"; // Default: Logo color (Super Admin)
+  const root = document.documentElement;
+  root.style.setProperty("--brand", hex);
+
+  const { h, s, l } = hexToHsl(hex);
+  
+  // Intensitas 1: Strong (Deep) - untuk button gradient, dark headers, active borders
+  const strongL = Math.max(l - 16, 5);
+  root.style.setProperty("--brand-strong", hslToHex(h, s, strongL));
+
+  // Intensitas 2: Hover - untuk interactive hover state
+  const hoverL = Math.max(l - 8, 8);
+  root.style.setProperty("--brand-hover", hslToHex(h, s, hoverL));
+
+  // Intensitas 3: Soft (Pastel) - untuk badge, soft highlights, alert background
+  const softL = Math.min(l + 42, 95);
+  const softS = Math.max(s - 15, 10);
+  root.style.setProperty("--brand-soft", hslToHex(h, softS, softL));
+
+  // Intensitas 4: Sidebar Dark Background - warna gelap pekat turunan dari Hue tema perusahaan
+  const sidebarBgL = Math.max(Math.min(l - 35, 11), 6);
+  const sidebarBgS = Math.min(s, 35);
+  root.style.setProperty("--sidebar-bg", hslToHex(h, sidebarBgS, sidebarBgL));
+
+  // RGB triplet untuk alpha-channel opacity
+  const sr = parseInt(hex.slice(1,3), 16) || 59;
+  const sg = parseInt(hex.slice(3,5), 16) || 31;
+  const sb = parseInt(hex.slice(5,7), 16) || 140;
+  root.style.setProperty("--brand-rgb", `${sr}, ${sg}, ${sb}`);
+}
+
+function hexToHsl(hex) {
+  let r = parseInt(hex.slice(1,3),16)/255;
+  let g = parseInt(hex.slice(3,5),16)/255;
+  let b = parseInt(hex.slice(5,7),16)/255;
+  const max = Math.max(r,g,b), min = Math.min(r,g,b);
+  let h, s, l = (max+min)/2;
+  if (max === min) { h = s = 0; }
+  else {
+    const d = max-min;
+    s = l > 0.5 ? d/(2-max-min) : d/(max+min);
+    switch(max) {
+      case r: h = ((g-b)/d + (g<b?6:0))/6; break;
+      case g: h = ((b-r)/d + 2)/6; break;
+      default: h = ((r-g)/d + 4)/6;
+    }
+  }
+  return { h: Math.round(h*360), s: Math.round(s*100), l: Math.round(l*100) };
+}
+
+function hslToHex(h, s, l) {
+  s /= 100; l /= 100;
+  const a = s * Math.min(l, 1-l);
+  const f = n => {
+    const k = (n + h/30) % 12;
+    const c = l - a * Math.max(Math.min(k-3, 9-k, 1), -1);
+    return Math.round(255*c).toString(16).padStart(2,'0');
+  };
+  return `#${f(0)}${f(8)}${f(4)}`;
 }

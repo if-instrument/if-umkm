@@ -64,6 +64,19 @@ abstract class BaseController extends Controller
         }
     }
 
+    protected function renderHtmlResponse(string $html, string $inject = ''): ResponseInterface
+    {
+        if ($inject !== '') {
+            $html = str_replace('<head>', '<head>' . $inject, $html);
+        }
+
+        // Dynamic timestamp script & stylesheet versioning to prevent browser cache issues
+        $timestamp = time();
+        $html = preg_replace('/(\.(?:js|css))\?v=[^"\'\s>]+/i', '$1?v=' . $timestamp, $html);
+
+        return $this->response->setContentType('text/html')->setBody($html);
+    }
+
     private function numericCompanyId(string $code): int
     {
         if ($code === 'company-main') {

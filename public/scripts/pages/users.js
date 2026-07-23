@@ -1,4 +1,4 @@
-import { renderLayout } from "../layout.js?v=coffee-v151";
+import { applyBrandTheme, renderLayout } from "../layout.js?v=coffee-v151";
 import { apiDelete, apiPost, apiPut, apiUpload, applyPermissionControls, canUsePermission, loadSession, loadState } from "../store.js?v=coffee-v151";
 import { byId, setText, showAlert, showFeedback } from "../dom.js";
 import { enhanceAllDataTables } from "../datatable.js";
@@ -19,6 +19,10 @@ function applyAccessData(data) {
   state.outlets = data.outlets || [];
   state.companyRoles = data.companyRoles || [];
   state.users = data.users || [];
+  if (data.centralPaymentGateway) {
+    state.centralPaymentGateway = data.centralPaymentGateway;
+    renderCentralMasterGateway(data.centralPaymentGateway);
+  }
 }
 
 function loadAccessData() {
@@ -141,7 +145,7 @@ function statusPill(status) {
 }
 
 function activeCompany() {
-  return state.companies.find((company) => company.id === state.activeCompanyId) || state.companies[0];
+  return (state.companies || []).find((company) => company.id === state.activeCompanyId) || (state.companies || [])[0] || {};
 }
 
 function activeOutlets() {
@@ -272,7 +276,7 @@ function renderCompanies() {
     <tr>
       <td><strong>${company.name}</strong><br><small>/${company.routeSlug || "-"}${company.id === state.activeCompanyId ? " · Perusahaan aktif" : ""}</small>${company.dbName ? `<br><small>DB: ${company.dbName}</small>` : ""}</td>
       <td>${company.adminName}<br><small>${company.adminEmail}</small><br>${statusPill(company.adminStatus)}</td>
-      <td><span class="theme-swatch" style="background:${company.themeColor || "#6e3a16"}"></span>${company.logoUrl ? " Logo diset" : "Logo belum diset"}</td>
+      <td><span class="theme-swatch" style="background:${company.themeColor || "#3B1F8C"}"></span>${company.logoUrl ? " Logo diset" : "Logo belum diset"}</td>
       <td>${statusPill(company.status)}</td>
       <td>
         <div class="row-actions">
@@ -291,7 +295,7 @@ function applyBranding() {
   const brandTitle = document.querySelector(".brand h1");
   const brandSubtitle = document.querySelector(".brand p");
   if (isSuperAdmin) {
-    document.documentElement.style.setProperty("--brand", "#6e3a16");
+    applyBrandTheme("#3B1F8C");
     if (brandMark) {
       brandMark.classList.add("app-brand-logo");
       brandMark.innerHTML = `<img src="/assets/if-instrument-logo.jpg" alt="IF Instrument">`;
@@ -301,7 +305,7 @@ function applyBranding() {
     return;
   }
   const company = activeCompany();
-  document.documentElement.style.setProperty("--brand", company.themeColor || "#6e3a16");
+  applyBrandTheme(company.themeColor || "#3B1F8C");
   if (brandMark) brandMark.innerHTML = company.logoUrl ? `<img src="${company.logoUrl}" alt="${company.name}">` : "IF";
   if (brandTitle) brandTitle.textContent = company.name;
 }
@@ -378,9 +382,10 @@ function renderOptions() {
 
 function refreshTables() {
   const company = activeCompany();
-  state.settings.companyName = company.name;
-  state.settings.companyLogoUrl = company.logoUrl;
-  state.settings.themeColor = company.themeColor;
+  if (!state.settings) state.settings = {};
+  state.settings.companyName = company.name || "IF Instrument";
+  state.settings.companyLogoUrl = company.logoUrl || "";
+  state.settings.themeColor = company.themeColor || "#3B1F8C";
   applyBranding();
   renderCompanies();
   renderRoles();
@@ -465,7 +470,7 @@ function openCompany(company = null) {
   byId("tenant-admin-email").value = company?.adminEmail || "";
   setLogoValue("tenant-logo-url", "tenant-logo-preview", company?.logoUrl || "", (company?.name || "IF").slice(0, 2).toUpperCase());
   byId("tenant-logo-file").value = "";
-  byId("tenant-theme-color").value = company?.themeColor || "#6e3a16";
+  byId("tenant-theme-color").value = company?.themeColor || "#3B1F8C";
   openModal("company-modal");
 }
 

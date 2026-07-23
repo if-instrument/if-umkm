@@ -4,18 +4,20 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>CRM Customer - IF Instrument</title>
-    <link rel="stylesheet" href="../styles.css?v=coffee-v154" />
+    <link rel="stylesheet" href="../styles.css?v=light-v3" />
   </head>
   <body data-page="crm-customers" data-title="CRM Customer" data-eyebrow="CRM">
     <template id="page-content">
       <section class="content-grid single">
-        <div class="page-command-bar">
-          <div>
+        <div class="hero-summary-banner">
+          <div class="hero-summary-copy">
             <span class="hero-kicker">Customer Relationship</span>
-            <h3>Member dan customer outlet aktif</h3>
+            <h2>Member & Database Customer</h2>
             <p>Data customer dari buku menu online tersimpan sebagai member outlet dan bisa dipakai ulang pada order berikutnya.</p>
           </div>
-          <button class="primary-button" data-open-customer-modal data-permission="crm.customers:create" type="button">+ Tambah Customer</button>
+          <div class="hero-summary-stats">
+            <button class="primary-button" data-open-customer-modal data-permission="crm.customers:create" type="button">+ Tambah Customer</button>
+          </div>
         </div>
 
         <div class="summary-cards order-history-summary" id="crm-summary"></div>
@@ -79,6 +81,6 @@
         </section>
       </div>
     </template>
-    <script type="module" src="../scripts/pages/crm-customers.js?v=coffee-v174"></script>
+    <script type="module" src="../scripts/pages/crm-customers.js?v=light-v3"></script>
   </body>
 </html>

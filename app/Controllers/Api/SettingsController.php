@@ -21,6 +21,26 @@ class SettingsController extends BaseController
         return $this->response->setJSON(['ok' => true, 'data' => $this->settings->saveGeneral($payload, $companyId, $outletId)]);
     }
 
+    public function getCentralPaymentGatewayMaster()
+    {
+        $claims = $this->request->jwt ?? [];
+        if (($claims['authType'] ?? '') !== 'super_admin') {
+            return $this->response->setStatusCode(403)->setJSON(['ok' => false, 'message' => 'Akses ditolak: Hanya Superadmin Pusat yang berhak mengelola Master Gateway Pusat.']);
+        }
+        return $this->response->setJSON(['ok' => true, 'data' => $this->settings->getCentralPaymentGatewayMaster()]);
+    }
+
+    public function centralPaymentGatewayMaster()
+    {
+        $claims = $this->request->jwt ?? [];
+        if (($claims['authType'] ?? '') !== 'super_admin') {
+            return $this->response->setStatusCode(403)->setJSON(['ok' => false, 'message' => 'Akses ditolak: Hanya Superadmin Pusat yang berhak mengelola Master Gateway Pusat.']);
+        }
+        $payload = $this->payload();
+        [$companyId, $outletId] = $this->scope($payload);
+        return $this->response->setJSON(['ok' => true, 'data' => $this->settings->saveCentralPaymentGatewayMaster($payload, $companyId, $outletId)]);
+    }
+
     public function getGeneral()
     {
         [$companyId, $outletId] = $this->scope();

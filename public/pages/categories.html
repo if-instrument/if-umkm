@@ -4,19 +4,21 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Kategori Produk - IFresso</title>
-    <link rel="stylesheet" href="../styles.css?v=coffee-v154" />
-    <link rel="stylesheet" href="../styles/pages/products.css?v=coffee-v154" />
+    <link rel="stylesheet" href="../styles.css?v=light-v3" />
+    <link rel="stylesheet" href="../styles/pages/products.css?v=light-v3" />
   </head>
   <body data-page="categories" data-title="Kategori Produk" data-eyebrow="Produk & Recipe">
     <template id="page-content">
       <section class="content-grid single">
-        <div class="page-command-bar category-board-command">
-          <div>
-            <span class="hero-kicker">Kategori Produk</span>
-            <h3>Kelola kategori dan susun produk outlet aktif</h3>
-            <p>Tambah atau edit kategori, lalu geser produk antar-kolom. Perubahan mapping hanya berlaku pada outlet aktif.</p>
+        <div class="hero-summary-banner">
+          <div class="hero-summary-copy">
+            <span class="hero-kicker">Category Board</span>
+            <h2>Kategori Produk & Menu</h2>
+            <p>Kelola kelompok kategori produk dan atur susunan menu untuk outlet aktif secara visual.</p>
           </div>
-          <button class="primary-button" data-open-category-modal data-permission="categories.manage:create" type="button">+ Tambah Kategori</button>
+          <div class="hero-summary-stats">
+            <button class="primary-button" data-open-category-modal data-permission="categories.manage:create" type="button">+ Tambah Kategori</button>
+          </div>
         </div>
         <div class="workspace-panel wide category-board-tools">
           <label class="category-board-search">Cari Produk
@@ -53,6 +55,6 @@
         </section>
       </div>
     </template>
-    <script type="module" src="../scripts/pages/categories.js?v=coffee-v172"></script>
+    <script type="module" src="../scripts/pages/categories.js?v=light-v3"></script>
   </body>
 </html>

@@ -4,25 +4,26 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>User & Role - IF Instrument</title>
-    <link rel="stylesheet" href="../styles.css?v=coffee-v154" />
-    <link rel="stylesheet" href="../styles/pages/users.css?v=coffee-v154" />
+    <link rel="stylesheet" href="../styles.css?v=light-v3" />
+    <link rel="stylesheet" href="../styles/pages/users.css?v=light-v3" />
   </head>
   <body data-page="users" data-title="User & Role" data-eyebrow="Manajemen">
     <template id="page-content">
       <section class="content-grid single">
-        <div class="page-command-bar">
-          <div>
-            <span class="hero-kicker">SaaS Identity</span>
-            <h3 data-access-heading>Kelola perusahaan dan undangan administrator.</h3>
+        <div class="hero-summary-banner">
+          <div class="hero-summary-copy">
+            <span class="hero-kicker">SaaS Identity & Access</span>
+            <h2 data-access-heading>Manajemen Perusahaan & Pengguna</h2>
+            <p>Kelola perusahaan, administrator tenant, role permission, serta hak akses pengguna secara terpusat.</p>
           </div>
-          <div class="inventory-actions">
-            <button class="ghost-button" data-open-company-modal data-permission="admin.companies:create" data-super-admin-only type="button">+ Perusahaan</button>
+          <div class="hero-summary-stats">
+            <button class="primary-button" data-open-company-modal data-permission="admin.companies:create" data-super-admin-only type="button">+ Perusahaan Baru</button>
             <button class="ghost-button" data-company-admin-only data-open-role-modal data-permission="roles.manage:create" hidden type="button">+ Role</button>
             <button class="ghost-button" data-company-admin-only data-open-outlet-modal data-permission="outlets.manage:create" hidden type="button">+ Outlet</button>
-            <button class="primary-button" data-company-admin-only data-open-user-modal data-permission="users.manage:create" hidden type="button">+ User</button>
+            <button class="primary-button" data-company-admin-only data-open-user-modal data-permission="users.manage:create" hidden type="button">+ User Baru</button>
           </div>
-          <p class="form-feedback full-row" id="company-feedback"></p>
         </div>
+        <p class="form-feedback full-row" id="company-feedback"></p>
 
         <div class="module-tabs user-admin-tabs" data-company-admin-only hidden>
           <button class="active" data-user-tab="users" type="button">User</button>
@@ -170,6 +171,6 @@
         </section>
       </div>
     </template>
-    <script type="module" src="../scripts/pages/users.js?v=coffee-v172"></script>
+    <script type="module" src="../scripts/pages/users.js?v=light-v3"></script>
   </body>
 </html>

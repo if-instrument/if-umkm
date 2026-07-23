@@ -9,7 +9,7 @@ const EMPTY_STATE = {
     costingMethod: "average",
     companyName: "IF Instrument",
     companyLogoUrl: "",
-    themeColor: "#6e3a16",
+    themeColor: "#3B1F8C",
     outletName: "Outlet aktif",
     taxRate: 0,
     dineInServiceRate: 0,

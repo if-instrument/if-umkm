@@ -73,6 +73,6 @@ class AppPageController extends BaseController
         }
 
         $html = file_get_contents($target) ?: '';
-        return $this->response->setContentType('text/html')->setBody(str_replace('<head>', '<head>' . $inject, $html));
+        return $this->renderHtmlResponse($html, $inject);
     }
 }

@@ -381,17 +381,186 @@ class SettingsService
 
     private function paymentGatewaySettings(array $settings): array
     {
-        $provider = strtolower((string) ($settings['payment_gateway_provider'] ?? 'manual'));
-        if (! in_array($provider, ['manual', 'xendit', 'midtrans'], true)) {
-            $provider = 'manual';
+        $rawProvider = strtolower((string) ($settings['payment_gateway_provider'] ?? 'manual'));
+        $validProviders = ['manual', 'central_xendit', 'central_midtrans', 'direct_xendit', 'direct_midtrans', 'xendit', 'midtrans'];
+        if (! in_array($rawProvider, $validProviders, true)) {
+            $rawProvider = 'manual';
         }
+
+        if ($rawProvider === 'xendit') {
+            $rawProvider = trim((string) ($settings['xendit_secret_key'] ?? '')) !== '' ? 'direct_xendit' : 'central_xendit';
+        } elseif ($rawProvider === 'midtrans') {
+            $rawProvider = trim((string) ($settings['midtrans_server_key'] ?? '')) !== '' ? 'direct_midtrans' : 'central_midtrans';
+        }
+
+        $db = Database::connect();
+        $this->ensureCentralPaymentGatewaysTable($db);
+
+        $centralGateways = [];
+        if ($db->tableExists('payment_gateways')) {
+            $rows = $db->table('payment_gateways')->get()->getResultArray();
+            foreach ($rows as $row) {
+                $centralGateways[$row['provider']] = [
+                    'status' => ($row['status'] ?? 'active') === 'active' ? 'active' : 'inactive',
+                    'apiKey' => (string) ($row['api_key'] ?? ''),
+                    'apiKeySet' => trim((string) ($row['api_key'] ?? '')) !== '',
+                    'qrisRate' => (float) ($row['qris_rate'] ?? 0.7),
+                    'cardRate' => (float) ($row['card_rate'] ?? 2.0),
+                    'vaFee' => (float) ($row['va_fee'] ?? 4000),
+                    'ewalletRate' => (float) ($row['ewallet_rate'] ?? 1.5),
+                ];
+            }
+        }
+
+        $xenditMaster = $centralGateways['xendit'] ?? [
+            'status' => 'active', 'apiKey' => '', 'apiKeySet' => false, 'qrisRate' => 0.7, 'cardRate' => 2.0, 'vaFee' => 4500, 'ewalletRate' => 1.5,
+        ];
+        $midtransMaster = $centralGateways['midtrans'] ?? [
+            'status' => 'active', 'apiKey' => '', 'apiKeySet' => false, 'qrisRate' => 0.7, 'cardRate' => 1.9, 'vaFee' => 4000, 'ewalletRate' => 1.7,
+        ];
+
+        $centralActiveProviders = ['manual'];
+        if ($xenditMaster['status'] === 'active') {
+            $centralActiveProviders[] = 'central_xendit';
+        }
+        if ($midtransMaster['status'] === 'active') {
+            $centralActiveProviders[] = 'central_midtrans';
+        }
+        $centralActiveProviders[] = 'direct_xendit';
+        $centralActiveProviders[] = 'direct_midtrans';
+
+        if (! in_array($rawProvider, $centralActiveProviders, true)) {
+            $rawProvider = 'manual';
+        }
+
+        $xenditSet = $xenditMaster['apiKeySet'] || trim((string) ($settings['xendit_secret_key'] ?? '')) !== '';
+        $midtransSet = $midtransMaster['apiKeySet'] || trim((string) ($settings['midtrans_server_key'] ?? '')) !== '';
+
         return [
-            'provider' => $provider,
+            'provider' => $rawProvider,
             'mode' => ($settings['payment_gateway_mode'] ?? 'sandbox') === 'live' ? 'live' : 'sandbox',
             'timeout' => (int) ($settings['payment_gateway_timeout'] ?? 15),
-            'xenditSecretSet' => trim((string) ($settings['xendit_secret_key'] ?? '')) !== '' || trim((string) (env('XENDIT_SECRET_KEY') ?: getenv('XENDIT_SECRET_KEY') ?: '')) !== '',
-            'midtransServerKeySet' => trim((string) ($settings['midtrans_server_key'] ?? '')) !== '' || trim((string) (env('MIDTRANS_SERVER_KEY') ?: getenv('MIDTRANS_SERVER_KEY') ?: '')) !== '',
+            'xenditSecretSet' => $xenditSet,
+            'midtransServerKeySet' => $midtransSet,
+            'centralActiveProviders' => $centralActiveProviders,
+            'centralMasterGateway' => [
+                'xendit' => $xenditMaster,
+                'midtrans' => $midtransMaster,
+            ],
         ];
+    }
+
+    public function getCentralPaymentGatewayMaster(): array
+    {
+        $db = Database::connect();
+        $this->ensureCentralPaymentGatewaysTable($db);
+
+        $rows = $db->table('payment_gateways')->get()->getResultArray();
+        $result = [];
+        foreach ($rows as $row) {
+            $prov = $row['provider'];
+            $result[$prov] = [
+                'status'      => $row['status'] ?? 'active',
+                'qrisRate'    => (float) ($row['qris_rate'] ?? 0.7),
+                'cardRate'    => (float) ($row['card_rate'] ?? 2.0),
+                'vaFee'       => (float) ($row['va_fee'] ?? 4000),
+                'ewalletRate' => (float) ($row['ewallet_rate'] ?? 1.5),
+                'hasApiKey'   => !empty($row['api_key']),
+            ];
+        }
+        return $result;
+    }
+
+    public function saveCentralPaymentGatewayMaster(array $payload, int $companyId = 1, int $outletId = 1): array
+    {
+        $db = Database::connect();
+        $this->ensureCentralPaymentGatewaysTable($db);
+
+        foreach (['xendit', 'midtrans'] as $prov) {
+            if (isset($payload[$prov])) {
+                $item = $payload[$prov];
+                $keyVal = trim((string) ($item['secretKey'] ?? $item['serverKey'] ?? ''));
+                $data = [
+                    'status' => ($item['status'] ?? 'active') === 'active' ? 'active' : 'inactive',
+                    'qris_rate' => (float) ($item['qrisRate'] ?? 0.7),
+                    'card_rate' => (float) ($item['cardRate'] ?? 2.0),
+                    'va_fee' => (float) ($item['vaFee'] ?? 4000),
+                    'ewallet_rate' => (float) ($item['ewalletRate'] ?? 1.5),
+                    'updated_at' => date('Y-m-d H:i:s'),
+                ];
+                if ($keyVal !== '') {
+                    $data['api_key'] = $keyVal;
+                }
+                $existing = $db->table('payment_gateways')->where('provider', $prov)->get()->getRowArray();
+                if ($existing) {
+                    $db->table('payment_gateways')->where('provider', $prov)->update($data);
+                } else {
+                    $data['provider'] = $prov;
+                    $data['created_at'] = date('Y-m-d H:i:s');
+                    $db->table('payment_gateways')->insert($data);
+                }
+            }
+        }
+        return $this->getCentralPaymentGatewayMaster();
+    }
+
+    private function ensureCentralPaymentGatewaysTable($db): void
+    {
+        if (! $db->tableExists('payment_gateways')) {
+            $forge = \Config\Database::forge($db);
+            $forge->addField([
+                'id' => ['type' => 'INT', 'unsigned' => true, 'auto_increment' => true],
+                'provider' => ['type' => 'VARCHAR', 'constraint' => 32],
+                'api_key' => ['type' => 'VARCHAR', 'constraint' => 255, 'null' => true],
+                'status' => ['type' => 'VARCHAR', 'constraint' => 24, 'default' => 'active'],
+                'qris_rate' => ['type' => 'DECIMAL', 'constraint' => '5,2', 'default' => '0.70'],
+                'card_rate' => ['type' => 'DECIMAL', 'constraint' => '5,2', 'default' => '2.00'],
+                'va_fee' => ['type' => 'DECIMAL', 'constraint' => '10,2', 'default' => '4000.00'],
+                'ewallet_rate' => ['type' => 'DECIMAL', 'constraint' => '5,2', 'default' => '1.50'],
+                'created_at' => ['type' => 'DATETIME', 'null' => true],
+                'updated_at' => ['type' => 'DATETIME', 'null' => true],
+            ]);
+            $forge->addKey('id', true);
+            $forge->addUniqueKey('provider');
+            $forge->createTable('payment_gateways', true);
+        }
+
+        if (! $db->fieldExists('api_key', 'payment_gateways')) {
+            $forge = \Config\Database::forge($db);
+            $forge->addColumn('payment_gateways', [
+                'api_key' => ['type' => 'VARCHAR', 'constraint' => 255, 'null' => true, 'after' => 'provider'],
+            ]);
+        }
+
+        $defaults = [
+            [
+                'provider' => 'xendit',
+                'status' => 'active',
+                'qris_rate' => 0.70,
+                'card_rate' => 2.00,
+                'va_fee' => 4500.00,
+                'ewallet_rate' => 1.50,
+                'created_at' => date('Y-m-d H:i:s'),
+                'updated_at' => date('Y-m-d H:i:s'),
+            ],
+            [
+                'provider' => 'midtrans',
+                'status' => 'active',
+                'qris_rate' => 0.70,
+                'card_rate' => 1.90,
+                'va_fee' => 4000.00,
+                'ewallet_rate' => 1.70,
+                'created_at' => date('Y-m-d H:i:s'),
+                'updated_at' => date('Y-m-d H:i:s'),
+            ],
+        ];
+
+        foreach ($defaults as $row) {
+            $existing = $db->table('payment_gateways')->where('provider', $row['provider'])->get()->getRowArray();
+            if (! $existing) {
+                $db->table('payment_gateways')->insert($row);
+            }
+        }
     }
 
     private function publicOrderContent(array $settings): array

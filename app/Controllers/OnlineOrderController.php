@@ -72,9 +72,7 @@ class OnlineOrderController extends BaseController
         if ($companySlug !== '') {
             $inject .= '<script>window.__COMPANY_SLUG__=' . json_encode($companySlug) . ';</script>';
         }
-        $html = str_replace('<head>', '<head>' . $inject, $html);
-
-        return $this->response->setContentType('text/html')->setBody($html);
+        return $this->renderHtmlResponse($html, $inject);
     }
 
     private function jsonAction(callable $action)

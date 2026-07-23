@@ -73,6 +73,8 @@ $routes->group('api', ['namespace' => 'App\Controllers\Api', 'filter' => 'jwt-au
     $routes->get('page/finance/bootstrap', '\App\Controllers\FinancePageController::bootstrap');
     $routes->get('setting', 'SettingsController::getGeneral');
     $routes->put('setting', 'SettingsController::general');
+    $routes->get('setting/central-gateway-master', 'SettingsController::getCentralPaymentGatewayMaster');
+    $routes->put('setting/central-gateway-master', 'SettingsController::centralPaymentGatewayMaster');
     $routes->get('printer', 'SettingsController::listPrinters');
     $routes->get('dining-table', 'SettingsController::listDiningTables');
     $routes->get('dining-table/(:segment)', 'SettingsController::getDiningTable/$1');

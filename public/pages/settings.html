@@ -4,12 +4,26 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Pengaturan - IF Instrument</title>
-    <link rel="stylesheet" href="../styles.css?v=coffee-v154" />
-    <link rel="stylesheet" href="../styles/pages/settings.css?v=coffee-v154" />
+    <link rel="stylesheet" href="../styles.css?v=light-v3" />
+    <link rel="stylesheet" href="../styles/pages/settings.css?v=light-v3" />
   </head>
   <body data-page="settings" data-title="Pengaturan" data-eyebrow="Manajemen">
     <template id="page-content">
       <section class="content-grid single">
+        <div class="hero-summary-banner">
+          <div class="hero-summary-copy">
+            <span class="hero-kicker">Tenant Configuration</span>
+            <h2>Pengaturan Sistem Perusahaan</h2>
+            <p>Kelola profil perusahaan, metode pembayaran, pajak & service charge, layout meja, serta aturan kemasan packaging.</p>
+          </div>
+          <div class="hero-summary-stats">
+            <div class="summary-stat-card">
+              <span class="stat-label">System State</span>
+              <span class="stat-value" style="color:#10b981;">Online</span>
+            </div>
+          </div>
+        </div>
+
         <div class="module-tabs settings-tabs">
           <button class="active" data-permission="company.branding:read" data-setting-tab="company" type="button">Company</button>
           <button data-permission="settings.outlet:read" data-setting-tab="outlet" type="button">Outlet & Transaksi</button>
@@ -149,9 +163,15 @@
           <form class="form-grid input-workflow two-column-form" id="payment-gateway-form">
             <label>Gateway Aktif
               <select id="payment-gateway-provider">
-                <option value="manual">Manual / Offline</option>
-                <option value="xendit">Xendit</option>
-                <option value="midtrans">Midtrans</option>
+                <option value="manual">Manual / Offline (Tanpa Payment Gateway)</option>
+                <optgroup label="Gateway Pusat (IF Instrument Global)">
+                  <option value="central_xendit">Xendit (Gateway Pusat)</option>
+                  <option value="central_midtrans">Midtrans (Gateway Pusat)</option>
+                </optgroup>
+                <optgroup label="Gateway Mandiri (Akun Direct Merchant)">
+                  <option value="direct_xendit">Xendit (Akun Mandiri Merchant)</option>
+                  <option value="direct_midtrans">Midtrans (Akun Mandiri Merchant)</option>
+                </optgroup>
               </select>
             </label>
             <label id="payment-gateway-mode-field">Mode
@@ -173,10 +193,16 @@
                 <button class="ghost-button compact-button" data-toggle-secret="payment-gateway-midtrans-secret" type="button">View</button>
               </span>
             </label>
+            <div class="full-row central-gateway-info-box" id="central-gateway-rates-info" hidden>
+              <strong>Rate MDR Gateway Pusat (IF Instrument Central):</strong>
+              <div class="central-rates-grid" id="central-gateway-rates-grid"></div>
+              <small>* Rate di atas ditentukan oleh Pusat IF Instrument. Merchant dapat memilih penanggung biaya (Merchant / Customer) di setiap metode pembayaran.</small>
+            </div>
             <p class="form-preview" id="payment-gateway-status">Gateway belum diset.</p>
             <div class="modal-actions full-row"><button class="primary-button" data-permission="settings.payment:update" type="submit">Simpan Gateway</button></div>
             <p class="form-feedback full-row" id="payment-gateway-feedback"></p>
           </form>
+
           <div class="table-shell">
             <table>
               <thead><tr><th>Urutan</th><th>Nama Metode</th><th>Tipe</th><th>Channel / Terminal</th><th>MDR / Fee</th><th>Akun Settlement</th><th>Status</th><th>Aksi</th></tr></thead>
@@ -251,7 +277,7 @@
           <form class="form-grid input-workflow two-column-form" id="payment-method-form">
             <input id="payment-method-id" type="hidden" />
             <label>Nama Metode <input id="payment-method-name" required type="text" placeholder="Cash / QRIS / Transfer" /></label>
-            <label>Tipe <select id="payment-method-type"><option value="cash">Cash (Tunai)</option><option value="qris">QRIS (Static & Dinamis)</option><option value="edc">EDC (Mesin EDC Kasir)</option><option value="card">Card (Kartu Online Gateway)</option><option value="transfer">Transfer Bank / E-Wallet</option><option value="other">Lainnya</option></select></label>
+            <label>Tipe <select id="payment-method-type"><option value="cash">Cash (Tunai)</option><option value="qris">QRIS (Static & Dinamis)</option><option value="card">Card (Kartu Debit / Kredit / EDC)</option><option value="va">VA (Virtual Account)</option><option value="ewallet">E-Wallet (OVO, GoPay, DANA, dll)</option></select></label>
             <label id="payment-qris-mode-field" hidden>Mode QRIS <select id="payment-qris-mode"><option value="offline">Offline / Static (Upload Gambar)</option><option value="online">Online / Dinamis (Gateway Aktif)</option></select></label>
             <label class="full-row" id="payment-qris-image-field" hidden>Gambar QRIS Static
               <input id="payment-qris-image-file" accept="image/jpeg,image/png,image/webp" type="file" />
@@ -283,6 +309,6 @@
       </div>
     </template>
 
-    <script type="module" src="../scripts/pages/settings.js?v=coffee-v174"></script>
+    <script type="module" src="../scripts/pages/settings.js?v=light-v3"></script>
   </body>
 </html>

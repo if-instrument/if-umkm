@@ -4,19 +4,19 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Stok Produk - IFresso Coffee</title>
-    <link rel="stylesheet" href="../styles.css?v=coffee-v154" />
-    <link rel="stylesheet" href="../styles/pages/inventory.css?v=coffee-v154" />
+    <link rel="stylesheet" href="../styles.css?v=light-v3" />
+    <link rel="stylesheet" href="../styles/pages/inventory.css?v=light-v3" />
   </head>
   <body data-page="finished-products" data-title="Stok Produk" data-eyebrow="Gudang">
     <template id="page-content">
       <section class="content-grid single">
-        <div class="page-command-bar">
-          <div>
-            <span class="hero-kicker">Product Stock</span>
-            <h3>Monitor batch produk dan barang dagang per outlet.</h3>
-            <p>Lihat stok hasil produksi atau pembelian barang dagang, HPP batch, expired date, dan prioritas FEFO sebelum dijual di POS.</p>
+        <div class="hero-summary-banner">
+          <div class="hero-summary-copy">
+            <span class="hero-kicker">Product Batch Stock</span>
+            <h2>Stok Produk Jadi & Barang Dagang</h2>
+            <p>Lihat stok hasil produksi atau barang dagang per batch, HPP batch, tanggal kedaluwarsa, dan prioritas FEFO sebelum dijual di POS.</p>
           </div>
-          <div class="inventory-actions">
+          <div class="hero-summary-stats">
             <button class="primary-button" data-open-product-stock-modal="purchase" data-permission="products.catalog:update" type="button">+ Beli Barang Dagang</button>
             <button class="ghost-button" data-open-product-stock-modal="production" data-permission="products.catalog:update" type="button">+ Produksi Produk</button>
           </div>
@@ -212,6 +212,6 @@
       </div>
     </template>
 
-    <script type="module" src="../scripts/pages/finished-products.js?v=coffee-v172"></script>
+    <script type="module" src="../scripts/pages/finished-products.js?v=light-v3"></script>
   </body>
 </html>

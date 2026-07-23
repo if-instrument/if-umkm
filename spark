@@ -1,6 +1,22 @@
 #!/usr/bin/env php
 <?php
 
+if (! function_exists('str_starts_with')) {
+    function str_starts_with(string $haystack, string $needle): bool {
+        return '' === $needle || 0 === strpos($haystack, $needle);
+    }
+}
+if (! function_exists('str_contains')) {
+    function str_contains(string $haystack, string $needle): bool {
+        return '' === $needle || false !== strpos($haystack, $needle);
+    }
+}
+if (! function_exists('str_ends_with')) {
+    function str_ends_with(string $haystack, string $needle): bool {
+        return '' === $needle || substr($haystack, -strlen($needle)) === $needle;
+    }
+}
+
 use CodeIgniter\Boot;
 use Config\Paths;
 
@@ -10,6 +26,10 @@ if (str_starts_with(PHP_SAPI, 'cgi')) {
 
 $minPhpVersion = '8.2';
 if (version_compare(PHP_VERSION, $minPhpVersion, '<')) {
+    $altPhp = '/opt/homebrew/opt/php@8.2/bin/php';
+    if (file_exists($altPhp)) {
+        exit(sprintf("Standard CLI PHP is %s. Please run spark using PHP 8.2:\n  %s spark %s\n\n", PHP_VERSION, $altPhp, implode(' ', array_slice($argv, 1))));
+    }
     exit(sprintf('Your PHP version must be %s or higher to run CodeIgniter. Current version: %s', $minPhpVersion, PHP_VERSION));
 }
 

@@ -82,11 +82,11 @@ function drawSalesChart() {
 
   context.beginPath();
   points.forEach((point, index) => (index ? context.lineTo(point.x, point.y) : context.moveTo(point.x, point.y)));
-  context.strokeStyle = "#7a3e12";
+  context.strokeStyle = "#3B1F8C";
   context.lineWidth = 2;
   context.stroke();
 
-  context.fillStyle = "#7a3e12";
+  context.fillStyle = "#3B1F8C";
   points.forEach((point) => {
     context.beginPath();
     context.arc(point.x, point.y, 3, 0, Math.PI * 2);

@@ -63,8 +63,7 @@ class UserRoleController extends BaseController
         if ($companySlug !== '') {
             $inject .= '<script>window.__COMPANY_SLUG__=' . json_encode($companySlug) . ';</script>';
         }
-
-        return $this->response->setContentType('text/html')->setBody(str_replace('<head>', '<head>' . $inject, $html));
+        return $this->renderHtmlResponse($html, $inject);
     }
 
     private function numericCompanyId(string $companyId): int

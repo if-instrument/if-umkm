@@ -22,7 +22,7 @@
 }
 
 .mapping-tabs button.active {
-  background: #6e3a16;
+  background: var(--brand);
   color: #fffaf4;
 }
 .table-product-photo {
@@ -176,7 +176,7 @@
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: start;
   gap: 10px;
-  border: 1px solid #eadfd5;
+  border: 1px solid var(--line);
   border-radius: 7px;
   background: #fffaf5;
   margin-bottom: 12px;
@@ -186,7 +186,7 @@
 .toggle-row {
   align-items: center;
   background: #fbf4ed;
-  border: 1px solid #eadfd5;
+  border: 1px solid var(--line);
   border-radius: 7px;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
@@ -195,7 +195,7 @@
 }
 
 .toggle-row input {
-  accent-color: #6e3a16;
+  accent-color: var(--brand);
   height: 16px;
   width: 16px;
 }
@@ -206,14 +206,14 @@
 }
 
 .toggle-row strong {
-  color: #2f2018;
+  color: var(--ink);
   font-size: 11px;
   font-weight: 850;
 }
 
 .toggle-row small,
 .muted-text {
-  color: #8a796d;
+  color: var(--muted);
   font-size: 9px;
   font-weight: 800;
 }
@@ -221,7 +221,7 @@
 .modifier-assignment-bar label {
   display: grid;
   gap: 6px;
-  color: #715f52;
+  color: var(--muted);
   font-size: 9px;
   font-weight: 800;
 }
@@ -236,7 +236,7 @@
 .modifier-checkbox-card {
   align-items: start;
   background: #fff;
-  border: 1px solid #eadfd5;
+  border: 1px solid var(--line);
   border-radius: 7px;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
@@ -246,7 +246,7 @@
 }
 
 .modifier-checkbox-card input {
-  accent-color: #6e3a16;
+  accent-color: var(--brand);
   height: 16px;
   width: 16px;
 }
@@ -258,7 +258,7 @@
 }
 
 .modifier-checkbox-card strong {
-  color: #2f2018;
+  color: var(--ink);
   font-size: 11px;
   font-weight: 850;
   overflow: hidden;
@@ -267,7 +267,7 @@
 }
 
 .modifier-checkbox-card small {
-  color: #8a796d;
+  color: var(--muted);
   font-size: 9px;
   font-weight: 800;
 }
@@ -281,7 +281,7 @@
 }
 
 .modifier-checkbox-card li {
-  color: #715f52;
+  color: var(--muted);
   font-size: 9px;
   font-weight: 760;
   line-height: 1.35;
@@ -301,14 +301,14 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
-  border: 1px solid #eadfd5;
+  border: 1px solid var(--line);
   border-radius: 7px;
   background: #fffaf5;
   padding: 16px 12px 12px;
 }
 
 .modifier-option-config legend {
-  color: #6e3a16;
+  color: var(--brand);
   font-size: 9px;
   font-weight: 850;
   padding: 0 5px;
@@ -317,7 +317,7 @@
 .modifier-option-toolbar {
   align-items: center;
   background: #fbf4ed;
-  border: 1px solid #eadfd5;
+  border: 1px solid var(--line);
   border-radius: 7px;
   display: flex;
   justify-content: space-between;
@@ -333,14 +333,14 @@
 }
 
 .modifier-option-toolbar strong {
-  color: #2f2018;
+  color: var(--ink);
   font-size: 12px;
   font-weight: 850;
 }
 
 .modifier-option-toolbar span,
 .modifier-option-field {
-  color: #715f52;
+  color: var(--muted);
   font-size: 10px;
   font-weight: 800;
 }
@@ -407,7 +407,7 @@
 }
 
 .modifier-material-heading strong {
-  color: #6e3a16;
+  color: var(--brand);
   font-size: 11px;
   font-weight: 850;
 }
@@ -430,7 +430,7 @@
 .modifier-price-row {
   align-items: end;
   background: #fffaf5;
-  border: 1px solid #eadfd5;
+  border: 1px solid var(--line);
   border-radius: 7px;
   display: grid;
   grid-template-columns: minmax(180px, 1.2fr) minmax(130px, 0.7fr) minmax(180px, 1fr);
@@ -445,14 +445,14 @@
 }
 
 .modifier-price-row strong {
-  color: #2f2018;
+  color: var(--ink);
   font-size: 12px;
   font-weight: 850;
 }
 
 .modifier-price-row span,
 .modifier-price-row label {
-  color: #715f52;
+  color: var(--muted);
   font-size: 10px;
   font-weight: 800;
 }

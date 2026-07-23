@@ -10,7 +10,7 @@ if (!invitation) {
   setText("invitation-title", "Undangan tidak valid");
   showFeedback("invitation-feedback", response?.message || "Link undangan tidak ditemukan atau sudah kedaluwarsa.");
 } else {
-  document.documentElement.style.setProperty("--brand", invitation.themeColor || "#6e3a16");
+  document.documentElement.style.setProperty("--brand", invitation.themeColor || "#3B1F8C");
   setText("invitation-company", invitation.companyName);
   setText("invitation-title", `Halo, ${invitation.name}`);
   byId("invitation-email").value = invitation.email;
