@@ -346,7 +346,12 @@ export function enabledServices() {
 }
 
 export function activePaymentMethods() {
-  return (state.settings.paymentMethods || []).filter((method) => isActiveStatus(method.status));
+  return (state.settings.paymentMethods || []).filter((method) => {
+    if (!isActiveStatus(method.status)) return false;
+    if (method.isAvailableOnline === false) return false;
+    if (method.targetChannel === "pos") return false;
+    return true;
+  });
 }
 
 export function hasMultipleOutlets() {

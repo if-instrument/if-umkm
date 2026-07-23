@@ -251,17 +251,16 @@
           <form class="form-grid input-workflow two-column-form" id="payment-method-form">
             <input id="payment-method-id" type="hidden" />
             <label>Nama Metode <input id="payment-method-name" required type="text" placeholder="Cash / QRIS / Transfer" /></label>
-            <label>Tipe <select id="payment-method-type"><option value="cash">Cash</option><option value="qris">QRIS</option><option value="card">Card / EDC</option><option value="transfer">Transfer</option><option value="ewallet">E-Wallet</option><option value="other">Lainnya</option></select></label>
-            <label id="payment-qris-mode-field" hidden>Mode QRIS <select id="payment-qris-mode"><option value="online">Online / Dinamis (Gateway Aktif)</option><option value="offline">Offline / Static</option></select></label>
+            <label>Tipe <select id="payment-method-type"><option value="cash">Cash (Tunai)</option><option value="qris">QRIS (Static & Dinamis)</option><option value="edc">EDC (Mesin EDC Kasir)</option><option value="card">Card (Kartu Online Gateway)</option><option value="transfer">Transfer Bank / E-Wallet</option><option value="other">Lainnya</option></select></label>
+            <label id="payment-qris-mode-field" hidden>Mode QRIS <select id="payment-qris-mode"><option value="offline">Offline / Static (Upload Gambar)</option><option value="online">Online / Dinamis (Gateway Aktif)</option></select></label>
             <label class="full-row" id="payment-qris-image-field" hidden>Gambar QRIS Static
               <input id="payment-qris-image-file" accept="image/jpeg,image/png,image/webp" type="file" />
               <input id="payment-qris-image-url" type="hidden" />
               <span class="image-upload-preview qris-upload-preview" id="payment-qris-image-preview">Belum ada QRIS</span>
               <small>Upload QRIS resmi outlet. JPG, PNG, atau WEBP maksimal 3 MB.</small>
             </label>
-            <label id="payment-card-mode-field" hidden>Mode Card <select id="payment-card-mode"><option value="offline">Offline EDC</option><option value="online">Online (Gateway Aktif)</option></select></label>
+            <label id="payment-edc-mode-field" hidden>Mode EDC <select id="payment-edc-mode"><option value="offline">Offline / Manual EDC (Input Ref Kasir)</option><option value="online" disabled>Online / Integrated Device (Integrasi API - Segera Hadir)</option></select></label>
             <label id="payment-card-acquirer-field" hidden>Bank Acquirer EDC <select id="payment-card-acquirer"><option value="BCA">BCA</option><option value="BRI">BRI</option><option value="BNI">BNI</option><option value="Mandiri">Mandiri</option></select></label>
-            <label id="payment-edc-mode-field" hidden>Mode EDC <select id="payment-edc-mode"><option value="manual">Manual EDC</option><option value="integrated">Integrated Terminal</option></select></label>
             <label>Channel / Acquirer <input id="payment-method-channel" type="text" placeholder="QRIS / BCA / CARDS" /></label>
             <label>Terminal ID <input id="payment-method-terminal" type="text" placeholder="ID mesin EDC jika ada" /></label>
             <label id="payment-merchant-id-field" hidden>Merchant ID <input id="payment-merchant-id" type="text" placeholder="MID dari acquirer / connector" /></label>
@@ -272,6 +271,11 @@
             <label>Akun Settlement <input id="payment-method-account" type="text" placeholder="Kas Tunai / Bank / Payment Gateway" /></label>
             <label>Urutan Tampil <input id="payment-method-sort" min="1" required type="number" /></label>
             <label>Status <select id="payment-method-status"><option value="10">Aktif</option><option value="90">Nonaktif</option></select></label>
+            <fieldset class="settings-checklist full-row">
+              <legend>Kanal Pembayaran Aktif</legend>
+              <label><input id="payment-method-available-pos" type="checkbox" checked /> Tampilkan di POS (Kasir)</label>
+              <label><input id="payment-method-available-online" type="checkbox" checked /> Tampilkan di Online Order</label>
+            </fieldset>
             <div class="modal-actions full-row"><button class="ghost-button" data-close-modal type="button">Batal</button><button class="primary-button" type="submit">Simpan Metode</button></div>
             <p class="form-feedback full-row" id="payment-method-feedback"></p>
           </form>
@@ -279,6 +283,6 @@
       </div>
     </template>
 
-    <script type="module" src="../scripts/pages/settings.js?v=coffee-v172"></script>
+    <script type="module" src="../scripts/pages/settings.js?v=coffee-v174"></script>
   </body>
 </html>

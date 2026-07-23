@@ -226,6 +226,9 @@ class SettingsService
             'account' => trim((string) ($payload['account'] ?? '')),
             'sort_order' => (int) ($payload['sort'] ?? 0),
             'status' => StatusCodeService::common($payload['status'] ?? 'active'),
+            'is_available_pos' => isset($payload['isAvailablePos']) ? ($payload['isAvailablePos'] ? 1 : 0) : (isset($payload['is_available_pos']) ? ((int)$payload['is_available_pos'] ? 1 : 0) : 1),
+            'is_available_online' => isset($payload['isAvailableOnline']) ? ($payload['isAvailableOnline'] ? 1 : 0) : (isset($payload['is_available_online']) ? ((int)$payload['is_available_online'] ? 1 : 0) : 1),
+            'target_channel' => trim((string) ($payload['targetChannel'] ?? $payload['target_channel'] ?? 'all')),
         ];
         if ($id) {
             $model->update($id, $row);
@@ -356,7 +359,7 @@ class SettingsService
             'type' => $row['type'],
             'gatewayProvider' => $row['gateway_provider'] ?? 'manual',
             'isDefault' => $row['type'] === 'cash' && strtolower((string) $row['name']) === 'cash',
-            'cardMode' => ($row['type'] === 'card' && ($row['gateway_provider'] ?? 'manual') !== 'manual') ? 'online' : 'offline',
+            'cardMode' => $row['type'] === 'card' ? 'online' : ($row['type'] === 'edc' ? 'offline' : (($row['gateway_provider'] ?? 'manual') !== 'manual' ? 'online' : 'offline')),
             'qrisMode' => $row['qris_mode'] ?? (($row['gateway_provider'] ?? 'manual') === 'manual' ? 'offline' : 'online'),
             'qrisImageUrl' => $row['qris_image_path'] ?? '',
             'channelCode' => $row['channel_code'] ?? '',
@@ -370,6 +373,9 @@ class SettingsService
             'status' => StatusCodeService::common($row['status'] ?? ''),
             'account' => $row['account'],
             'sort' => (int) $row['sort_order'],
+            'isAvailablePos' => isset($row['is_available_pos']) ? (int) $row['is_available_pos'] === 1 : true,
+            'isAvailableOnline' => isset($row['is_available_online']) ? (int) $row['is_available_online'] === 1 : true,
+            'targetChannel' => $row['target_channel'] ?? ($row['type'] === 'card' && ($row['gateway_provider'] ?? 'manual') === 'manual' ? 'pos' : 'all'),
         ], $rows);
     }
 

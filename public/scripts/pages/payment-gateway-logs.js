@@ -29,7 +29,7 @@ function statusPill(status) {
     [PAYMENT_STATUS.CANCELLED]: "status-empty",
     [PAYMENT_STATUS.EXPIRED]: "status-empty"
   }[code] || "status-warning";
-  return `<span class="status-pill ${className}">${statusLabel(code, "payment")} <small>${code}</small></span>`;
+  return `<span class="status-pill ${className}">${statusLabel(code, "payment")}</span>`;
 }
 
 function formatDate(value) {
@@ -100,12 +100,12 @@ function openDetail(id) {
   if (!item) return;
   const detailLogs = item.detailLogs || [];
   byId("gateway-log-title").textContent = `${item.orderNo} · ${item.provider}`;
-  byId("gateway-log-subtitle").textContent = `${item.reference} · ${statusLabel(item.status, "payment")} (${paymentStatusCode(item.status)})`;
+  byId("gateway-log-subtitle").textContent = `${item.reference} · ${statusLabel(item.status, "payment")}`;
   byId("gateway-log-detail").innerHTML = `
     <div class="gateway-log-detail-grid">
       <article><span>Order</span><strong>${escapeHtml(item.orderNo)}</strong></article>
       <article><span>Provider Ref</span><strong>${escapeHtml(item.reference)}</strong></article>
-      <article><span>Status</span><strong>${escapeHtml(statusLabel(item.status, "payment"))} (${paymentStatusCode(item.status)})</strong></article>
+      <article><span>Status</span><strong>${escapeHtml(statusLabel(item.status, "payment"))}</strong></article>
       <article><span>Dibuat</span><strong>${formatDate(item.createdAt)}</strong></article>
     </div>
     <section class="gateway-hit-log-section">

@@ -46,8 +46,8 @@ class PosPagePresenter
                 'id', 'name', 'type', 'status', 'isDefault', 'sortOrder',
                 'gatewayProvider', 'qrisMode', 'qrisImageUrl', 'cardMode',
                 'edcMode', 'bank', 'terminalId', 'channelCode',
-                'feeRate', 'feeFixed', 'feePayer',
-            ]), $this->activeRows($settings['paymentMethods'] ?? []))),
+                'feeRate', 'feeFixed', 'feePayer', 'isAvailablePos', 'isAvailableOnline', 'targetChannel',
+            ]), array_filter($this->activeRows($settings['paymentMethods'] ?? []), fn ($m) => ($m['isAvailablePos'] ?? true) && ($m['targetChannel'] ?? 'all') !== 'online'))),
             'packagingRules' => array_values(array_map(fn ($row) => $this->posPackagingRule($row), $this->activeRows($settings['packagingRules'] ?? []))),
         ];
     }

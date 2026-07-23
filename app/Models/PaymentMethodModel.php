@@ -10,6 +10,6 @@ class PaymentMethodModel extends BaseAppModel
         'company_id', 'outlet_id', 'name', 'type', 'gateway_provider', 'qris_mode', 'qris_image_path',
         'channel_code', 'terminal_id', 'edc_mode', 'merchant_id', 'terminal_serial',
         'connector_status', 'use_sandbox', 'fee_rate', 'fee_payer',
-        'account', 'sort_order', 'status',
+        'account', 'sort_order', 'status', 'is_available_pos', 'is_available_online', 'target_channel',
     ];
 }

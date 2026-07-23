@@ -79,18 +79,21 @@ export function renderMemberSuggestions(members) {
 
 export function renderPayments() {
   const methods = activePaymentMethods();
-  byId("order-payments").innerHTML = methods.length ? methods.map((method) => `
-    <button class="${method.id === state.paymentMethodId ? "active" : ""}" data-payment-id="${method.id}" type="button">
-      <strong>${escapeHtml(method.name)}</strong>
-      <span>${method.type === "cash" ? "Bayar nanti di kasir" : method.qrisMode === "offline" ? "Konfirmasi outlet" : "Payment gateway"}</span>
-    </button>
-  `).join("") : `<div class="empty-state compact">Metode pembayaran belum aktif.</div>`;
+  byId("order-payments").innerHTML = methods.length ? methods.map((method) => {
+    const label = method.account || method.channelCode || method.gatewayProvider || "";
+    return `
+      <button class="${method.id === state.paymentMethodId ? "active" : ""}" data-payment-id="${method.id}" type="button">
+        <strong>${escapeHtml(method.name)}</strong>
+        ${label ? `<span>${escapeHtml(label)}</span>` : ""}
+      </button>
+    `;
+  }).join("") : `<div class="empty-state compact">Metode pembayaran belum aktif.</div>`;
   const method = paymentById(state.paymentMethodId);
   renderPaymentProofInput(method);
   
-  const isQris = method && (method.type === "qris" || method.qrisImageUrl);
-  const isGateway = method && (method.type === "card" || method.paymentUrl);
-  const qrImage = method?.qrisImageUrl || method?.qrImage || (isQris ? "/assets/qris-placeholder.png" : "");
+  const isQris = Boolean(method && (method.type === "qris" || method.qrisImageUrl));
+  const isGateway = Boolean(method && (method.paymentUrl || (method.type === "card" && method.gatewayProvider && method.gatewayProvider !== "manual")));
+  const qrImage = method?.qrisImageUrl || method?.qrImage || "";
   const paymentUrl = method?.paymentUrl || method?.url || "";
 
   const previewBox = optionalById("order-payment-preview-box");
@@ -127,13 +130,8 @@ export function renderPayments() {
     previewBox.hidden = !showBox;
   }
 
-  byId("order-payment-note").textContent = method?.type === "cash"
-    ? "Order akan dibuat dengan status unpaid dan dibayar di kasir."
-    : paymentRequiresProof(method)
-      ? "Upload bukti bayar agar kasir bisa cek sebelum approve pesanan."
-      : (isQris || isGateway)
-        ? `Order menggunakan ${method.name}. Silakan gunakan QR Code atau link di atas.`
-        : "Order akan dibuat menunggu pembayaran sesuai konfigurasi outlet.";
+  const noteLabel = method?.account || method?.name || "";
+  byId("order-payment-note").textContent = noteLabel ? `Opsi: ${noteLabel}` : "";
 }
 
 export function openPaymentModal(method = paymentById(state.paymentMethodId)) {

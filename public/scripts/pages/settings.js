@@ -90,6 +90,7 @@ function refreshSettingsData() {
   state.activeCompanyId = data.activeCompanyId || session?.companyId || state.activeCompanyId;
   state.settings = { ...state.settings, ...(data.settings || {}) };
   state.ingredients = (data.ingredients || []).map((item) => ({ ...item, minStock: item.minStock || 0, avgCost: item.avgCost || 0 }));
+  renderSettings();
 }
 
 function exists(id) {
@@ -98,8 +99,8 @@ function exists(id) {
 
 function statusPill(status) {
   return isActiveStatus(status)
-    ? `<span class="status-pill status-ok">Aktif <small>${COMMON_STATUS.ACTIVE}</small></span>`
-    : `<span class="status-pill status-empty">Nonaktif <small>${COMMON_STATUS.INACTIVE}</small></span>`;
+    ? `<span class="status-pill status-ok">Aktif</span>`
+    : `<span class="status-pill status-empty">Nonaktif</span>`;
 }
 
 function slugify(value) {
@@ -182,14 +183,15 @@ function sortedPaymentMethods() {
 
 function paymentTypeLabel(type) {
   const labels = {
-    cash: "Cash",
+    cash: "Cash (Tunai)",
     qris: "QRIS",
-    card: "Card / EDC",
-    transfer: "Transfer",
+    edc: "EDC Kasir",
+    card: "Card Online",
+    transfer: "Transfer / E-Wallet",
     ewallet: "E-Wallet",
     other: "Lainnya"
   };
-  return labels[type] || "Lainnya";
+  return labels[type] || type || "Lainnya";
 }
 
 function paymentGatewayLabel(provider) {
@@ -202,26 +204,20 @@ function paymentGatewayLabel(provider) {
 }
 
 function cardModeLabel(method) {
-  if (method.type !== "card") return "";
-  return method.cardMode === "online" ? `Online ${paymentGatewayLabel(state.settings.paymentGateway?.provider)}` : "Offline EDC";
+  if (method.type === "card") return `Online Gateway (${paymentGatewayLabel(state.settings.paymentGateway?.provider)})`;
+  if (method.type === "edc") return method.edcMode === "online" ? "Online Integrated Device" : "Offline / Manual EDC";
+  return "";
 }
 
 function qrisModeLabel(method) {
   if (method.type !== "qris") return "";
-  return method.qrisMode === "offline" ? "QRIS Static / Manual" : `QRIS Dinamis / ${paymentGatewayLabel(state.settings.paymentGateway?.provider)}`;
+  return method.qrisMode === "offline" ? "QRIS Static (Upload Gambar)" : `QRIS Dinamis (${paymentGatewayLabel(state.settings.paymentGateway?.provider)})`;
 }
 
 function edcConnectorLabel(method) {
-  if (method.type !== "card" || method.cardMode === "online") return "";
-  const mode = method.edcMode === "integrated" ? "Integrated Terminal" : "Manual EDC";
-  const statuses = {
-    [CONNECTOR_STATUS.READY]: "Ready",
-    [CONNECTOR_STATUS.NOT_CONFIGURED]: "Belum dikonfigurasi",
-    ready: "Ready",
-    [CONNECTOR_STATUS.INACTIVE]: "Nonaktif",
-    not_configured: "Belum dikonfigurasi"
-  };
-  return `${mode} · ${statuses[method.connectorStatus] || statusLabel(method.connectorStatus, "connector")}`;
+  if (method.type !== "edc") return "";
+  const mode = method.edcMode === "online" ? "Integrated Device API" : "Manual EDC Kasir";
+  return `${mode}`;
 }
 
 function feePayerLabel(method) {
@@ -255,7 +251,7 @@ function renderPaymentMethods() {
   byId("payment-method-table").innerHTML = methods.length ? methods.map((method) => `
     <tr>
       <td>${method.sort || "-"}</td>
-      <td><strong>${method.name}</strong></td>
+      <td><strong>${method.name}</strong><br><small style="color:#4f46e5; font-weight:600;">${(method.isAvailablePos ?? true) && (method.isAvailableOnline ?? true) ? "POS & Online" : (method.isAvailablePos ?? true) ? "Hanya POS" : (method.isAvailableOnline ?? true) ? "Hanya Online" : "Non-aktif Kanal"}</small></td>
       <td>${paymentTypeLabel(method.type)}</td>
       <td>${method.channelCode || "-"}${method.terminalId ? `<br><small>${method.terminalId}</small>` : ""}${cardModeLabel(method) ? `<br><small>${cardModeLabel(method)}</small>` : ""}${qrisModeLabel(method) ? `<br><small>${qrisModeLabel(method)}</small>` : ""}${edcConnectorLabel(method) ? `<br><small>${edcConnectorLabel(method)}</small>` : ""}</td>
       <td>${formatQty(Number(method.feeRate || 0))}%<br><small>${feePayerLabel(method)}</small></td>
@@ -538,25 +534,27 @@ function saveDiningTable(event) {
 
 function openPaymentMethod(method = null) {
   const nextSort = Math.max(0, ...sortedPaymentMethods().map((item) => Number(item.sort || 0))) + 1;
-  byId("payment-method-id").value = method?.id || "";
-  byId("payment-method-name").value = method?.name || "";
-  byId("payment-method-type").value = method?.type || "cash";
-  byId("payment-qris-mode").value = method?.qrisMode || (method?.gatewayProvider === "manual" ? "offline" : "online");
+  if (byId("payment-method-id")) byId("payment-method-id").value = method?.id || "";
+  if (byId("payment-method-name")) byId("payment-method-name").value = method?.name || "";
+  if (byId("payment-method-type")) byId("payment-method-type").value = method?.type || "cash";
+  if (byId("payment-qris-mode")) byId("payment-qris-mode").value = method?.qrisMode || (method?.gatewayProvider === "manual" ? "offline" : "online");
   setQrisImage(method?.qrisImageUrl || "");
-  byId("payment-qris-image-file").value = "";
-  byId("payment-card-mode").value = method?.cardMode || (method?.gatewayProvider !== "manual" ? "online" : "offline");
-  byId("payment-card-acquirer").value = ["BCA", "BRI", "BNI", "Mandiri"].includes(method?.channelCode) ? method.channelCode : "BCA";
-  byId("payment-method-channel").value = method?.channelCode || "";
-  byId("payment-method-terminal").value = method?.terminalId || "";
-  byId("payment-edc-mode").value = method?.edcMode || "manual";
-  byId("payment-merchant-id").value = method?.merchantId || "";
-  byId("payment-terminal-serial").value = method?.terminalSerial || "";
-  byId("payment-connector-status").value = method?.connectorStatus || CONNECTOR_STATUS.NOT_CONFIGURED;
-  byId("payment-method-fee").value = method?.feeRate ?? 0;
-  byId("payment-method-fee-payer").value = method?.feePayer || "merchant";
-  byId("payment-method-account").value = method?.account || "";
-  byId("payment-method-sort").value = method?.sort || nextSort;
-  byId("payment-method-status").value = method?.status || COMMON_STATUS.ACTIVE;
+  if (byId("payment-qris-image-file")) byId("payment-qris-image-file").value = "";
+  if (byId("payment-card-mode")) byId("payment-card-mode").value = method?.cardMode || (method?.gatewayProvider !== "manual" ? "online" : "offline");
+  if (byId("payment-card-acquirer")) byId("payment-card-acquirer").value = ["BCA", "BRI", "BNI", "Mandiri"].includes(method?.channelCode) ? method.channelCode : "BCA";
+  if (byId("payment-method-channel")) byId("payment-method-channel").value = method?.channelCode || "";
+  if (byId("payment-method-terminal")) byId("payment-method-terminal").value = method?.terminalId || "";
+  if (byId("payment-edc-mode")) byId("payment-edc-mode").value = method?.edcMode || "manual";
+  if (byId("payment-merchant-id")) byId("payment-merchant-id").value = method?.merchantId || "";
+  if (byId("payment-terminal-serial")) byId("payment-terminal-serial").value = method?.terminalSerial || "";
+  if (byId("payment-connector-status")) byId("payment-connector-status").value = method?.connectorStatus || CONNECTOR_STATUS.NOT_CONFIGURED;
+  if (byId("payment-method-fee")) byId("payment-method-fee").value = method?.feeRate ?? 0;
+  if (byId("payment-method-fee-payer")) byId("payment-method-fee-payer").value = method?.feePayer || "merchant";
+  if (byId("payment-method-account")) byId("payment-method-account").value = method?.account || "";
+  if (byId("payment-method-sort")) byId("payment-method-sort").value = method?.sort || nextSort;
+  if (byId("payment-method-available-pos")) byId("payment-method-available-pos").checked = method?.isAvailablePos ?? true;
+  if (byId("payment-method-available-online")) byId("payment-method-available-online").checked = method?.isAvailableOnline ?? true;
+  if (byId("payment-method-status")) byId("payment-method-status").value = method?.status || COMMON_STATUS.ACTIVE;
   setText("payment-method-feedback", "");
   syncPaymentMethodFields();
   openModal("payment-method-modal");
@@ -564,48 +562,37 @@ function openPaymentMethod(method = null) {
 
 function syncPaymentMethodFields() {
   const type = byId("payment-method-type").value;
-  const isCard = type === "card";
   const isQris = type === "qris";
+  const isEdc = type === "edc";
+  const isCard = type === "card";
   
   // Get active gateway provider configuration
   const gateway = state.settings.paymentGateway || {};
   const isManualGateway = !gateway.provider || gateway.provider === "manual";
   
-  // Find online option elements in QRIS and Card modes
+  // Find online option elements in QRIS mode
   const qrisOnlineOpt = byId("payment-qris-mode")?.querySelector('option[value="online"]');
-  const cardOnlineOpt = byId("payment-card-mode")?.querySelector('option[value="online"]');
-  
   if (qrisOnlineOpt) qrisOnlineOpt.disabled = isManualGateway;
-  if (cardOnlineOpt) cardOnlineOpt.disabled = isManualGateway;
   
-  if (isManualGateway) {
-    if (byId("payment-qris-mode")) byId("payment-qris-mode").value = "offline";
-    if (byId("payment-card-mode")) byId("payment-card-mode").value = "offline";
+  if (isManualGateway && isQris && byId("payment-qris-mode")) {
+    byId("payment-qris-mode").value = "offline";
   }
 
   const isOfflineQris = isQris && byId("payment-qris-mode").value === "offline";
-  const isOfflineCard = isCard && byId("payment-card-mode").value === "offline";
   byId("payment-qris-mode-field").hidden = !isQris;
   byId("payment-qris-image-field").hidden = !isOfflineQris;
-  byId("payment-card-mode-field").hidden = !isCard;
-  byId("payment-card-acquirer-field").hidden = !isOfflineCard;
-  byId("payment-edc-mode-field").hidden = !isOfflineCard;
-  byId("payment-merchant-id-field").hidden = !isOfflineCard;
-  byId("payment-terminal-serial-field").hidden = !isOfflineCard;
-  byId("payment-connector-status-field").hidden = !isOfflineCard;
+  byId("payment-edc-mode-field").hidden = !isEdc;
+  byId("payment-card-acquirer-field").hidden = !isEdc;
+  byId("payment-merchant-id-field").hidden = !isEdc;
+  byId("payment-terminal-serial-field").hidden = !isEdc;
+  byId("payment-connector-status-field").hidden = !isEdc;
+
   if (isQris) {
     byId("payment-method-channel").value = "QRIS";
-  }
-  if (!isCard) return;
-  if (isOfflineCard) {
+  } else if (isEdc) {
     byId("payment-method-channel").value = byId("payment-card-acquirer").value;
-  } else {
+  } else if (isCard) {
     byId("payment-method-channel").value = "CARDS";
-    byId("payment-method-terminal").value = "";
-    byId("payment-edc-mode").value = "manual";
-    byId("payment-merchant-id").value = "";
-    byId("payment-terminal-serial").value = "";
-    byId("payment-connector-status").value = CONNECTOR_STATUS.NOT_CONFIGURED;
   }
 }
 
@@ -622,12 +609,15 @@ function savePaymentMethod(event) {
     showFeedback("payment-method-feedback", "Nama metode bayar sudah digunakan.");
     return;
   }
+  const type = byId("payment-method-type").value;
+  const qrisMode = byId("payment-qris-mode").value;
+  const isOnlinePayment = (type === "qris" && qrisMode === "online") || type === "card";
   const payload = {
     id,
     name,
-    type: byId("payment-method-type").value,
-    gatewayProvider: ((byId("payment-method-type").value === "card" && byId("payment-card-mode").value === "online") || (byId("payment-method-type").value === "qris" && byId("payment-qris-mode").value === "online")) ? "online" : "manual",
-    qrisMode: byId("payment-qris-mode").value,
+    type,
+    gatewayProvider: isOnlinePayment ? "online" : "manual",
+    qrisMode,
     qrisImageUrl: byId("payment-qris-image-url").value.trim(),
     channelCode: byId("payment-method-channel").value.trim(),
     terminalId: byId("payment-method-terminal").value.trim(),
@@ -639,14 +629,15 @@ function savePaymentMethod(event) {
     feePayer: byId("payment-method-fee-payer").value,
     account: byId("payment-method-account").value.trim(),
     sort: Number(byId("payment-method-sort").value),
+    isAvailablePos: byId("payment-method-available-pos") ? byId("payment-method-available-pos").checked : true,
+    isAvailableOnline: byId("payment-method-available-online") ? byId("payment-method-available-online").checked : true,
     status: byId("payment-method-status").value
   };
   if (payload.type === "qris" && payload.qrisMode === "offline" && !payload.qrisImageUrl) {
     showFeedback("payment-method-feedback", "Upload gambar QRIS Static terlebih dahulu.");
     return;
   }
-  const onlineMode = (payload.type === "qris" && payload.qrisMode === "online") || (payload.type === "card" && payload.gatewayProvider === "online");
-  if (onlineMode && !["xendit", "midtrans"].includes(state.settings.paymentGateway?.provider)) {
+  if (isOnlinePayment && !["xendit", "midtrans"].includes(state.settings.paymentGateway?.provider)) {
     showFeedback("payment-method-feedback", "Pilih Xendit atau Midtrans pada Pengaturan Gateway terlebih dahulu.");
     return;
   }
@@ -1031,15 +1022,15 @@ byId("company-name").addEventListener("input", () => {
 byId("company-logo-file").addEventListener("change", (event) => {
   uploadLogo(event.target.files?.[0]);
 });
-byId("payment-method-type").addEventListener("change", () => {
+byId("payment-method-type")?.addEventListener("change", () => {
   if (byId("payment-method-type").value === "qris" && !byId("payment-method-channel").value.trim()) byId("payment-method-channel").value = "QRIS";
-  if (byId("payment-method-type").value === "card" && !byId("payment-method-channel").value.trim()) byId("payment-method-channel").value = "BCA";
+  if (byId("payment-method-type").value === "card" && !byId("payment-method-channel").value.trim()) byId("payment-method-channel").value = "CARDS";
   syncPaymentMethodFields();
 });
-byId("payment-card-mode").addEventListener("change", syncPaymentMethodFields);
-byId("payment-qris-mode").addEventListener("change", syncPaymentMethodFields);
-byId("payment-qris-image-file").addEventListener("change", (event) => uploadQrisImage(event.target.files?.[0]));
-byId("payment-card-acquirer").addEventListener("change", syncPaymentMethodFields);
-byId("payment-edc-mode").addEventListener("change", syncPaymentMethodFields);
+byId("payment-card-mode")?.addEventListener("change", syncPaymentMethodFields);
+byId("payment-qris-mode")?.addEventListener("change", syncPaymentMethodFields);
+byId("payment-qris-image-file")?.addEventListener("change", (event) => uploadQrisImage(event.target.files?.[0]));
+byId("payment-card-acquirer")?.addEventListener("change", syncPaymentMethodFields);
+byId("payment-edc-mode")?.addEventListener("change", syncPaymentMethodFields);
 
 renderSettings();

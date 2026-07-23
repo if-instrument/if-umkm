@@ -6017,3 +6017,35 @@ body[data-page="orders"] .order-board.completed-only {
     display: none;
   }
 }
+
+/* Global Table Responsiveness & Portrait Top-Left Alignment */
+.table-shell,
+.datatable-shell,
+.table-responsive {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (orientation: portrait), (max-width: 900px) {
+  .app-shell,
+  .main,
+  .workspace-panel,
+  .panel-heading,
+  .form-grid,
+  .modal-content {
+    justify-content: flex-start !important;
+    align-items: flex-start !important;
+    align-content: flex-start !important;
+    text-align: left !important;
+  }
+
+  .table-shell,
+  .datatable-shell {
+    display: block !important;
+    width: 100% !important;
+    overflow-x: auto !important;
+    white-space: nowrap !important;
+  }
+}
