@@ -1,4 +1,4 @@
-import { apiGet, appPath, applyPermissionControls, canAccessAllOutlets, canUsePermission, clearSession, loadSession, loadState, primaryOutletId, saveSession } from "./store.js?v=coffee-v151";
+import { apiGet, appPath, applyPermissionControls, canAccessAllOutlets, canUsePermission, clearSession, loadSession, loadState, primaryOutletId, saveSession } from "./store.js?v=1784794256";
 import { isInactiveStatus } from "./status-codes.js";
 
 const APP_LOGO = "/assets/if-instrument-logo.jpg";
@@ -135,16 +135,31 @@ function navMarkup(currentPage, session, state) {
     .join("");
 }
 
-export function renderLayout() {
-  const state = loadState();
-  const session = loadSession();
-  if (!session && !window.location.pathname.endsWith("/login.html")) {
-    window.location.href = appPath("/login");
-    return;
+function updateFavicon(iconUrl) {
+  if (!iconUrl) return;
+  let link = document.querySelector("link[rel*='icon']");
+  if (!link) {
+    link = document.createElement("link");
+    link.rel = "icon";
+    document.head.appendChild(link);
   }
-  if (session && !session.token && !window.location.pathname.endsWith("/login.html")) {
-    clearSession();
-    window.location.href = appPath("/login");
+  link.href = iconUrl;
+}
+
+function formatSlugToTitle(slug) {
+  if (!slug) return "";
+  return slug
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replace(/[-_]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+export function renderLayout() {
+  const session = loadSession();
+  const state = loadState();
+  if (!session && !window.location.pathname.endsWith("/login.html") && window.location.pathname !== "/login") {
+    window.location.href = appPath("/login.html");
     return;
   }
   if (session?.authType !== "super_admin" && session?.companySlug && !window.__COMPANY_SLUG__) {
@@ -181,14 +196,27 @@ export function renderLayout() {
     }
   }
   const company = activeCompany(state, session);
-  const companyName = company.name || state.settings.companyName || APP_NAME;
+  const companySlug = company.routeSlug || session?.companySlug || window.__COMPANY_SLUG__ || "";
+  const derivedCompanyName = company.name || state.settings.companyName || (companySlug ? formatSlugToTitle(companySlug) : APP_NAME);
+  const companyName = derivedCompanyName;
   const companyLogoUrl = company.logoUrl || state.settings.companyLogoUrl || "";
   const isSuperAdmin = session?.authType === "super_admin";
   const companyThemeColor = isSuperAdmin ? "#3B1F8C" : (company.themeColor || state.settings.themeColor || "#3B1F8C");
   applyBrandTheme(companyThemeColor);
+
+  const activeFavicon = isSuperAdmin ? APP_LOGO : (companyLogoUrl || APP_LOGO);
+  updateFavicon(activeFavicon);
+
   const page = document.body.dataset.page || "dashboard";
   const title = document.body.dataset.title || "Dashboard";
   const eyebrow = document.body.dataset.eyebrow || "Operasional hari ini";
+
+  if (isSuperAdmin) {
+    document.title = `${title} - ${APP_NAME}`;
+  } else {
+    document.title = `${title} - ${companyName}`;
+  }
+
   const content = document.querySelector("#page-content");
   const today = new Intl.DateTimeFormat("id-ID", { day: "numeric", month: "long", year: "numeric" }).format(new Date());
   const companyId = session?.companyId || state.activeCompanyId;
@@ -218,7 +246,7 @@ export function renderLayout() {
     ? `<span class="brand-mark app-brand-logo"><img src="${APP_LOGO}" alt="${APP_NAME}" /></span>`
     : `<span class="brand-mark">${companyLogoUrl ? `<img src="${companyLogoUrl}" alt="${companyName}" />` : companyName.slice(0, 2).toUpperCase()}</span>`;
   const brandTitle = isSuperAdmin ? APP_NAME : companyName;
-  const brandSubtitle = isSuperAdmin ? APP_TAGLINE : "Company Management";
+  const brandSubtitle = isSuperAdmin ? APP_TAGLINE : "UMKM Solution";
   const showOnboardingProgress = session?.authType === "company_admin"
     && currentPage !== "onboarding"
     && onboardingStatus

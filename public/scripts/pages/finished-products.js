@@ -1,11 +1,11 @@
-import { renderLayout } from "../layout.js?v=coffee-v151";
-import { apiPost, applyPermissionControls, canUsePermission, loadSession, loadState, scopedPayload, visibleForSession } from "../store.js?v=coffee-v151";
+import { renderLayout } from "../layout.js?v=1784794256";
+import { apiPost, applyPermissionControls, canUsePermission, loadSession, loadState, scopedPayload, visibleForSession } from "../store.js?v=1784794256";
 import { formatQty, money } from "../format.js";
 import { byId, setText, showAlert, showFeedback } from "../dom.js";
 import { enhanceAllDataTables } from "../datatable.js";
 import { ingredientById, isStockedProduct } from "../inventory.js";
 import { isInactiveStatus } from "../status-codes.js";
-import { applyPageBootstrap, loadPageBootstrap } from "../page-engine.js?v=coffee-v154";
+import { applyPageBootstrap, loadPageBootstrap } from "../page-engine.js?v=1784794256";
 
 renderLayout();
 

@@ -1,5 +1,5 @@
-import { renderLayout } from "../layout.js?v=coffee-v151";
-import { apiGet, applyPermissionControls, loadSession, loadState, scopedApiUrl } from "../store.js?v=coffee-v151";
+import { renderLayout } from "../layout.js?v=1784794256";
+import { apiGet, applyPermissionControls, loadSession, loadState, scopedApiUrl } from "../store.js?v=1784794256";
 import { byId, showAlert } from "../dom.js";
 import { orderStatusLabel, statusLabel } from "../status-codes.js";
 

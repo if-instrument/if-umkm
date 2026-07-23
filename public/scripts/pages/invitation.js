@@ -1,4 +1,4 @@
-import { apiGet, apiPost } from "../store.js?v=coffee-v151";
+import { apiGet, apiPost } from "../store.js?v=1784794256";
 import { byId, setText, showFeedback } from "../dom.js";
 
 const token = window.__INVITATION_TOKEN__ || "";

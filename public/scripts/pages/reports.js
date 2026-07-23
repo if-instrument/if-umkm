@@ -1,9 +1,9 @@
-import { renderLayout } from "../layout.js?v=coffee-v151";
-import { applyPermissionControls, loadSession, loadState } from "../store.js?v=coffee-v151";
+import { renderLayout } from "../layout.js?v=1784794256";
+import { applyPermissionControls, loadSession, loadState } from "../store.js?v=1784794256";
 import { formatQty, money, shortDate } from "../format.js";
 import { byId, setText } from "../dom.js";
 import { enhanceAllDataTables } from "../datatable.js";
-import { loadPageBootstrap } from "../page-engine.js?v=coffee-v154";
+import { loadPageBootstrap } from "../page-engine.js?v=1784794256";
 
 renderLayout();
 

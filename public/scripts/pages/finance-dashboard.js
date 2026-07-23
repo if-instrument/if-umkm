@@ -1,8 +1,8 @@
-import { renderLayout } from "../layout.js?v=coffee-v151";
-import { loadSession, loadState } from "../store.js?v=coffee-v151";
+import { renderLayout } from "../layout.js?v=1784794256";
+import { loadSession, loadState } from "../store.js?v=1784794256";
 import { money } from "../format.js";
 import { byId, setText } from "../dom.js";
-import { loadPageBootstrap } from "../page-engine.js?v=coffee-v154";
+import { loadPageBootstrap } from "../page-engine.js?v=1784794256";
 
 renderLayout();
 

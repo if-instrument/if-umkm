@@ -158,7 +158,7 @@ $routes->group('api', ['namespace' => 'App\Controllers\Api', 'filter' => 'jwt-au
     $routes->get('customer-transaction', 'CrmController::listTransactions');
 });
 
-$routes->get('(:segment)', 'AppPageController::tenantDashboard/$1');
+$routes->get('(:segment)', 'OnlineOrderController::tenant/$1');
 $routes->get('(:segment)/login', 'LoginController::tenant/$1');
 $routes->get('(:segment)/login.html', 'LoginController::tenant/$1');
 $routes->get('(:segment)/order', 'OnlineOrderController::tenant/$1');

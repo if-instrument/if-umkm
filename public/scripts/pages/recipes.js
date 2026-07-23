@@ -1,11 +1,11 @@
-import { renderLayout } from "../layout.js?v=coffee-v151";
-import { apiPost, apiPut, appPath, applyPermissionControls, canAccessAllOutlets, canManageCompanyMasters, canUsePermission, loadSession, loadState, primaryOutletId, scopedPayload, stampScopedMaster, visibleForSession } from "../store.js?v=coffee-v151";
+import { renderLayout } from "../layout.js?v=1784794256";
+import { apiPost, apiPut, appPath, applyPermissionControls, canAccessAllOutlets, canManageCompanyMasters, canUsePermission, loadSession, loadState, primaryOutletId, scopedPayload, stampScopedMaster, visibleForSession } from "../store.js?v=1784794256";
 import { formatQty, money } from "../format.js";
 import { byId, setText, showAlert } from "../dom.js";
 import { ingredientName, missingModifierOptions, missingModifierSummary, missingRecipeLines, missingRecipeSummary, productAvailability, productCogs, productModifiers } from "../inventory.js";
 import { enhanceAllDataTables } from "../datatable.js";
 import { COMMON_STATUS, isInactiveStatus } from "../status-codes.js";
-import { loadPageBootstrap } from "../page-engine.js?v=coffee-v151";
+import { loadPageBootstrap } from "../page-engine.js?v=1784794256";
 
 renderLayout();
 
@@ -65,7 +65,11 @@ function createIngredientTemplateFromRecipe() {
 }
 
 function visibleProducts() {
-  return state.products.filter((product) => visibleForSession(product, state, session));
+  return state.products.filter((product) => {
+    if (!visibleForSession(product, state, session)) return false;
+    if (product.inventoryType === "retail" || product.isRetail || product.isVendorProduct) return false;
+    return true;
+  });
 }
 
 function visibleIngredients() {
@@ -187,9 +191,10 @@ function openModal(line = null) {
   const mappingOnly = isTemplateMappingMode(product);
   byId("recipe-form").reset();
   byId("recipe-original-template").value = line?.templateId || "";
-  byId("recipe-modal-title").textContent = mappingOnly ? "Hubungkan Template ke Bahan Outlet" : (line ? "Edit Bahan Recipe" : "Tambah Bahan Recipe");
+  byId("recipe-modal-title").textContent = mappingOnly ? "Hubungkan Template ke Bahan Outlet" : (line ? "Edit Bahan Recipe" : `Tambah Bahan Recipe (${product?.name || ""})`);
   byId("recipe-submit-button").textContent = mappingOnly ? "Simpan Mapping Outlet" : (line ? "Simpan Perubahan" : "Simpan ke Recipe");
   byId("recipe-submit-button").dataset.permission = `recipes.template:${line ? "update" : "create"}`;
+  if (byId("recipe-product-field")) byId("recipe-product-field").hidden = true;
   byId("recipe-product").value = focusedProductId;
   const selectedTemplateId = line?.templateId || visibleTemplates()[0]?.id || "__new_template";
   byId("recipe-template").value = selectedTemplateId;
@@ -206,7 +211,7 @@ function openModal(line = null) {
   byId("recipe-modal").hidden = false;
   document.body.classList.add("modal-open");
   applyPermissionControls(document, state, session);
-  setTimeout(() => byId("recipe-product").focus(), 80);
+  setTimeout(() => byId("recipe-qty")?.focus(), 80);
 }
 
 function closeModal() {
@@ -217,17 +222,28 @@ function closeModal() {
 
 function renderOptions() {
   const products = visibleProducts();
-  byId("recipe-product").innerHTML = products.map((item) => `<option value="${item.id}">${item.name}</option>`).join("");
-  byId("recipe-focus-product").innerHTML = products.map((item) => `<option value="${item.id}">${item.name}</option>`).join("");
-  byId("recipe-focus-product").value = focusedProductId;
-  byId("recipe-product").value = focusedProductId;
-  byId("recipe-template").innerHTML = visibleTemplates()
-    .map((item) => `<option value="${item.id}">${item.name} · ${item.category} (${item.unit})</option>`)
-    .join("") + `<option value="__new_template">+ Buat template bahan baru</option>`;
-  if (visibleTemplates().length) byId("recipe-template").value = visibleTemplates()[0].id;
-  else byId("recipe-template").value = "__new_template";
-  byId("recipe-new-template-category").value = byId("recipe-new-template-category").value || "Raw Material";
-  byId("recipe-new-template-unit").value = byId("recipe-new-template-unit").value || "gram";
+  const recipeProd = byId("recipe-product");
+  if (recipeProd) {
+    recipeProd.innerHTML = products.map((item) => `<option value="${item.id}">${item.name}</option>`).join("");
+    recipeProd.value = focusedProductId;
+  }
+  const focusProd = byId("recipe-focus-product");
+  if (focusProd) {
+    focusProd.innerHTML = products.map((item) => `<option value="${item.id}">${item.name}</option>`).join("");
+    focusProd.value = focusedProductId;
+  }
+  const templateEl = byId("recipe-template");
+  if (templateEl) {
+    templateEl.innerHTML = visibleTemplates()
+      .map((item) => `<option value="${item.id}">${item.name} · ${item.category} (${item.unit})</option>`)
+      .join("") + `<option value="__new_template">+ Buat template bahan baru</option>`;
+    if (visibleTemplates().length) templateEl.value = visibleTemplates()[0].id;
+    else templateEl.value = "__new_template";
+  }
+  const catEl = byId("recipe-new-template-category");
+  if (catEl) catEl.value = catEl.value || "Raw Material";
+  const unitEl = byId("recipe-new-template-unit");
+  if (unitEl) unitEl.value = unitEl.value || "gram";
 }
 
 function createOutletIngredientButton(templateId) {
@@ -664,37 +680,51 @@ function renderModifiers() {
   const product = state.products.find((item) => item.id === focusedProductId);
   const modifiers = product ? productModifiers(state, product) : [];
   const masterModifiers = visibleModifiers();
-  byId("product-modifier-list").innerHTML = masterModifiers.length
-    ? masterModifiers.map((modifier) => `
-      <label class="modifier-checkbox-card">
-        <input ${product?.modifierIds?.includes(modifier.id) ? "checked" : ""} data-product-modifier-id="${modifier.id}" type="checkbox" />
-        <span>
-          <strong>${escapeHtml(modifier.name)}</strong>
-          <small>${isInactiveStatus(modifier.status) ? "Nonaktif" : `${(modifier.options || []).length} opsi tersedia · ${modifier.choiceType === "single" ? "Radio" : "Checkbox"} · ${modifier.requiredSelection ? "Wajib" : "Opsional"}`}</small>
-          <ul>${modifierOptionSummary(modifier)}</ul>
-        </span>
-      </label>
-    `).join("")
-    : `<div class="empty-state">Belum ada modifier master. Tambahkan master modifier dulu.</div>`;
-  byId("modifier-table").innerHTML = modifiers.length
-    ? modifiers.map((modifier) => {
-      const missingOptions = missingModifierOptions(state, modifier);
-      return `
-      <tr>
-        <td><strong>${escapeHtml(modifier.name)}</strong><br><span class="muted-text">${modifier.choiceType === "single" ? "Radio" : "Checkbox"} · ${modifier.requiredSelection ? "Wajib" : "Opsional"}</span>${missingOptions.length ? `<br><small class="muted-text">Mapping bahan: ${escapeHtml(missingModifierSummary(state, modifier))}</small>` : ""}</td>
-        <td>${(modifier.options || []).map((option) => `${escapeHtml(option.name)}: ${money(option.priceDelta || 0)}`).join("<br>")}</td>
-        <td>${modifierDescription(modifier)}</td>
-        <td><button class="ghost-button compact-button" ${canEditMaster(modifier) ? "" : "disabled title=\"Selected Outlet hanya bisa edit modifier outlet yang dipilih\""} data-edit-modifier="${modifier.id}" data-permission="modifiers.master:update" type="button">Edit Master</button></td>
-      </tr>
-    `;
-    }).join("")
-    : `<tr><td colspan="4" class="empty-state">Belum ada modifier untuk produk ini. Pilih modifier dari daftar master.</td></tr>`;
-  enhanceAllDataTables(byId("modifier-table").closest(".workspace-panel"));
+  const listEl = byId("product-modifier-list");
+  if (listEl) {
+    listEl.innerHTML = masterModifiers.length
+      ? masterModifiers.map((modifier) => `
+        <label class="modifier-checkbox-card">
+          <input ${product?.modifierIds?.includes(modifier.id) ? "checked" : ""} data-product-modifier-id="${modifier.id}" type="checkbox" />
+          <span>
+            <strong>${escapeHtml(modifier.name)}</strong>
+            <small>${isInactiveStatus(modifier.status) ? "Nonaktif" : `${(modifier.options || []).length} opsi tersedia · ${modifier.choiceType === "single" ? "Radio" : "Checkbox"} · ${modifier.requiredSelection ? "Wajib" : "Opsional"}`}</small>
+            <ul>${modifierOptionSummary(modifier)}</ul>
+          </span>
+        </label>
+      `).join("")
+      : `<div class="empty-state">Belum ada modifier master. Tambahkan master modifier dulu.</div>`;
+  }
+  const tableEl = byId("modifier-table");
+  if (tableEl) {
+    tableEl.innerHTML = modifiers.length
+      ? modifiers.map((modifier) => {
+        const missingOptions = missingModifierOptions(state, modifier);
+        return `
+        <tr>
+          <td><strong>${escapeHtml(modifier.name)}</strong><br><span class="muted-text">${modifier.choiceType === "single" ? "Radio" : "Checkbox"} · ${modifier.requiredSelection ? "Wajib" : "Opsional"}</span>${missingOptions.length ? `<br><small class="muted-text">Mapping bahan: ${escapeHtml(missingModifierSummary(state, modifier))}</small>` : ""}</td>
+          <td>${(modifier.options || []).map((option) => `${escapeHtml(option.name)}: ${money(option.priceDelta || 0)}`).join("<br>")}</td>
+          <td>${modifierDescription(modifier)}</td>
+          <td><button class="ghost-button compact-button" ${canEditMaster(modifier) ? "" : "disabled title=\"Selected Outlet hanya bisa edit modifier outlet yang dipilih\""} data-edit-modifier="${modifier.id}" data-permission="modifiers.master:update" type="button">Edit Master</button></td>
+        </tr>
+      `;
+      }).join("")
+      : `<tr><td colspan="4" class="empty-state">Belum ada modifier untuk produk ini. Pilih modifier dari daftar master.</td></tr>`;
+    enhanceAllDataTables(tableEl.closest(".workspace-panel"));
+  }
   applyPermissionControls(document, state, session);
 }
 
 function renderRecipeList() {
-  const product = visibleProducts().find((item) => item.id === focusedProductId) || visibleProducts()[0];
+  const products = visibleProducts();
+  const detailEl = byId("recipe-detail");
+  if (!products.length) {
+    if (detailEl) {
+      detailEl.innerHTML = `<div class="workspace-panel empty-state">Belum ada produk olahan resep (non-vendor). Produk barang dagangan (retail/vendor) tidak memerlukan recipe.</div>`;
+    }
+    return;
+  }
+  const product = products.find((item) => item.id === focusedProductId) || products[0];
   if (!product) return;
   const mappingOnly = isTemplateMappingMode(product);
   const cogs = productCogs(state, product);
@@ -713,37 +743,44 @@ function renderRecipeList() {
             ? `<button class="ghost-button compact-button" data-edit-recipe-ingredient="${rowKey}" data-permission="recipes.template:update" type="button">Edit</button>`
             : `<a class="ghost-button compact-button button-link" href="${appPath("/pages/ingredient-mapping.html")}">Atur Mapping</a>`;
           const action = `<div class="row-actions">${!ingredientReady ? createOutletIngredientButton(line.templateId) : ""}${editAction}</div>`;
-          return `<tr><td><strong>${name}</strong>${!ingredientReady ? `<br><small class="status-pill status-low">Belum dimapping di outlet</small>` : ""}${line.templateName ? `<br><small>Template: ${line.templateName}</small>` : ""}</td><td>${ingredient?.unit || line.unit || ""}</td><td>${formatQty(line.qty)}</td><td>${money(unitCost)} / ${ingredient?.unit || line.unit || ""}</td><td>${money(unitCost * line.qty)}</td><td>${action}</td></tr>`;
+          return `<tr><td><strong>${name}</strong>${!ingredientReady ? `<br><small class="status-pill status-low">Belum dimapping di outlet</small>` : ""} ${line.templateName ? `<br><small>Template: ${line.templateName}</small>` : ""}</td><td>${ingredient?.unit || line.unit || ""}</td><td>${formatQty(line.qty)}</td><td>${money(unitCost)} / ${ingredient?.unit || line.unit || ""}</td><td>${money(unitCost * line.qty)}</td><td>${action}</td></tr>`;
         })
         .join("")
     : `<tr><td colspan="6" class="empty-state">Belum ada recipe untuk produk ini.</td></tr>`;
 
-  byId("recipe-detail").innerHTML = `
-    <section class="recipe-detail-layout">
-      <article class="workspace-panel recipe-product-summary">
-        <div class="recipe-hero-visual"><span></span></div>
-        <h3>${product.name}</h3>
-        <span class="status-pill status-ok">Aktif</span>
-        <dl>
-          <div><dt>Kategori</dt><dd>${product.category}</dd></div>
-          <div><dt>Harga Jual</dt><dd>${money(product.price)}</dd></div>
-          <div><dt>Total HPP</dt><dd>${money(cogs)}</dd></div>
-          <div><dt>Kapasitas</dt><dd>${productAvailability(state, product)} unit</dd></div>
-        </dl>
-      </article>
-      <article class="workspace-panel">
-        <div class="panel-heading"><h3>Template Bahan Recipe</h3><p>Susun kebutuhan bahan standar produk di sini. Mapping bahan outlet dikerjakan di menu Produk & Recipe.</p></div>
-        ${missingRecipe.length ? `<div class="form-preview full-row">Pengingat outlet: ${missingRecipeSummary(state, product)} belum dimapping. Buka Produk & Recipe > Mapping Bahan agar kapasitas dan HPP akurat.</div>` : ""}
-        <div class="table-wrap"><table><thead><tr><th>Bahan</th><th>Satuan</th><th>Qty Digunakan</th><th>Harga Satuan</th><th>Total Cost</th><th>Aksi</th></tr></thead><tbody>${rows}</tbody></table></div>
-        <div class="recipe-cost-summary">
-          <div><span>Total HPP</span><strong>${money(cogs)}</strong></div>
-          <div><span>Harga Jual</span><strong>${money(product.price)}</strong></div>
-          <div class="margin"><span>Margin</span><strong>${money(profit)} (${margin.toFixed(1)}%)</strong></div>
-        </div>
-      </article>
-    </section>
-  `;
-  enhanceAllDataTables(byId("recipe-detail"));
+  if (detailEl) {
+    detailEl.innerHTML = `
+      <section class="recipe-detail-layout">
+        <article class="workspace-panel recipe-product-summary">
+          <div class="recipe-hero-visual">${product.imageUrl ? `<img class="product-photo-image" src="${escapeHtml(product.imageUrl)}" alt="${escapeHtml(product.name)}" />` : `<span>${escapeHtml((product.name || "?").slice(0, 1))}</span>`}</div>
+          <label class="product-picker-dropdown">
+            <span>Pilih Produk Recipe:</span>
+            <select id="recipe-select-product" class="recipe-product-dropdown">
+              ${visibleProducts().map((p) => `<option value="${p.id}" ${p.id === product.id ? "selected" : ""}>${escapeHtml(p.name)} (${money(p.price)})</option>`).join("")}
+            </select>
+          </label>
+          <span class="status-pill status-ok">Aktif</span>
+          <dl>
+            <div><dt>Kategori</dt><dd>${product.category}</dd></div>
+            <div><dt>Harga Jual</dt><dd>${money(product.price)}</dd></div>
+            <div><dt>Total HPP</dt><dd>${money(cogs)}</dd></div>
+            <div><dt>Kapasitas</dt><dd>${productAvailability(state, product)} unit</dd></div>
+          </dl>
+        </article>
+        <article class="workspace-panel">
+          <div class="panel-heading"><h3>Template Bahan Recipe</h3><p>Susun kebutuhan bahan standar produk di sini. Mapping bahan outlet dikerjakan di menu Produk & Recipe.</p></div>
+          ${missingRecipe.length ? `<div class="form-preview full-row">Pengingat outlet: ${missingRecipeSummary(state, product)} belum dimapping. Buka Produk & Recipe > Mapping Bahan agar kapasitas dan HPP akurat.</div>` : ""}
+          <div class="table-wrap"><table><thead><tr><th>Bahan</th><th>Satuan</th><th>Qty Digunakan</th><th>Harga Satuan</th><th>Total Cost</th><th>Aksi</th></tr></thead><tbody>${rows}</tbody></table></div>
+          <div class="recipe-cost-summary">
+            <div><span>Total HPP</span><strong>${money(cogs)}</strong></div>
+            <div><span>Harga Jual</span><strong>${money(product.price)}</strong></div>
+            <div class="margin"><span>Margin</span><strong>${money(profit)} (${margin.toFixed(1)}%)</strong></div>
+          </div>
+        </article>
+      </section>
+    `;
+    enhanceAllDataTables(detailEl);
+  }
   applyPermissionControls(document, state, session);
   const addButton = document.querySelector("[data-open-recipe-modal]");
   if (addButton) {
@@ -901,14 +938,14 @@ byId("outlet-ingredient-form").addEventListener("submit", (event) => {
   }
 });
 
-byId("save-product-modifiers").addEventListener("click", () => {
+byId("save-product-modifiers")?.addEventListener("click", () => {
   const product = state.products.find((item) => item.id === focusedProductId);
   if (!product) return;
   if (!canUsePermission("recipes.template", "update", state, session)) {
     setText("recipe-feedback", "Anda tidak punya akses untuk mengubah modifier produk.");
     return;
   }
-  product.modifierIds = [...byId("product-modifier-list").querySelectorAll("[data-product-modifier-id]:checked")]
+  product.modifierIds = [...(byId("product-modifier-list")?.querySelectorAll("[data-product-modifier-id]:checked") || [])]
     .map((option) => option.dataset.productModifierId)
     .filter(Boolean);
   try {
@@ -922,7 +959,7 @@ byId("save-product-modifiers").addEventListener("click", () => {
   }
 });
 
-byId("recipe-form").querySelectorAll("input, select").forEach((field) => {
+byId("recipe-form")?.querySelectorAll("input, select").forEach((field) => {
   field.addEventListener("input", updatePreview);
   field.addEventListener("change", () => {
     if (field.id === "recipe-template") toggleNewTemplateFields();
@@ -930,11 +967,11 @@ byId("recipe-form").querySelectorAll("input, select").forEach((field) => {
   });
 });
 
-byId("modifier-option-editor").addEventListener("input", (event) => {
+byId("modifier-option-editor")?.addEventListener("input", (event) => {
   syncModifierMaterialStandardCostFromField(event.target);
   updateModifierPreview();
 });
-byId("modifier-option-editor").addEventListener("change", (event) => {
+byId("modifier-option-editor")?.addEventListener("change", (event) => {
   const changed = event.target;
   const config = changed?.closest?.("[data-option-config]");
   if (config && changed?.matches("[data-option-template]")) {
@@ -950,15 +987,20 @@ byId("modifier-option-editor").addEventListener("change", (event) => {
 });
 
 ["outlet-ingredient-stock", "outlet-ingredient-cost"].forEach((id) => {
-  byId(id).addEventListener("input", syncOutletIngredientStandardCost);
+  byId(id)?.addEventListener("input", syncOutletIngredientStandardCost);
 });
-byId("outlet-ingredient-unit").addEventListener("input", updateOutletIngredientPreview);
+byId("outlet-ingredient-unit")?.addEventListener("input", updateOutletIngredientPreview);
 
-byId("recipe-focus-product").addEventListener("change", (event) => {
-  focusedProductId = event.target.value;
-  byId("recipe-product").value = focusedProductId;
-  window.history.replaceState({}, "", `${window.location.pathname}?product=${encodeURIComponent(focusedProductId)}`);
-  renderRecipeList();
+document.addEventListener("change", (event) => {
+  if (event.target.id === "recipe-focus-product" || event.target.id === "recipe-select-product") {
+    focusedProductId = event.target.value;
+    if (byId("recipe-focus-product")) byId("recipe-focus-product").value = focusedProductId;
+    if (byId("recipe-select-product")) byId("recipe-select-product").value = focusedProductId;
+    if (byId("recipe-product")) byId("recipe-product").value = focusedProductId;
+    window.history.replaceState({}, "", `${window.location.pathname}?product=${encodeURIComponent(focusedProductId)}`);
+    renderRecipeList();
+    renderModifiers();
+  }
 });
 
 document.addEventListener("click", (event) => {

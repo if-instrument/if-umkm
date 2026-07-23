@@ -1,4 +1,4 @@
-import { apiGet, apiPost, appPath, currentCompanySlug, loadSession, saveSession } from "../store.js?v=coffee-v151";
+import { apiGet, apiPost, appPath, currentCompanySlug, loadSession, saveSession } from "../store.js?v=1784794256";
 import { byId, setText, showFeedback } from "../dom.js";
 
 const session = loadSession();
@@ -16,6 +16,17 @@ if (companySlug && !tenant) {
   setText("login-preview", "Route perusahaan tidak ditemukan atau belum aktif.");
 }
 
+function updateFavicon(iconUrl) {
+  if (!iconUrl) return;
+  let link = document.querySelector("link[rel*='icon']");
+  if (!link) {
+    link = document.createElement("link");
+    link.rel = "icon";
+    document.head.appendChild(link);
+  }
+  link.href = iconUrl;
+}
+
 if (tenant) {
   applyCompanyTheme(tenant.themeColor || "#3B1F8C");
   const logo = document.querySelector(".login-brand .brand-mark");
@@ -28,9 +39,13 @@ if (tenant) {
   if (tagline) tagline.textContent = tenant.tagline || "UMKM Solution";
   if (copyTitle) copyTitle.textContent = `Masuk ke ${tenant.name}`;
   if (copyText) copyText.textContent = "Gunakan email dan password user yang terdaftar pada perusahaan ini.";
+  document.title = `Login - ${tenant.name}`;
+  updateFavicon(tenant.logoUrl || "/assets/if-instrument-logo.jpg");
   document.querySelectorAll('[data-sample-login]').forEach((button) => button.remove());
   byId("tenant-login-panel").hidden = true;
 } else {
+  document.title = `Login - IF Instrument`;
+  updateFavicon("/assets/if-instrument-logo.jpg");
   document.querySelectorAll('[data-sample-login]:not([data-sample-login="super"])').forEach((button) => { button.hidden = true; });
   byId("tenant-login-panel").hidden = false;
   renderTenantList();

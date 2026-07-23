@@ -335,10 +335,11 @@ a {
 
 .ghost-button:disabled {
   cursor: not-allowed;
-  border-color: #e5ddd5;
-  background: #f5f1ed;
-  color: #b1a399;
+  border-color: #cbd5e1;
+  background: #f1f5f9;
+  color: #94a3b8;
   box-shadow: none;
+  opacity: 0.6;
 }
 
 .ghost-button,
@@ -560,7 +561,7 @@ a {
   padding: 12px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: #f8f7ff;
+  background: var(--brand-soft, #f8fafc);
 }
 
 .filter-toolbar label {
@@ -1780,19 +1781,13 @@ body[data-page="pos"] .product-visual {
   position: relative;
   height: 104px;
   border-radius: 0;
-  background: linear-gradient(145deg, #b97d48, #48240e);
+  background: var(--brand-soft, #f8fafc);
 }
 
-body[data-page="pos"] .product-tone-1 {
-  background: linear-gradient(145deg, #d3a16d, #6d3818);
-}
-
-body[data-page="pos"] .product-tone-2 {
-  background: linear-gradient(145deg, #9d653b, #2e1b11);
-}
-
+body[data-page="pos"] .product-tone-1,
+body[data-page="pos"] .product-tone-2,
 body[data-page="pos"] .product-tone-3 {
-  background: linear-gradient(145deg, #d9b58e, #79451e);
+  background: var(--brand-soft, #f8fafc);
 }
 
 body[data-page="pos"] .product-visual > span:first-child {
@@ -3587,12 +3582,25 @@ body[data-page="orders"] .order-board {
   margin: -16px -16px 14px;
 }
 
+.product-visual,
+.pos-product-detail-visual {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  overflow: hidden;
+}
+
 .product-visual img,
 .pos-product-detail-visual img,
 .product-photo-image {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
+  margin: auto !important;
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+  object-fit: scale-down;
+  object-position: center;
+  display: block;
 }
 
 .product-card {
@@ -4262,7 +4270,7 @@ body[data-page="orders"] .order-board {
   place-items: center;
   overflow: hidden;
   border-radius: 6px;
-  background: linear-gradient(145deg, #c68a51, #4b260e);
+  background: var(--brand-soft, #f8fafc);
 }
 
 .pos-product-detail-visual span {
@@ -4608,7 +4616,7 @@ body[data-page="orders"] .order-board {
   width: 23px;
   height: 23px;
   border-radius: 5px;
-  background: linear-gradient(135deg, #e9d4bb, #8e4d20);
+  background: var(--brand-soft, #f8fafc);
 }
 
 .low-stock-item {
@@ -5226,12 +5234,13 @@ body {
 }
 
 .primary-button {
-  background: linear-gradient(180deg, #814313, #642e08);
+  background: var(--brand) !important;
+  color: #ffffff !important;
 }
 
 .primary-button:hover {
-  background: var(--brand-strong, var(--brand));
-  box-shadow: 0 7px 14px rgba(var(--brand-rgb, 59, 31, 140), 0.18);
+  background: var(--brand-strong, var(--brand)) !important;
+  box-shadow: 0 7px 14px rgba(var(--brand-rgb, 59, 31, 140), 0.18) !important;
 }
 
 .ghost-button,
@@ -5452,11 +5461,11 @@ input:focus,
 .ghost-button.compact-button:disabled,
 .ghost-button.compact-button:disabled:hover {
   cursor: not-allowed;
-  border-color: #e2d8cf;
-  background: #f3eee9;
-  color: #b5a79d;
+  border-color: #cbd5e1;
+  background: #f1f5f9;
+  color: #94a3b8;
   box-shadow: none;
-  opacity: 0.72;
+  opacity: 0.6;
 }
 
 @media (max-width: 980px) {
@@ -5604,8 +5613,8 @@ body[data-page="orders"] .order-board.completed-only {
 
 .completed-orders-table-panel {
   overflow: hidden;
-  border: 1px solid #e4d9d0;
-  border-radius: 6px;
+  border: 1px solid var(--line, #e2e8f0);
+  border-radius: 8px;
   background: #ffffff;
 }
 
@@ -5620,21 +5629,22 @@ body[data-page="orders"] .order-board.completed-only {
 }
 
 .completed-orders-table th {
-  background: #f5eee8;
-  color: #746458;
-  padding: 9px 10px;
-  font-size: 7px;
-  font-weight: 850;
+  background: var(--brand-soft, #f8fafc);
+  color: var(--brand-strong, var(--brand, #3B1F8C));
+  padding: 12px 14px;
+  font-size: 12px;
+  font-weight: 800;
   text-align: left;
   text-transform: uppercase;
+  border-bottom: 1px solid var(--line, #e2e8f0);
 }
 
 .completed-orders-table td {
-  border-bottom: 1px solid #eee5de;
-  color: #514238;
-  padding: 10px;
-  font-size: 9px;
-  vertical-align: top;
+  border-bottom: 1px solid var(--line, #e2e8f0);
+  color: var(--ink, #0f172a);
+  padding: 12px 14px;
+  font-size: 13px;
+  vertical-align: middle;
 }
 
 .completed-orders-table tr:last-child td {
@@ -5644,8 +5654,8 @@ body[data-page="orders"] .order-board.completed-only {
 .completed-orders-table td > span {
   display: block;
   margin-top: 3px;
-  color: #8b7b6f;
-  font-size: 7px;
+  color: var(--muted, #64748b);
+  font-size: 11px;
 }
 
 .completed-order-items {

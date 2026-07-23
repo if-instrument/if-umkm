@@ -121,13 +121,42 @@
 }
 
 .recipe-hero-visual {
+  width: 100%;
   height: 185px;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  overflow: hidden;
+  border-radius: 12px;
+  background: var(--brand-soft, #f8fafc);
+  color: var(--brand-strong, var(--brand, #3B1F8C));
+  margin-bottom: 12px;
+}
+
+.recipe-hero-visual img {
+  margin: auto !important;
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+  object-fit: scale-down;
+  object-position: center;
+  border-radius: inherit;
+  display: block;
 }
 
 .recipe-hero-visual span {
-  width: 112px;
-  height: 112px;
-  border-width: 10px;
+  display: grid;
+  place-items: center;
+  width: 84px;
+  height: 84px;
+  border: 3px solid var(--brand, #3B1F8C);
+  border-radius: 50%;
+  font-size: 28px;
+  font-weight: 800;
+  text-transform: uppercase;
+  background: #ffffff;
+  color: var(--brand, #3B1F8C);
 }
 
 .recipe-product-summary dl {
@@ -786,4 +815,62 @@
   .category-product-card {
     cursor: default;
   }
+}
+
+.hero-select-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.18);
+  padding: 6px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.hero-product-select {
+  background: #ffffff !important;
+  color: #0f172a !important;
+  font-weight: 700 !important;
+  border-radius: 6px !important;
+  padding: 5px 10px !important;
+  border: none !important;
+  outline: none !important;
+  cursor: pointer;
+  min-height: 32px !important;
+}
+
+.product-picker-dropdown {
+  display: grid;
+  gap: 4px;
+  margin: 10px 0 12px;
+}
+
+.product-picker-dropdown span {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.recipe-product-dropdown {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff !important;
+  color: var(--ink) !important;
+  font-size: 14px;
+  font-weight: 800;
+  padding: 8px 12px;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.recipe-product-dropdown:focus {
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px rgba(var(--brand-rgb, 59, 31, 140), 0.15);
 }

@@ -123,11 +123,14 @@ class JwtAuthFilter implements FilterInterface
         if (preg_match('#^payment-transaction/[^/]+/(confirm|cancel)$#', $apiPath)) return [['pos.payment', 'create']];
         if (preg_match('#^order/[^/]+/status$#', $apiPath)) {
             $payload = (array) ($request->getJSON(true) ?: []);
-            return match ($payload['status'] ?? '') {
-                '20', '30', 'preparing', 'ready' => [['queue.kitchen', 'update']],
-                '90', 'completed' => [['queue.cashier', 'update']],
-                default => [['queue.kitchen', 'update'], ['queue.cashier', 'update']],
-            };
+            $st = $payload['status'] ?? '';
+            if (in_array($st, ['20', '30', 'preparing', 'ready'], true)) {
+                return [['queue.kitchen', 'update']];
+            }
+            if (in_array($st, ['90', 'completed'], true)) {
+                return [['queue.cashier', 'update']];
+            }
+            return [['queue.kitchen', 'update'], ['queue.cashier', 'update']];
         }
         if (preg_match('#^order/[^/]+/ready-items$#', $apiPath)) return [['queue.kitchen', 'update']];
         if (preg_match('#^order/[^/]+/settle$#', $apiPath)) return [['pos.payment', 'create']];
@@ -189,12 +192,17 @@ class JwtAuthFilter implements FilterInterface
 
     private function crudAction(string $method): string
     {
-        return match ($method) {
-            'post' => 'create',
-            'put', 'patch' => 'update',
-            'delete' => 'delete',
-            default => 'read',
-        };
+        switch ($method) {
+            case 'post':
+                return 'create';
+            case 'put':
+            case 'patch':
+                return 'update';
+            case 'delete':
+                return 'delete';
+            default:
+                return 'read';
+        }
     }
 
     private function hasAnyPermission(array $claims, array $permissionOptions): bool

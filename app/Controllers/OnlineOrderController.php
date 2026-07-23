@@ -30,8 +30,9 @@ class OnlineOrderController extends BaseController
     public function tenant(string $slug)
     {
         $company = $this->tenantDb->companyBySlug($slug);
+        $response = $this->response ?? response();
         if (! $company) {
-            return $this->response->setStatusCode(404)->setBody('Company route tidak ditemukan.');
+            return $response->setStatusCode(404)->setBody('Company route tidak ditemukan.');
         }
 
         return $this->renderOrderPage((string) ($company['route_slug'] ?? $slug));
@@ -63,8 +64,9 @@ class OnlineOrderController extends BaseController
     {
         $target = realpath(FCPATH . 'pages/order.html');
         $publicRoot = realpath(FCPATH);
+        $response = $this->response ?? response();
         if (! $target || ! $publicRoot || ! str_starts_with($target, $publicRoot) || ! is_file($target)) {
-            return $this->response->setStatusCode(404)->setBody('Halaman order online tidak ditemukan.');
+            return $response->setStatusCode(404)->setBody('Halaman order online tidak ditemukan.');
         }
 
         $html = file_get_contents($target) ?: '';

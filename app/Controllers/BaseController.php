@@ -74,7 +74,8 @@ abstract class BaseController extends Controller
         $timestamp = time();
         $html = preg_replace('/(\.(?:js|css))\?v=[^"\'\s>]+/i', '$1?v=' . $timestamp, $html);
 
-        return $this->response->setContentType('text/html')->setBody($html);
+        $response = $this->response ?? response();
+        return $response->setContentType('text/html')->setBody($html);
     }
 
     private function numericCompanyId(string $code): int

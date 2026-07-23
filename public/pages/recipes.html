@@ -4,8 +4,8 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Buat Recipe Template - IFresso Coffee</title>
-    <link rel="stylesheet" href="../styles.css?v=light-v3" />
-    <link rel="stylesheet" href="../styles/pages/products.css?v=light-v3" />
+    <link rel="stylesheet" href="../styles.css?v=1784794256" />
+    <link rel="stylesheet" href="../styles/pages/products.css?v=1784794256" />
   </head>
   <body data-page="recipes" data-title="Buat Recipe Template" data-eyebrow="Produk & Recipe">
     <template id="page-content">
@@ -17,6 +17,10 @@
             <p>Atur komposisi takaran bahan baku per produk. HPP dan pemotongan stok otomatis dihitung dari recipe ini.</p>
           </div>
           <div class="hero-summary-stats">
+            <label class="hero-select-field">
+              <span>Pilih Produk:</span>
+              <select id="recipe-focus-product" class="hero-product-select"></select>
+            </label>
             <button class="primary-button" data-open-recipe-modal data-permission="recipes.template:create" type="button">+ Tambah Bahan Recipe</button>
           </div>
         </div>
@@ -56,7 +60,7 @@
           </header>
           <form class="form-grid input-workflow" id="recipe-form">
             <input id="recipe-original-template" type="hidden" />
-            <label>Produk <select id="recipe-product" required></select></label>
+            <label id="recipe-product-field" hidden>Produk <select id="recipe-product" required></select></label>
             <label id="recipe-template-field">Template Bahan <select id="recipe-template" required></select></label>
             <div class="form-grid full-row compact-subform" id="recipe-new-template-fields" hidden>
               <label>Nama Template Baru <input id="recipe-new-template-name" autocomplete="off" placeholder="Contoh: Oat Milk" type="text" /></label>
@@ -154,6 +158,6 @@
       </div>
     </template>
 
-    <script type="module" src="../scripts/pages/recipes.js?v=light-v3"></script>
+    <script type="module" src="../scripts/pages/recipes.js?v=1784794256"></script>
   </body>
 </html>
