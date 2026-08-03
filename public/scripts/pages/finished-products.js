@@ -1,11 +1,11 @@
-import { renderLayout } from "../layout.js?v=1784794256";
-import { apiPost, applyPermissionControls, canUsePermission, loadSession, loadState, scopedPayload, visibleForSession } from "../store.js?v=1784794256";
+import { renderLayout } from "../layout.js";
+import { apiPost, applyPermissionControls, canUsePermission, loadSession, loadState, scopedPayload, visibleForSession } from "../store.js";
 import { formatQty, money } from "../format.js";
 import { byId, setText, showAlert, showFeedback } from "../dom.js";
 import { enhanceAllDataTables } from "../datatable.js";
 import { ingredientById, isStockedProduct } from "../inventory.js";
 import { isInactiveStatus } from "../status-codes.js";
-import { applyPageBootstrap, loadPageBootstrap } from "../page-engine.js?v=1784794256";
+import { applyPageBootstrap, loadPageBootstrap } from "../page-engine.js";
 
 renderLayout();
 

@@ -1,9 +1,9 @@
-import { renderLayout } from "../layout.js?v=1784794256";
-import { apiDelete, apiPost, apiPut, applyPermissionControls, loadSession, loadState, scopedPayload } from "../store.js?v=1784794256";
+import { renderLayout } from "../layout.js";
+import { apiDelete, apiPost, apiPut, applyPermissionControls, loadSession, loadState, scopedPayload } from "../store.js";
 import { money } from "../format.js";
 import { byId, setText, showAlert, showFeedback } from "../dom.js";
 import { enhanceAllDataTables } from "../datatable.js";
-import { loadPageBootstrap } from "../page-engine.js?v=1784794256";
+import { loadPageBootstrap } from "../page-engine.js";
 
 renderLayout();
 

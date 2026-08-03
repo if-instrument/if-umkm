@@ -1,5 +1,5 @@
-import { renderLayout } from "../layout.js?v=1784794256";
-import { apiDelete, apiGet, apiPost, apiPut, applyPermissionControls, canUsePermission, loadSession, loadState, scopedApiUrl, scopedPayload } from "../store.js?v=1784794256";
+import { renderLayout } from "../layout.js";
+import { apiDelete, apiGet, apiPost, apiPut, applyPermissionControls, canUsePermission, loadSession, loadState, scopedApiUrl, scopedPayload } from "../store.js";
 import { byId, setText, showAlert } from "../dom.js";
 import { enhanceAllDataTables } from "../datatable.js";
 import { COMMON_STATUS, isInactiveStatus } from "../status-codes.js";

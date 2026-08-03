@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Rekening Pembayaran Central - IF Instrument</title>
+    <link rel="stylesheet" href="../styles.css" />
+  </head>
+  <body data-page="payment-accounts" data-title="Rekening Pembayaran Central" data-eyebrow="SaaS Pusat">
+    <template id="page-content">
+      <section class="content-grid single">
+        <div class="hero-summary-banner">
+          <div class="hero-summary-copy">
+            <span class="hero-kicker">SaaS Central Management</span>
+            <h2>Setting Rekening Pembayaran SaaS Central</h2>
+            <p>Kelola daftar rekening bank / e-wallet tujuan transfer pembayaran yang ditampilkan pada modal pendaftaran perusahaan baru.</p>
+          </div>
+          <div class="hero-summary-stats">
+            <button class="primary-button" id="btn-add-payment-account" type="button">+ Tambah Metode Pembayaran (Bank / QRIS)</button>
+          </div>
+        </div>
+
+        <p class="form-feedback full-row" id="payment-account-feedback"></p>
+
+        <section class="workspace-panel wide">
+          <div class="panel-heading">
+            <div>
+              <h3>Daftar Rekening Pembayaran Aktif</h3>
+              <p>Rekening bank / e-wallet di bawah ini ditampilkan secara langsung pada halaman pendaftaran pendaftar baru.</p>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Nama Bank / Provider</th>
+                  <th>Nomor Rekening</th>
+                  <th>Nama Pemilik (a.n.)</th>
+                  <th>Catatan / Petunjuk</th>
+                  <th>Status</th>
+                  <th>Aksi</th>
+                </tr>
+              </thead>
+              <tbody id="payment-account-table"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <div class="modal-backdrop" data-app-modal hidden>
+          <div class="modal-container">
+            <section class="modal-dialog" id="payment-account-modal" aria-modal="true" role="dialog" aria-labelledby="payment-account-modal-title" hidden>
+              <header class="modal-header">
+                <div>
+                  <span class="hero-kicker">Super Admin</span>
+                  <h3 id="payment-account-modal-title">Tambah Rekening Pembayaran Central</h3>
+                  <p>Atur nama bank, nomor rekening, dan atas nama rekening yang ditampilkan pada form pendaftaran.</p>
+                </div>
+                <button class="icon-button" data-close-modal type="button" aria-label="Tutup modal">x</button>
+              </header>
+              <form class="form-grid input-workflow two-column-form" id="payment-account-form">
+                <input id="payment-account-id" type="hidden" />
+
+                <!-- Type Selector -->
+                <label class="full-row" style="background: var(--brand-soft); padding: 12px; border-radius: 8px; border: 1px solid rgba(59,31,140,0.15);">
+                  <strong style="display: block; margin-bottom: 6px; color: var(--brand);">Pilih Jenis Metode Pembayaran:</strong>
+                  <select id="payment-account-type" style="font-weight: 700; font-size: 14px; color: var(--ink);">
+                    <option value="bank">🏦 Transfer Rekening Bank (BCA, Mandiri, BRI, BNI, dll)</option>
+                    <option value="qris">⚡ QRIS Statis / E-Wallet (Scan Barcode QR Code)</option>
+                  </select>
+                </label>
+
+                <!-- Section A: Transfer Bank -->
+                <div id="section-bank-fields" class="full-row form-grid two-column-form" style="margin: 0; padding: 0;">
+                  <label>Nama Bank <input id="payment-account-bank-name" placeholder="misal: Bank BCA / Mandiri / BRI" type="text" /></label>
+                  <label>Nomor Rekening <input id="payment-account-number" placeholder="misal: 8830-192-881" type="text" /></label>
+                  <label class="full-row">Nama Pemilik Rekening (Atas Nama) <input id="payment-account-holder" placeholder="misal: PT IF Instrument SaaS" type="text" /></label>
+                </div>
+
+                <!-- Section B: QRIS Statis -->
+                <div id="section-qris-fields" class="full-row form-grid two-column-form" style="margin: 0; padding: 0;" hidden>
+                  <label>Nama Provider / Label <input id="payment-account-qris-provider" placeholder="misal: QRIS All Payment / GPN" type="text" value="QRIS All Payment" /></label>
+                  <label>NMID / ID Merchant (Opsional) <input id="payment-account-qris-nmid" placeholder="misal: ID1020039201928" type="text" /></label>
+                  <label class="full-row">Nama Merchant / Atas Nama <input id="payment-account-qris-holder" placeholder="misal: PT IF Instrument SaaS" type="text" /></label>
+
+                  <label class="full-row" style="background: #f0fdf4; border: 1px solid #bbf7d0; padding: 12px; border-radius: 8px;">
+                    <strong style="color: #166534; display: flex; align-items: center; gap: 6px;">📷 Upload Gambar Barcode QRIS Statis:</strong>
+                    <input type="file" id="payment-account-qris-file" accept="image/*" style="margin-top: 6px; font-size: 13px;" />
+                    <input id="payment-account-qris-url" type="hidden" />
+                    <div id="payment-account-qris-preview-wrap" style="margin-top: 10px; text-align: center;" hidden>
+                      <img id="payment-account-qris-img-preview" src="" alt="Preview QRIS" style="max-width: 180px; max-height: 180px; border-radius: 8px; border: 1px solid #cbd5e1; box-shadow: 0 4px 12px rgba(0,0,0,0.1);" />
+                    </div>
+                  </label>
+                </div>
+
+                <label>Status <select id="payment-account-status"><option value="10">Aktif</option><option value="90">Nonaktif</option></select></label>
+                <label class="full-row">Catatan Transfer / Petunjuk (Opsional)
+                  <input id="payment-account-notes" placeholder="misal: Transfer via m-Banking / Scan QRIS via aplikasi E-Wallet pilihan Anda" type="text" />
+                </label>
+                <div class="modal-actions full-row">
+                  <button class="ghost-button" data-close-modal type="button">Batal</button>
+                  <button class="primary-button" type="submit">Simpan Metode Pembayaran</button>
+                </div>
+              </form>
+            </section>
+          </div>
+        </div>
+      </section>
+    </template>
+    <script type="module" src="../scripts/pages/payment-accounts.js"></script>
+  </body>
+</html>

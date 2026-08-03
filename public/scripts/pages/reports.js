@@ -1,9 +1,9 @@
-import { renderLayout } from "../layout.js?v=1784794256";
-import { applyPermissionControls, loadSession, loadState } from "../store.js?v=1784794256";
+import { renderLayout } from "../layout.js";
+import { applyPermissionControls, loadSession, loadState } from "../store.js";
 import { formatQty, money, shortDate } from "../format.js";
 import { byId, setText } from "../dom.js";
 import { enhanceAllDataTables } from "../datatable.js";
-import { loadPageBootstrap } from "../page-engine.js?v=1784794256";
+import { loadPageBootstrap } from "../page-engine.js";
 
 renderLayout();
 

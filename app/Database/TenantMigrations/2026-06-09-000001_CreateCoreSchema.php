@@ -79,6 +79,7 @@ class CreateCoreSchema extends Migration
             'password_hash' => ['type' => 'VARCHAR', 'constraint' => 255],
             'type' => ['type' => 'VARCHAR', 'constraint' => 32, 'default' => 'company_user'],
             'status' => ['type' => 'VARCHAR', 'constraint' => 2, 'default' => '10'],
+            'must_change_password' => ['type' => 'TINYINT', 'constraint' => 1, 'default' => 0],
         ] + $this->baseFields());
         $this->forge->addKey('id', true);
         $this->forge->addUniqueKey('email');

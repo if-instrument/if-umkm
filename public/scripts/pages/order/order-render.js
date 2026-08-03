@@ -50,7 +50,8 @@ export function render() {
   syncOrderStatus();
   const { pristineBookTemplate } = bookState;
   if (pristineBookTemplate) {
-    const book = byId("order-flipbook");
+    const book = optionalById("order-flipbook");
+    if (!book) return;
     const snapshot = snapshotBookInputs();
     destroyFlipbook();
     book.innerHTML = pristineBookTemplate;
@@ -148,6 +149,8 @@ export function renderOrderContent() {
 }
 
 export function renderBill() {
+  const container = optionalById("order-final-bill");
+  if (!container) return;
   const result = state.orderResult;
   const totals = calculateTotals();
   const order = result?.order || {};
@@ -162,7 +165,7 @@ export function renderBill() {
         return Boolean(product?.isPreorder);
       });
 
-  byId("order-final-bill").innerHTML = `
+  container.innerHTML = `
     <div class="public-receipt-paper">
       <div class="public-receipt-head">
         ${logoUrl ? `<img src="${escapeHtml(logoUrl)}" alt="${escapeHtml(state.company?.name || "Logo")}" />` : ""}

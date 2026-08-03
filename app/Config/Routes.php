@@ -26,6 +26,13 @@ $routes->group('api', ['namespace' => 'App\Controllers\Api'], static function ($
     $routes->post('webhook/xendit', 'SalesController::xenditWebhook');
     $routes->get('public/card-payment/(:segment)', 'SalesController::publicCardPayment/$1');
     $routes->post('public/card-payment/(:segment)/sync', 'SalesController::syncPublicCardPayment/$1');
+    $routes->get('public/saas-plans', '\App\Controllers\LoginController::publicSaasPlans');
+    $routes->post('public/register-company', '\App\Controllers\LoginController::publicRegisterCompany');
+    $routes->post('public/upload-payment-proof', 'AccessController::uploadPaymentProof');
+    $routes->post('public/upload-company-logo', 'AccessController::uploadLogo');
+    $routes->post('public/change-password', '\App\Controllers\LoginController::changePassword');
+    $routes->post('public/forgot-password', '\App\Controllers\LoginController::publicForgotPassword');
+    $routes->get('public/central-payment-accounts', '\App\Controllers\LoginController::publicCentralPaymentAccounts');
 });
 $routes->group('api/page', static function ($routes) {
     $routes->get('login/bootstrap', 'LoginController::bootstrap');
@@ -45,8 +52,18 @@ $routes->group('api', ['namespace' => 'App\Controllers\Api', 'filter' => 'jwt-au
     $routes->post('company', 'AccessController::company');
     $routes->put('company/(:segment)', 'AccessController::updateCompany/$1');
     $routes->delete('company/(:segment)', 'AccessController::deleteCompany/$1');
+    $routes->post('company/(:segment)/approve', 'AccessController::approveCompany/$1');
+    $routes->post('company/(:segment)/reject', 'AccessController::rejectCompany/$1');
     $routes->post('company/(:segment)/invite-admin', 'AccessController::resendCompanyAdminInvitation/$1');
     $routes->post('company-logo', 'AccessController::uploadLogo');
+    $routes->get('saas-plan', 'AccessController::listSaasPlans');
+    $routes->post('saas-plan', 'AccessController::saveSaasPlan');
+    $routes->put('saas-plan/(:segment)', 'AccessController::updateSaasPlan/$1');
+    $routes->delete('saas-plan/(:segment)', 'AccessController::deleteSaasPlan/$1');
+    $routes->get('central-payment-account', 'AccessController::listCentralPaymentAccounts');
+    $routes->post('central-payment-account', 'AccessController::saveCentralPaymentAccount');
+    $routes->put('central-payment-account/(:segment)', 'AccessController::updateCentralPaymentAccount/$1');
+    $routes->delete('central-payment-account/(:segment)', 'AccessController::deleteCentralPaymentAccount/$1');
     $routes->get('outlet', 'AccessController::listOutlets');
     $routes->get('outlet/(:segment)', 'AccessController::getOutlet/$1');
     $routes->post('outlet', 'AccessController::outlet');

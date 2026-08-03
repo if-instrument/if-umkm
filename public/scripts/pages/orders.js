@@ -1,5 +1,5 @@
-import { renderLayout } from "../layout.js?v=1784794256";
-import { apiGet, apiPut, applyPermissionControls, canUsePermission, loadSession, loadState, scopedApiUrl, scopedPayload, visibleForSession } from "../store.js?v=1784794256";
+import { renderLayout } from "../layout.js";
+import { apiGet, apiPut, applyPermissionControls, canUsePermission, loadSession, loadState, scopedApiUrl, scopedPayload, visibleForSession } from "../store.js";
 import { effectiveRecipe, isStockedProduct, productById, productModifierOptions } from "../inventory.js";
 import { money } from "../format.js";
 import { byId } from "../dom.js";

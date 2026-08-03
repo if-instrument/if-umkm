@@ -1,5 +1,5 @@
-import { renderLayout } from "../layout.js?v=1784794256";
-import { apiGet, appPath, loadSession, loadState, scopedApiUrl } from "../store.js?v=1784794256";
+import { renderLayout } from "../layout.js";
+import { apiGet, appPath, loadSession, loadState, scopedApiUrl } from "../store.js";
 import { byId, setText, showFeedback } from "../dom.js";
 
 renderLayout();

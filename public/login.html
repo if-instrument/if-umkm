@@ -4,8 +4,8 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Login - IF Instrument</title>
-    <link rel="stylesheet" href="styles.css?v=1784794256" />
-    <link rel="stylesheet" href="styles/pages/login.css?v=1784794256" />
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="styles/pages/login.css" />
   </head>
   <body class="login-page">
     <main class="login-shell">
@@ -17,53 +17,154 @@
             <p>UMKM Solution</p>
           </div>
         </div>
-        <div class="login-copy">
+
+        <div class="login-copy" id="central-login-copy">
           <span class="hero-kicker">Secure Access</span>
           <h2>Masuk sebagai Super Admin atau Admin Perusahaan.</h2>
-          <p>Super admin hanya mengelola tenant/perusahaan. Admin perusahaan mengelola operasional, outlet, user, role, dan branding perusahaannya.</p>
+          <p>Super admin mengelola tenant/perusahaan. Admin perusahaan mengelola operasional, outlet, user, role, dan branding perusahaannya.</p>
         </div>
-        <div class="sample-login-grid">
-          <button class="sample-login-card" data-sample-login="super" type="button">
-            <strong>Super Admin</strong>
-            <span>superadmin@app.test</span>
-            <small>Akses list perusahaan saja</small>
-          </button>
-          <button class="sample-login-card" data-sample-login="company" type="button" hidden>
-            <strong>Admin Perusahaan</strong>
-            <span>admin@ifresso.id</span>
-            <small>Akses penuh perusahaan</small>
-          </button>
-          <button class="sample-login-card" data-sample-login="area" type="button" hidden>
-            <strong>Area Manager</strong>
-            <span>area@ifresso.id</span>
-            <small>All Outlet, report & operasional</small>
-          </button>
-          <button class="sample-login-card" data-sample-login="manager" type="button" hidden>
-            <strong>Outlet Manager</strong>
-            <span>manager@ifresso.id</span>
-            <small>Selected Outlet, operasional outlet</small>
-          </button>
-          <button class="sample-login-card" data-sample-login="cashier" type="button" hidden>
-            <strong>Kasir</strong>
-            <span>kasir@ifresso.id</span>
-            <small>POS dan antrian outlet</small>
-          </button>
-          <button class="sample-login-card" data-sample-login="kitchen" type="button" hidden>
-            <strong>Kitchen</strong>
-            <span>kitchen@ifresso.id</span>
-            <small>Antrian produksi outlet</small>
-          </button>
-          <button class="sample-login-card" data-sample-login="inventory" type="button" hidden>
-            <strong>Inventory Staff</strong>
-            <span>inventory@ifresso.id</span>
-            <small>Stok dan inventory outlet</small>
-          </button>
-        </div>
-        <div class="tenant-login-panel" id="tenant-login-panel" hidden>
-          <div>
-            <span class="hero-kicker">Company Login</span>
-            <h3>Pilih perusahaan</h3>
+
+        <!-- Tenant Login Showcase — company login only -->
+        <div class="company-login-showcase" id="company-login-showcase" hidden>
+          <div class="company-showcase-header">
+            <div class="company-logo-halo">
+              <img id="company-showcase-logo" src="assets/if-instrument-logo.jpg" alt="Logo Perusahaan" />
+            </div>
+            <h2 id="company-showcase-name">Nama Perusahaan</h2>
+            <p id="company-showcase-tagline">Solusi Bisnis & Operasional UMKM</p>
+            <span class="status-pill status-active company-status-badge">🟢 Sistem Operasional Aktif</span>
           </div>
+
+          <div class="company-showcase-features">
+            <div class="showcase-feature-card">
+              <span class="feature-icon icon-pos">🛒</span>
+              <div>
+                <strong>POS Kasir & Transaksi</strong>
+                <small>Kasir online, cetak struk, & QRIS</small>
+              </div>
+            </div>
+            <div class="showcase-feature-card">
+              <span class="feature-icon icon-stock">📦</span>
+              <div>
+                <strong>Stok & Inventaris</strong>
+                <small>Kontrol stok bahan & produk</small>
+              </div>
+            </div>
+            <div class="showcase-feature-card">
+              <span class="feature-icon icon-reports">📊</span>
+              <div>
+                <strong>Laporan Laba Rugi</strong>
+                <small>Analisis penjualan real-time</small>
+              </div>
+            </div>
+            <div class="showcase-feature-card">
+              <span class="feature-icon icon-outlet">🏪</span>
+              <div>
+                <strong>Multi-Outlet</strong>
+                <small>Manajemen banyak cabang</small>
+              </div>
+            </div>
+            <div class="showcase-feature-card">
+              <span class="feature-icon icon-team">👥</span>
+              <div>
+                <strong>Tim & Akses Role</strong>
+                <small>Hak akses kasir, kitchen & manager</small>
+              </div>
+            </div>
+            <div class="showcase-feature-card">
+              <span class="feature-icon icon-menu">☕</span>
+              <div>
+                <strong>Katalog Menu</strong>
+                <small>Varian produk & resep resep</small>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2-Column Main Row — central login only (Slideshow & SaaS Plans) -->
+        <div class="login-main-row" id="login-main-row">
+          <!-- Left Column: App Preview Slideshow -->
+          <div class="app-preview-slideshow" id="app-preview-slideshow">
+            <div class="slideshow-track" id="slideshow-track">
+              <div class="slide-item">
+                <div class="slide-img-wrap">
+                  <img src="assets/slides/slide-dashboard.png" alt="Dashboard Bisnis & Performa Sales" />
+                  <span class="slide-zoom-hint">🔍 Klik untuk perbesar</span>
+                </div>
+                <div class="slide-caption">
+                  <strong>Dashboard Performa Bisnis</strong>
+                  <p>Pantau omzet real-time, grafik penjualan, dan analisis performa outlet secara langsung.</p>
+                </div>
+              </div>
+              <div class="slide-item">
+                <div class="slide-img-wrap">
+                  <img src="assets/slides/slide-pos.png" alt="POS Kasir Online & Transaksi Quick Checkout" />
+                  <span class="slide-zoom-hint">🔍 Klik untuk perbesar</span>
+                </div>
+                <div class="slide-caption">
+                  <strong>POS Kasir & Transaksi Cepat</strong>
+                  <p>Interface kasir yang intuitif, mendukung QRIS, cetak struk, dan varian modifier menu.</p>
+                </div>
+              </div>
+              <div class="slide-item">
+                <div class="slide-img-wrap">
+                  <img src="assets/slides/slide-inventory.png" alt="Kontrol Stok Bahan Baku & Inventory Control" />
+                  <span class="slide-zoom-hint">🔍 Klik untuk perbesar</span>
+                </div>
+                <div class="slide-caption">
+                  <strong>Kontrol Stok & Bahan Baku</strong>
+                  <p>Manajemen stok bahan otomatis berkurang tiap transaksi kasir dengan peringatan stok minim.</p>
+                </div>
+              </div>
+              <div class="slide-item">
+                <div class="slide-img-wrap">
+                  <img src="assets/slides/slide-reports.png" alt="Laporan Keuangan & Laba Rugi Otomatis" />
+                  <span class="slide-zoom-hint">🔍 Klik untuk perbesar</span>
+                </div>
+                <div class="slide-caption">
+                  <strong>Laporan Keuangan & Laba Rugi</strong>
+                  <p>Laporan penjualan harian, rekapitulasi shift kasir, dan perhitungan HPP serta profit margin.</p>
+                </div>
+              </div>
+              <div class="slide-item">
+                <div class="slide-img-wrap">
+                  <img src="assets/slides/slide-menu.png" alt="Pemesanan Mandiri / Customer Online Order" />
+                  <span class="slide-zoom-hint">🔍 Klik untuk perbesar</span>
+                </div>
+                <div class="slide-caption">
+                  <strong>Menu Order Online Pelanggan</strong>
+                  <p>Pelanggan dapat scan QR di meja untuk memesan makanan & minuman secara mandiri.</p>
+                </div>
+              </div>
+            </div>
+            <div class="slideshow-nav">
+              <div class="slideshow-dots">
+                <button type="button" class="slide-dot active" data-slide="0" aria-label="Slide 1"></button>
+                <button type="button" class="slide-dot" data-slide="1" aria-label="Slide 2"></button>
+                <button type="button" class="slide-dot" data-slide="2" aria-label="Slide 3"></button>
+                <button type="button" class="slide-dot" data-slide="3" aria-label="Slide 4"></button>
+                <button type="button" class="slide-dot" data-slide="4" aria-label="Slide 5"></button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Right Column: SaaS Subscription Plan Cards Showcase -->
+          <div class="saas-subscription-showcase" id="saas-subscription-showcase">
+            <div class="saas-badge-title">
+              <span class="pulse-dot"></span>
+              <strong>SaaS Multi-Tenant Plans</strong>
+            </div>
+            <div class="saas-plan-cards" id="saas-plan-cards"></div>
+            <div class="saas-expiration-notice">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16" style="flex-shrink:0;"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              <span><strong>Expire Management:</strong> Lisensi tenant yang melewati batas tanggal masa aktif akan secara otomatis dibatasi aksesnya.</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tenant List / Mitra Bisnis — central login only -->
+        <div class="tenant-login-panel" id="tenant-login-panel">
+          <span class="hero-kicker" style="width: fit-content; display: inline-block;">MITRA BISNIS</span>
           <div class="tenant-login-grid" id="tenant-login-list"></div>
         </div>
       </section>
@@ -71,17 +172,173 @@
       <section class="login-card">
         <form id="login-form">
           <div>
-            <span class="hero-kicker">Login</span>
-            <h3>Masuk ke aplikasi</h3>
+            <span class="hero-kicker" id="form-hero-kicker">PORTAL IF INSTRUMENT</span>
+            <h3 id="form-hero-title">Masuk ke akun Admin pusat</h3>
           </div>
-          <label>Email <input id="login-email" autocomplete="username" required type="email" /></label>
-          <label>Password <input id="login-password" autocomplete="current-password" required type="password" /></label>
-          <p class="form-preview" id="login-preview">Login menggunakan email dan password user.</p>
+          <label>Email <input id="login-email" autocomplete="username" placeholder="email@bisnisanda.com" required type="email" /></label>
+          <label>Password
+            <div class="password-field-wrapper">
+              <input id="login-password" autocomplete="current-password" required type="password" />
+              <button class="password-toggle-btn" id="toggle-login-password" type="button" aria-label="Tampilkan password" title="Tampilkan password">
+                <svg class="eye-icon eye-open" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+                <svg class="eye-icon eye-closed" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.52 13.52 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" y1="2" x2="22" y2="22"/></svg>
+              </button>
+            </div>
+          </label>
+          <div style="text-align: right; margin-top: 4px; margin-bottom: 8px;">
+            <a href="#" id="btn-open-forgot-modal" style="font-size: 12px; color: var(--brand, #3B1F8C); font-weight: 700; text-decoration: none;">Lupa Password?</a>
+          </div>
+          <p class="form-preview" id="login-preview" hidden></p>
           <button class="primary-button full" type="submit">Masuk</button>
+
+          <div id="central-register-prompt-container" style="margin-top: 14px; text-align: center; border-top: 1px dashed var(--line); padding-top: 14px;">
+            <p style="margin: 0 0 8px; font-size: 13px; color: var(--muted);">Ingin mendaftarkan Perusahaan Baru?</p>
+            <button class="ghost-button full" id="btn-open-register-modal" type="button" style="border-color: var(--brand); color: var(--brand); font-weight: 800;">+ Register Perusahaan Baru</button>
+          </div>
+
+          <div id="company-public-order-container" style="margin-top: 14px; text-align: center; border-top: 1px dashed var(--line); padding-top: 14px;" hidden>
+            <p style="margin: 0 0 8px; font-size: 13px; color: var(--muted);">Ingin memesan makanan / minuman?</p>
+            <a id="btn-company-public-order" href="#" class="primary-button full" style="display: inline-block; background: #059669; border-color: #059669; font-weight: 800; text-decoration: none;">📱 Menu Order Online Pelanggan →</a>
+          </div>
+
           <p class="form-feedback" id="login-feedback" role="status"></p>
         </form>
       </section>
     </main>
-    <script type="module" src="scripts/pages/login.js?v=1784794256"></script>
+
+    <!-- Modal Register Perusahaan Baru -->
+    <div class="modal-backdrop" id="register-modal-backdrop" hidden>
+      <div class="modal-container">
+        <section class="modal-dialog" id="public-register-modal" aria-modal="true" role="dialog" aria-labelledby="register-modal-title" style="max-width: 680px;" hidden>
+          <header class="modal-header">
+            <div>
+              <span class="hero-kicker">Pendaftaran Perusahaan</span>
+              <h3 id="register-modal-title">Register Perusahaan & Langganan SaaS</h3>
+              <p>Daftarkan perusahaan Anda, tentukan paket subscription, dan unggah bukti pembayaran.</p>
+            </div>
+            <button class="icon-button" id="btn-close-register-modal" type="button" aria-label="Tutup modal">x</button>
+          </header>
+
+          <form class="form-grid input-workflow two-column-form" id="public-register-form">
+            <label class="full-row">Pilih Paket Subscription SaaS
+              <select id="reg-subscription-plan" required style="font-weight: 700; color: var(--brand);"></select>
+            </label>
+
+            <!-- Plan Price Summary Banner -->
+            <div class="full-row" id="reg-plan-price-summary" style="background: var(--brand-soft, #ede9f9); border: 1px solid rgba(var(--brand-rgb, 59, 31, 140), 0.2); border-radius: 8px; padding: 10px 14px; font-size: 13px; font-weight: 700; color: var(--brand-strong, #3B1F8C); display: flex; justify-content: space-between; align-items: center;">
+              <span>Paket Terpilih: <strong id="reg-summary-plan-name">Starter Plan</strong></span>
+              <span id="reg-summary-plan-price" style="font-size: 14px; font-weight: 800;">Rp 150.000 / th</span>
+            </div>
+
+            <label class="full-row">Nama Perusahaan <input id="reg-company-name" placeholder="misal: Kopi Kenangan Jaya" required type="text" /></label>
+
+            <label class="logo-upload-field">Upload Logo Perusahaan
+              <input id="reg-company-logo-url" type="hidden" />
+              <span class="logo-upload-control">
+                <span class="logo-preview" id="reg-company-logo-preview">Logo</span>
+                <input id="reg-company-logo-file" accept="image/png,image/jpeg,image/webp" type="file" />
+              </span>
+            </label>
+
+            <label>Pilihan Warna Tema Perusahaan
+              <div style="display: flex; align-items: center; gap: 8px; margin-top: 4px;">
+                <input id="reg-theme-color" type="color" value="#3B1F8C" style="width: 44px; height: 38px; border: 1px solid var(--line); border-radius: 6px; cursor: pointer; padding: 2px;" />
+                <div class="preset-theme-swatches" style="display: flex; gap: 6px;">
+                  <button type="button" class="theme-preset-btn" data-color="#3B1F8C" style="background:#3B1F8C; width:24px; height:24px; border-radius:50%; border:2px solid #fff; box-shadow:0 0 0 1px #ccc; cursor:pointer;" title="Deep Purple"></button>
+                  <button type="button" class="theme-preset-btn" data-color="#4F46E5" style="background:#4F46E5; width:24px; height:24px; border-radius:50%; border:2px solid #fff; box-shadow:0 0 0 1px #ccc; cursor:pointer;" title="Indigo"></button>
+                  <button type="button" class="theme-preset-btn" data-color="#0284C7" style="background:#0284C7; width:24px; height:24px; border-radius:50%; border:2px solid #fff; box-shadow:0 0 0 1px #ccc; cursor:pointer;" title="Ocean Blue"></button>
+                  <button type="button" class="theme-preset-btn" data-color="#059669" style="background:#059669; width:24px; height:24px; border-radius:50%; border:2px solid #fff; box-shadow:0 0 0 1px #ccc; cursor:pointer;" title="Emerald"></button>
+                  <button type="button" class="theme-preset-btn" data-color="#D97706" style="background:#D97706; width:24px; height:24px; border-radius:50%; border:2px solid #fff; box-shadow:0 0 0 1px #ccc; cursor:pointer;" title="Amber"></button>
+                  <button type="button" class="theme-preset-btn" data-color="#DC2626" style="background:#DC2626; width:24px; height:24px; border-radius:50%; border:2px solid #fff; box-shadow:0 0 0 1px #ccc; cursor:pointer;" title="Crimson"></button>
+                </div>
+              </div>
+            </label>
+
+            <label>Nama Admin Perusahaan <input id="reg-admin-name" placeholder="Nama lengkap admin" required type="text" /></label>
+            <label>Email Admin <input id="reg-admin-email" placeholder="admin@perusahaan.com" required type="email" /></label>
+
+            <div class="full-row" id="reg-payment-section" style="background: #f8fafc; border: 1px solid var(--line); border-radius: 8px; padding: 14px; margin-top: 4px;">
+              <span style="display: block; font-size: 12px; font-weight: 800; color: var(--brand); text-transform: uppercase; margin-bottom: 8px;">💳 Rekening Pembayaran SaaS Central</span>
+              <div id="reg-payment-accounts-list" style="margin-bottom: 12px; display: flex; flex-direction: column; gap: 6px;"></div>
+
+              <label class="logo-upload-field" style="margin: 0;">Upload Bukti Pembayaran / Transfer (Gambar / Resi)
+                <input id="reg-payment-proof-url" type="hidden" />
+                <span class="logo-upload-control" style="margin-top: 6px;">
+                  <span class="logo-preview" id="reg-payment-proof-preview" style="width: 80px; height: 50px; font-size: 10px; border-radius: 6px;">Bukti</span>
+                  <input id="reg-payment-proof-file" accept="image/png,image/jpeg,image/webp" type="file" />
+                </span>
+              </label>
+            </div>
+
+            <p class="form-feedback full-row" id="register-feedback"></p>
+
+            <div class="modal-actions full-row">
+              <button class="ghost-button" id="btn-cancel-register" type="button">Batal</button>
+              <button class="primary-button" type="submit">Kirim Pendaftaran & Bukti Bayar</button>
+            </div>
+          </form>
+        </section>
+      </div>
+    </div>
+
+    <!-- Modal Wajib Ganti Password -->
+    <div class="modal-backdrop" id="password-change-modal-backdrop" hidden>
+      <div class="modal-container">
+        <section class="modal-dialog" id="must-change-password-modal" style="max-width: 480px;" hidden>
+          <header class="modal-header">
+            <div>
+              <span class="hero-kicker" style="color: #ef4444;">Wajib Ganti Password</span>
+              <h3>Ganti Password Pertama Kali</h3>
+              <p>Anda menggunakan password sementara. Wajib membuat password baru sebelum masuk ke aplikasi.</p>
+            </div>
+          </header>
+          <form id="must-change-password-form" class="form-grid">
+            <input id="pwd-change-email" type="hidden" />
+            <label>Password Sementara <input id="pwd-change-current" required type="password" /></label>
+            <label>Password Baru <input id="pwd-change-new" minlength="8" placeholder="Minimal 8 karakter" required type="password" /></label>
+            <label>Konfirmasi Password Baru <input id="pwd-change-confirm" minlength="8" required type="password" /></label>
+            <p class="form-feedback" id="pwd-change-feedback"></p>
+            <div class="modal-actions">
+              <button class="primary-button full" type="submit">Simpan & Perbarui Password</button>
+            </div>
+          </form>
+        </section>
+      </div>
+    </div>
+
+    <!-- Modal Lupa Password -->
+    <div class="modal-backdrop" id="forgot-modal-backdrop" hidden>
+      <div class="modal-container">
+        <section class="modal-dialog" id="forgot-password-modal" aria-modal="true" role="dialog" aria-labelledby="forgot-modal-title" style="max-width: 440px;" hidden>
+          <header class="modal-header">
+            <div>
+              <span class="hero-kicker">Reset Password</span>
+              <h3 id="forgot-modal-title">Lupa Password</h3>
+              <p>Masukkan email terdaftar Anda untuk menerima password sementara baru.</p>
+            </div>
+            <button class="icon-button" id="btn-close-forgot-modal" type="button" aria-label="Tutup modal">x</button>
+          </header>
+
+          <form id="forgot-password-form" style="padding: 16px 20px; display: flex; flex-direction: column; gap: 14px;">
+            <label>Email Terdaftar
+              <input id="forgot-email" autocomplete="email" placeholder="email@bisnisanda.com" required type="email" style="width: 100%; margin-top: 4px;" />
+            </label>
+            <p class="form-feedback" id="forgot-feedback" role="status"></p>
+            <div class="modal-actions" style="margin-top: 8px; display: flex; justify-content: flex-end; gap: 8px;">
+              <button class="ghost-button" id="btn-cancel-forgot-modal" type="button">Batal</button>
+              <button class="primary-button" type="submit" style="font-weight: 700;">🔑 Kirim Password Sementara</button>
+            </div>
+          </form>
+        </section>
+      </div>
+    </div>
+
+    <!-- Lightbox overlay for slide image full-view -->
+    <div id="slide-lightbox" class="hidden" role="dialog" aria-modal="true" aria-label="Preview Aplikasi">
+      <button id="slide-lightbox-close" aria-label="Tutup preview">✕</button>
+      <img id="slide-lightbox-img" src="" alt="Preview" />
+    </div>
+
+    <script type="module" src="scripts/pages/login.js"></script>
   </body>
 </html>

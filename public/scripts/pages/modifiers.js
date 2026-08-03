@@ -1,11 +1,11 @@
-import { renderLayout } from "../layout.js?v=1784794256";
-import { apiDelete, apiPost, apiPut, applyPermissionControls, canAccessAllOutlets, canManageCompanyMasters, canUsePermission, loadSession, loadState, primaryOutletId, scopedPayload, stampScopedMaster, visibleForSession } from "../store.js?v=1784794256";
+import { renderLayout } from "../layout.js";
+import { apiDelete, apiPost, apiPut, applyPermissionControls, canAccessAllOutlets, canManageCompanyMasters, canUsePermission, loadSession, loadState, primaryOutletId, scopedPayload, stampScopedMaster, visibleForSession } from "../store.js";
 import { formatQty, money } from "../format.js";
 import { byId, setText, showAlert } from "../dom.js";
 import { ingredientName, missingModifierOptions, missingModifierSummary } from "../inventory.js";
 import { enhanceAllDataTables } from "../datatable.js";
 import { COMMON_STATUS, isInactiveStatus } from "../status-codes.js";
-import { loadPageBootstrap } from "../page-engine.js?v=1784794256";
+import { loadPageBootstrap } from "../page-engine.js";
 
 renderLayout();
 

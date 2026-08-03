@@ -9,6 +9,13 @@ class StatusCodeService
     public const INACTIVE = '90';
     public const DELETED = '99';
 
+    public const COMPANY_PENDING_APPROVAL = 'PENDING_APPROVAL';
+    public const COMPANY_ACTIVE = 'ACTIVE';
+    public const COMPANY_REJECTED = 'REJECTED';
+
+    public const TENANT_NOT_CREATED = 'NOT_CREATED';
+    public const TENANT_CREATED = 'CREATED';
+
     public const PAYMENT_UNPAID = '00';
     public const PAYMENT_PAID = '10';
     public const PAYMENT_FAILED = '20';

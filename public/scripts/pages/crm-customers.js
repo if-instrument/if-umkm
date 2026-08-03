@@ -1,5 +1,5 @@
-import { renderLayout } from "../layout.js?v=1784794256";
-import { apiDelete, apiGet, apiPost, apiPut, applyPermissionControls, canUsePermission, loadSession, loadState, scopedApiUrl, scopedPayload } from "../store.js?v=1784794256";
+import { renderLayout } from "../layout.js";
+import { apiDelete, apiGet, apiPost, apiPut, applyPermissionControls, canUsePermission, loadSession, loadState, scopedApiUrl, scopedPayload } from "../store.js";
 import { byId, showAlert, showFeedback } from "../dom.js";
 import { isActiveStatus, statusLabel } from "../status-codes.js";
 

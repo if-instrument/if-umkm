@@ -61,12 +61,116 @@ class AccessController extends BaseController
         }
     }
 
+    public function uploadPaymentProof()
+    {
+        try {
+            $file = $this->request->getFile('file');
+            if (! $file || ! $file->isValid()) {
+                throw new \InvalidArgumentException('Berkas bukti pembayaran tidak valid.');
+            }
+            $targetDir = FCPATH . 'uploads/payments/';
+            if (! is_dir($targetDir)) {
+                mkdir($targetDir, 0755, true);
+            }
+            $newName = 'payment_' . time() . '_' . $file->getRandomName();
+            $file->move($targetDir, $newName);
+            $url = '/uploads/payments/' . $newName;
+
+            return $this->response->setJSON(['ok' => true, 'url' => $url, 'paymentProofUrl' => $url]);
+        } catch (\Throwable $exception) {
+            return $this->response->setStatusCode(422)->setJSON(['ok' => false, 'message' => $exception->getMessage()]);
+        }
+    }
+
+    public function approveCompany(string $id)
+    {
+        try {
+            return $this->response->setJSON(['ok' => true, 'data' => $this->access->approveCompany($id)]);
+        } catch (\Throwable $exception) {
+            return $this->response->setStatusCode(422)->setJSON(['ok' => false, 'message' => $exception->getMessage()]);
+        }
+    }
+
+    public function rejectCompany(string $id)
+    {
+        try {
+            $notes = (string) ($this->payload()['notes'] ?? '');
+            return $this->response->setJSON(['ok' => true, 'data' => $this->access->rejectCompany($id, $notes)]);
+        } catch (\Throwable $exception) {
+            return $this->response->setStatusCode(422)->setJSON(['ok' => false, 'message' => $exception->getMessage()]);
+        }
+    }
+
     public function resendCompanyAdminInvitation(string $id)
     {
         try {
             $companyId = $this->numericCompanyId($id);
             $this->validateScope($companyId, -1);
             return $this->jsonAction(fn () => $this->access->resendCompanyAdminInvitation($id));
+        } catch (\Throwable $exception) {
+            return $this->response->setStatusCode(422)->setJSON(['ok' => false, 'message' => $exception->getMessage()]);
+        }
+    }
+
+    public function listSaasPlans()
+    {
+        return $this->response->setJSON(['ok' => true, 'data' => $this->access->saasPlans()]);
+    }
+
+    public function saveSaasPlan()
+    {
+        try {
+            return $this->response->setJSON(['ok' => true, 'data' => $this->access->saveSaasPlan($this->payload())]);
+        } catch (\Throwable $exception) {
+            return $this->response->setStatusCode(422)->setJSON(['ok' => false, 'message' => $exception->getMessage()]);
+        }
+    }
+
+    public function updateSaasPlan(string $id)
+    {
+        try {
+            return $this->response->setJSON(['ok' => true, 'data' => $this->access->saveSaasPlan(['id' => $id] + $this->payload())]);
+        } catch (\Throwable $exception) {
+            return $this->response->setStatusCode(422)->setJSON(['ok' => false, 'message' => $exception->getMessage()]);
+        }
+    }
+
+    public function deleteSaasPlan(string $id)
+    {
+        try {
+            return $this->response->setJSON(['ok' => true, 'data' => $this->access->deactivateSaasPlan($id)]);
+        } catch (\Throwable $exception) {
+            return $this->response->setStatusCode(422)->setJSON(['ok' => false, 'message' => $exception->getMessage()]);
+        }
+    }
+
+    public function listCentralPaymentAccounts()
+    {
+        return $this->response->setJSON(['ok' => true, 'data' => $this->access->centralPaymentAccounts()]);
+    }
+
+    public function saveCentralPaymentAccount()
+    {
+        try {
+            return $this->response->setJSON(['ok' => true, 'data' => $this->access->saveCentralPaymentAccount($this->payload())]);
+        } catch (\Throwable $exception) {
+            return $this->response->setStatusCode(422)->setJSON(['ok' => false, 'message' => $exception->getMessage()]);
+        }
+    }
+
+    public function updateCentralPaymentAccount(string $id)
+    {
+        try {
+            return $this->response->setJSON(['ok' => true, 'data' => $this->access->saveCentralPaymentAccount(['id' => $id] + $this->payload())]);
+        } catch (\Throwable $exception) {
+            return $this->response->setStatusCode(422)->setJSON(['ok' => false, 'message' => $exception->getMessage()]);
+        }
+    }
+
+    public function deleteCentralPaymentAccount(string $id)
+    {
+        try {
+            return $this->response->setJSON(['ok' => true, 'data' => $this->access->deactivateCentralPaymentAccount($id)]);
         } catch (\Throwable $exception) {
             return $this->response->setStatusCode(422)->setJSON(['ok' => false, 'message' => $exception->getMessage()]);
         }

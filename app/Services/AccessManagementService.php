@@ -22,6 +22,12 @@ class AccessManagementService
         $userRoles = $db->tableExists('user_roles') ? $db->table('user_roles')->get()->getResultArray() : [];
         $userOutlets = $db->tableExists('user_outlets') ? $db->table('user_outlets')->get()->getResultArray() : [];
 
+        $saasPlans = $this->saasPlans();
+        $saasPlansMap = [];
+        foreach ($saasPlans as $plan) {
+            $saasPlansMap[strtolower($plan['code'])] = $plan;
+        }
+
         return [
             'activeCompanyId' => 'company-main',
             'companies' => array_map(fn ($row) => [
@@ -39,7 +45,19 @@ class AccessManagementService
                 'adminEmail' => $this->companyAdmin($row, $users)['email'] ?? 'admin@company.id',
                 'adminUserId' => isset($this->companyAdmin($row, $users)['id']) ? $this->userCode($this->companyAdmin($row, $users)) : '',
                 'adminStatus' => StatusCodeService::common($this->companyAdmin($row, $users)['status'] ?? 'inactive', StatusCodeService::INACTIVE),
-                'status' => StatusCodeService::common($row['status'] ?? ''),
+                'subscriptionPlan' => $row['subscription_plan'] ?? 'Professional',
+                'expiresAt' => $this->resolveCompanyExpiresAt($row, $saasPlansMap),
+                'maxOutlets' => (int) ($row['max_outlets'] ?? ($saasPlansMap[strtolower($row['subscription_plan'] ?? 'professional')]['maxOutlets'] ?? 5)),
+                'createdAt' => $row['created_at'] ?? '',
+                'paymentProofUrl' => $row['payment_proof_path'] ?? '',
+                'paymentStatus' => $row['payment_status'] ?? '10',
+                'paymentNotes' => $row['payment_notes'] ?? '',
+                'tenantStatus' => $row['tenant_status'] ?? ($row['db_name'] ? 'CREATED' : 'NOT_CREATED'),
+                'status' => (function($s) {
+                    // Normalize legacy string statuses to numeric codes
+                    $map = ['ACTIVE' => '10', 'REJECTED' => '90', 'PENDING_APPROVAL' => '00', 'INACTIVE' => '90'];
+                    return $map[strtoupper((string)$s)] ?? ($s ?? '00');
+                })($row['status'] ?? '00'),
             ], $companies),
             'outlets' => array_map(fn ($row) => [
                 'id' => $this->outletCode((int) $row['id']),
@@ -51,7 +69,113 @@ class AccessManagementService
             ], $outlets),
             'companyRoles' => array_map(fn ($row) => $this->rolePayload($row), $roles),
             'users' => array_map(fn ($row) => $this->userPayload($row, $roles, $userRoles, $userOutlets), $users),
+            'saasPlans' => $saasPlans,
+            'centralPaymentAccounts' => $this->centralPaymentAccounts(),
         ];
+    }
+
+    private function resolveCompanyExpiresAt(array $row, array $saasPlansMap): ?string
+    {
+        if (! empty($row['expires_at'])) {
+            return $row['expires_at'];
+        }
+        $planCode = strtolower(trim((string) ($row['subscription_plan'] ?? 'Professional')));
+        $durationDays = $saasPlansMap[$planCode]['durationDays'] ?? 365;
+        if ($durationDays <= 0) {
+            return null;
+        }
+
+        $createdAtStr = ! empty($row['created_at']) ? $row['created_at'] : date('Y-m-d H:i:s');
+        $createdAtTime = strtotime($createdAtStr);
+        $expiresTime = strtotime("+{$durationDays} days", $createdAtTime);
+        $expiresDate = date('Y-m-d', $expiresTime);
+
+        if (! empty($row['id'])) {
+            Database::connect()->table('companies')->where('id', (int) $row['id'])->update(['expires_at' => $expiresDate]);
+        }
+
+        return $expiresDate;
+    }
+
+    public function saasPlans(): array
+    {
+        try {
+            $db = Database::connect();
+            if ($db->tableExists('saas_plans')) {
+                $rows = $db->table('saas_plans')->orderBy('id')->get()->getResultArray();
+                if (! empty($rows)) {
+                    return array_map(fn ($row) => [
+                        'id' => (string) $row['id'],
+                        'code' => (string) $row['code'],
+                        'name' => (string) $row['name'],
+                        'price' => (float) ($row['price'] ?? 0),
+                        'maxOutlets' => (int) ($row['max_outlets'] ?? 5),
+                        'durationDays' => (int) ($row['duration_days'] ?? 365),
+                        'description' => (string) ($row['description'] ?? ''),
+                        'isFeatured' => (bool) ($row['is_featured'] ?? false),
+                        'status' => (string) ($row['status'] ?? '10'),
+                    ], $rows);
+                }
+            }
+        } catch (\Throwable $exception) {
+            // Fall back to default server plans
+        }
+
+        return [
+            ['id' => '1', 'code' => 'Starter', 'name' => 'Starter Plan', 'price' => 150000, 'maxOutlets' => 3, 'durationDays' => 90, 'description' => 'Masa aktif langganan standar 90 hari dengan batas kuota 3 outlet.', 'isFeatured' => false, 'status' => '10'],
+            ['id' => '2', 'code' => 'Professional', 'name' => 'Professional Plan', 'price' => 350000, 'maxOutlets' => 10, 'durationDays' => 365, 'description' => 'Lisensi penuh 1 tahun, multi-outlet, CRM, inventory sync, & payment gateway.', 'isFeatured' => true, 'status' => '10'],
+            ['id' => '3', 'code' => 'Enterprise', 'name' => 'Enterprise Plan', 'price' => 750000, 'maxOutlets' => 999, 'durationDays' => 0, 'description' => 'Akses unlimited outlet, dedicated tenant DB, & prioritas support 24/7.', 'isFeatured' => false, 'status' => '10'],
+        ];
+    }
+
+    public function saveSaasPlan(array $payload): array
+    {
+        $db = Database::connect();
+        if (! $db->tableExists('saas_plans')) {
+            $migrator = new \App\Database\Migrations\CreateSaasPlansSchema();
+            $migrator->up();
+        }
+
+        $code = trim((string) ($payload['code'] ?? $payload['name'] ?? 'Plan'));
+        $code = preg_replace('/[^A-Za-z0-9_-]/', '', $code) ?: 'Plan_' . time();
+        $name = trim((string) ($payload['name'] ?? $code));
+        $price = max(0, (float) ($payload['price'] ?? 0));
+        $maxOutlets = max(1, (int) ($payload['maxOutlets'] ?? 5));
+        $durationDays = max(0, (int) ($payload['durationDays'] ?? 365));
+        $description = trim((string) ($payload['description'] ?? ''));
+        $isFeatured = ! empty($payload['isFeatured']) ? 1 : 0;
+        $status = StatusCodeService::common($payload['status'] ?? 'active');
+
+        $row = [
+            'code' => $code,
+            'name' => $name,
+            'price' => $price,
+            'max_outlets' => $maxOutlets,
+            'duration_days' => $durationDays,
+            'description' => $description,
+            'is_featured' => $isFeatured,
+            'status' => $status,
+            'updated_at' => date('Y-m-d H:i:s'),
+        ];
+
+        $id = (int) ($payload['id'] ?? 0);
+        if ($id > 0) {
+            $db->table('saas_plans')->where('id', $id)->update($row);
+        } else {
+            $row['created_at'] = date('Y-m-d H:i:s');
+            $db->table('saas_plans')->insert($row);
+        }
+
+        return $this->saasPlans();
+    }
+
+    public function deactivateSaasPlan(string $id): array
+    {
+        $db = Database::connect();
+        if ($db->tableExists('saas_plans')) {
+            $db->table('saas_plans')->where('id', (int) $id)->update(['status' => '90', 'updated_at' => date('Y-m-d H:i:s')]);
+        }
+        return $this->saasPlans();
     }
 
     public function saveCompany(array $payload): array
@@ -77,6 +201,9 @@ class AccessManagementService
             'tagline' => 'UMKM Solution',
             'logo_path' => trim((string) ($payload['logoUrl'] ?? '')),
             'theme_color' => $payload['themeColor'] ?? '#6e3a16',
+            'subscription_plan' => trim((string) ($payload['subscriptionPlan'] ?? 'Professional')),
+            'expires_at' => trim((string) ($payload['expiresAt'] ?? '')) ?: null,
+            'max_outlets' => (int) ($payload['maxOutlets'] ?? 5),
             'status' => StatusCodeService::common($payload['status'] ?? 'active'),
         ];
         if ($id) {
@@ -108,6 +235,494 @@ class AccessManagementService
         $id = $this->numericId($legacyId);
         if ($id) (new CompanyModel())->update($id, ['status' => StatusCodeService::INACTIVE]);
         return $this->companyDetail($this->companyCode($id));
+    }
+
+    public function publicRegisterCompany(array $payload): array
+    {
+        $adminName = trim((string) ($payload['adminName'] ?? ''));
+        $adminEmail = strtolower(trim((string) ($payload['adminEmail'] ?? '')));
+        $companyName = trim((string) ($payload['name'] ?? ''));
+        $planCode = trim((string) ($payload['subscriptionPlan'] ?? 'Professional'));
+        $paymentProofUrl = trim((string) ($payload['paymentProofUrl'] ?? ''));
+        $logoUrl = trim((string) ($payload['logoUrl'] ?? ''));
+        $themeColor = trim((string) ($payload['themeColor'] ?? '#3B1F8C')) ?: '#3B1F8C';
+
+        if (! $companyName) throw new \InvalidArgumentException('Nama perusahaan wajib diisi.');
+        if (! filter_var($adminEmail, FILTER_VALIDATE_EMAIL)) throw new \InvalidArgumentException('Email admin perusahaan tidak valid.');
+        if ((new UserModel())->where('email', $adminEmail)->first()) throw new \InvalidArgumentException('Email admin sudah terdaftar.');
+
+        $saasPlans = $this->saasPlans();
+        $selectedPlan = null;
+        foreach ($saasPlans as $p) {
+            if (strtolower($p['code']) === strtolower($planCode)) {
+                $selectedPlan = $p;
+                break;
+            }
+        }
+        $durationDays = $selectedPlan['durationDays'] ?? 365;
+        $maxOutlets = $selectedPlan['maxOutlets'] ?? 5;
+        $expiresAt = $durationDays > 0 ? date('Y-m-d', strtotime("+{$durationDays} days")) : null;
+
+        $db = Database::connect();
+        $db->transStart();
+
+        try {
+            $companyModel = new CompanyModel();
+            $row = [
+                'name' => $companyName,
+                'brand_name' => $companyName,
+                'route_slug' => null, // Slug generated upon approval provisioning
+                'tagline' => 'UMKM Solution',
+                'logo_path' => $logoUrl,
+                'theme_color' => $themeColor,
+                'subscription_plan' => $planCode,
+                'expires_at' => $expiresAt,
+                'max_outlets' => $maxOutlets,
+                'status' => '00',
+                'tenant_status' => 'NOT_CREATED',
+                'payment_proof_path' => $paymentProofUrl,
+                'payment_status' => '00', // Pending verification
+                'payment_notes' => 'Pendaftaran online mandiri. Menunggu persetujuan Super Admin.',
+                'created_at' => date('Y-m-d H:i:s'),
+                'updated_at' => date('Y-m-d H:i:s'),
+            ];
+
+            $companyId = (int) $companyModel->insert($row);
+
+            $userModel = new UserModel();
+            $userId = (int) $userModel->insert([
+                'company_id' => $companyId,
+                'name' => $adminName ?: 'Admin ' . $companyName,
+                'email' => $adminEmail,
+                'password_hash' => password_hash(bin2hex(random_bytes(16)), PASSWORD_DEFAULT), // Temporary placeholder hash until approval
+                'type' => 'company_admin',
+                'status' => '00', // Draft / Pending
+                'must_change_password' => 0,
+                'created_at' => date('Y-m-d H:i:s'),
+                'updated_at' => date('Y-m-d H:i:s'),
+            ]);
+
+            $this->recordAuditLog($companyId, $userId, 'PUBLIC_REGISTRATION_SUBMITTED', "Pendaftaran perusahaan {$companyName} berhasil disimpan dengan status PENDING_APPROVAL.");
+
+            $db->transComplete();
+
+            if ($db->transStatus() === false) {
+                throw new \RuntimeException('Gagal menyimpan data pendaftaran perusahaan.');
+            }
+
+            $companyRow = $companyModel->find($companyId);
+            $userRow = $userModel->find($userId);
+
+            // Step 2: Email to User (Registration received notification, NO password, NO tenant)
+            $this->sendEmail('user_registration_pending', [
+                'company' => $companyRow,
+                'user' => $userRow,
+            ]);
+
+            // Step 3: Email to Super Admin
+            $this->sendEmail('admin_registration_notification', [
+                'company' => $companyRow,
+                'user' => $userRow,
+            ]);
+
+            return [
+                'ok' => true,
+                'message' => 'Pendaftaran perusahaan Anda berhasil diterima! Tim Super Admin akan memverifikasi bukti pembayaran Anda.',
+                'companyId' => $this->companyCode($companyId),
+            ];
+        } catch (\Throwable $ex) {
+            $db->transRollback();
+            throw $ex;
+        }
+    }
+
+    public function publicForgotPassword(array $payload): array
+    {
+        $email = strtolower(trim((string) ($payload['email'] ?? '')));
+        $companySlug = trim((string) ($payload['companySlug'] ?? ''));
+
+        if (! $email || ! filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            throw new \InvalidArgumentException('Alamat email tidak valid.');
+        }
+
+        $userModel = new UserModel();
+        $companyModel = new CompanyModel();
+        $tenantService = new TenantDatabaseService();
+
+        // 1. Locate User
+        $user = $userModel->where('email', $email)->first();
+        if (! $user && $companySlug !== '') {
+            $tenantDb = $tenantService->connectionForCompanySlug($companySlug);
+            if ($tenantDb && $tenantDb->tableExists('users')) {
+                $user = $tenantDb->table('users')->where('email', $email)->get()->getRowArray();
+            }
+        }
+
+        if (! $user) {
+            throw new \InvalidArgumentException('Alamat email tidak terdaftar dalam sistem.');
+        }
+
+        // 2. Generate Temporary Password
+        $tempPassword = 'Tmp' . bin2hex(random_bytes(3)) . '!';
+        $tempHash = password_hash($tempPassword, PASSWORD_DEFAULT);
+        $now = date('Y-m-d H:i:s');
+
+        // 3. Update Central DB User
+        $centralUser = $userModel->where('email', $email)->first();
+        if ($centralUser) {
+            $userModel->update($centralUser['id'], [
+                'password_hash' => $tempHash,
+                'must_change_password' => 1,
+                'updated_at' => $now,
+            ]);
+        }
+
+        // 4. Update Tenant DB User
+        $companyId = (int) ($user['company_id'] ?? 0);
+        $company = $companyId ? $companyModel->find($companyId) : null;
+        if (! $company && $companySlug !== '') {
+            $company = $tenantService->companyBySlug($companySlug);
+        }
+
+        if ($company && ! empty($company['route_slug'])) {
+            $tenantDb = $tenantService->connectionForCompanySlug($company['route_slug']);
+            if ($tenantDb && $tenantDb->tableExists('users')) {
+                $tenantDb->table('users')->where('email', $email)->update([
+                    'password_hash' => $tempHash,
+                    'must_change_password' => 1,
+                    'updated_at' => $now,
+                ]);
+            }
+        }
+
+        // 5. Audit Log & Email
+        $this->recordAuditLog($companyId ?: null, (int) ($user['id'] ?? null), 'PASSWORD_RESET_TEMPORARY_ISSUED', "Password sementara diterbitkan untuk email {$email}.");
+
+        $this->sendEmail('user_forgot_password', [
+            'company' => $company ?: [],
+            'user' => $user,
+            'tempPassword' => $tempPassword,
+        ]);
+
+        return [
+            'ok' => true,
+            'message' => 'Password sementara telah berhasil dibuat dan dikirimkan ke email Anda. Silakan periksa inbox email Anda.',
+        ];
+    }
+
+    public function approveCompany(string $companyId): array
+    {
+        $id = $this->numericId($companyId);
+        if (! $id) throw new \InvalidArgumentException('ID Perusahaan tidak valid.');
+
+        return $this->provisionCompany($id);
+    }
+
+    public function provisionCompany(int $companyId): array
+    {
+        $db = Database::connect();
+        $db->transStart();
+
+        try {
+            $companyModel = new CompanyModel();
+            $company = $companyModel->find($companyId);
+            if (! $company) {
+                throw new \InvalidArgumentException('Data Perusahaan tidak ditemukan.');
+            }
+
+            // 1. Generate unique route slug
+            $slug = $company['route_slug'] ?: $this->generateUniqueCompanySlug($company['name'], $companyId);
+
+            // 2. Resolve tenant DB configuration
+            $tenantProvisioning = new TenantDatabaseProvisioningService();
+            $tenantDbName = $company['db_name'] ?: $tenantProvisioning->databaseNameForSlug($slug);
+            $tenantConfig = $tenantProvisioning->tenantConfig($tenantDbName);
+
+            // 3. Generate Temporary Password
+            $tempPassword = 'Tmp' . bin2hex(random_bytes(3)) . '!';
+
+            // 4. Update Company record
+            $companyUpdate = [
+                'route_slug' => $slug,
+                'status' => '10', // ACTIVE (numeric)
+                'tenant_status' => 'CREATED',
+                'payment_status' => '10', // PAID
+                'payment_notes' => 'Pendaftaran disetujui & tenant berhasil diprovisi oleh Super Admin.',
+                'updated_at' => date('Y-m-d H:i:s'),
+            ] + $tenantConfig;
+            $companyModel->update($companyId, $companyUpdate);
+
+            // 5. Update Admin User in Central DB
+            $userModel = new UserModel();
+            $adminUser = $userModel->where('company_id', $companyId)->first();
+            if (! $adminUser) {
+                $adminUserId = (int) $userModel->insert([
+                    'company_id' => $companyId,
+                    'name' => 'Admin ' . $company['name'],
+                    'email' => strtolower('admin@' . $slug . '.com'),
+                    'password_hash' => password_hash($tempPassword, PASSWORD_DEFAULT),
+                    'type' => 'company_admin',
+                    'status' => '10',
+                    'must_change_password' => 1,
+                    'created_at' => date('Y-m-d H:i:s'),
+                    'updated_at' => date('Y-m-d H:i:s'),
+                ]);
+                $adminUser = $userModel->find($adminUserId);
+            } else {
+                $userModel->update($adminUser['id'], [
+                    'password_hash' => password_hash($tempPassword, PASSWORD_DEFAULT),
+                    'status' => '10',
+                    'must_change_password' => 1,
+                    'updated_at' => date('Y-m-d H:i:s'),
+                ]);
+                $adminUser['password_hash'] = password_hash($tempPassword, PASSWORD_DEFAULT);
+                $adminUser['status'] = '10';
+            }
+
+            // 6. Provision Tenant Database (Run Migrations and Seeders)
+            $companyRow = $companyModel->find($companyId);
+            $tenantProvisioning->provision($tenantDbName, $companyRow, [
+                'name' => $adminUser['name'],
+                'email' => strtolower($adminUser['email']),
+                'password_hash' => password_hash($tempPassword, PASSWORD_DEFAULT),
+                'status' => '10',
+                'must_change_password' => 1,
+            ]);
+
+            // 7. Record Audit Log
+            $this->recordAuditLog($companyId, $adminUser['id'] ?? null, 'APPROVE_COMPANY_PROVISIONING', "Tenant DB {$tenantDbName} berhasil diprovisi dengan slug {$slug}.");
+
+            $db->transComplete();
+
+            if ($db->transStatus() === false) {
+                throw new \RuntimeException('Gagal memproses DB transaction provisioning tenant.');
+            }
+
+            // 8. Send Email Activation to User with Temporary Password
+            $this->sendEmail('user_registration_approved', [
+                'company' => $companyRow,
+                'user' => $adminUser,
+                'tempPassword' => $tempPassword,
+            ]);
+
+            return $this->data();
+        } catch (\Throwable $ex) {
+            $db->transRollback();
+            $this->recordAuditLog($companyId, null, 'PROVISIONING_FAILED', $ex->getMessage());
+            throw $ex;
+        }
+    }
+
+    public function rejectCompany(string $companyId, string $notes = ''): array
+    {
+        $id = $this->numericId($companyId);
+        if (! $id) throw new \InvalidArgumentException('ID Perusahaan tidak valid.');
+
+        $db = Database::connect();
+        $db->transStart();
+
+        $companyModel = new CompanyModel();
+        $company = $companyModel->find($id);
+        if (! $company) throw new \InvalidArgumentException('Data Perusahaan tidak ditemukan.');
+
+        $companyModel->update($id, [
+            'status' => '90', // INACTIVE/REJECTED (numeric)
+            'tenant_status' => 'NOT_CREATED',
+            'payment_status' => '20', // Rejected
+            'payment_notes' => $notes ?: 'Pendaftaran ditolak oleh Super Admin.',
+            'updated_at' => date('Y-m-d H:i:s'),
+        ]);
+
+        $userModel = new UserModel();
+        $adminUser = $userModel->where('company_id', $id)->first();
+        if ($adminUser) {
+            $userModel->update($adminUser['id'], ['status' => '90']);
+        }
+
+        $this->recordAuditLog($id, null, 'REJECT_COMPANY_REGISTRATION', $notes ?: 'Pendaftaran ditolak Super Admin.');
+
+        $db->transComplete();
+
+        if ($adminUser) {
+            $this->sendEmail('user_registration_rejected', [
+                'company' => $company,
+                'user' => $adminUser,
+                'notes' => $notes ?: 'Pendaftaran tidak memenuhi verifikasi bukti pembayaran.',
+            ]);
+        }
+
+        return $this->data();
+    }
+
+    public function recordAuditLog(?int $companyId, ?int $userId, string $action, ?string $details = null): void
+    {
+        try {
+            $db = Database::connect();
+            if ($db->tableExists('audit_logs')) {
+                $db->table('audit_logs')->insert([
+                    'company_id' => $companyId,
+                    'user_id' => $userId,
+                    'action' => $action,
+                    'details' => $details,
+                    'created_at' => date('Y-m-d H:i:s'),
+                ]);
+            }
+        } catch (\Throwable $e) {
+            log_message('error', 'Gagal mencatat audit log: ' . $e->getMessage());
+        }
+    }
+
+    private function sendEmail(string $template, array $data): bool
+    {
+        try {
+            $email = service('email');
+            $fromEmail = (string) (env('email.fromEmail') ?: env('email.SMTPUser') ?: 'noreply@if-instrument.com');
+            $fromName = (string) (env('email.fromName') ?: 'IF Instrument SaaS');
+
+            $company = $data['company'] ?? [];
+            $user = $data['user'] ?? [];
+            $companyName = htmlspecialchars($company['name'] ?? 'Perusahaan', ENT_QUOTES, 'UTF-8');
+            $userName = htmlspecialchars($user['name'] ?? 'Admin', ENT_QUOTES, 'UTF-8');
+            $userEmail = $user['email'] ?? '';
+            $baseUrl = rtrim((string) config('App')->baseURL, '/');
+
+            if ($template === 'user_registration_pending' && $userEmail) {
+                $email->setFrom($fromEmail, $fromName);
+                $email->setTo($userEmail);
+                $email->setSubject("Pendaftaran Perusahaan {$companyName} Berhasil Diterima");
+                $email->setMessage(<<<HTML
+<!doctype html>
+<html><body style="font-family:Arial,sans-serif;color:#1e293b;line-height:1.6">
+  <div style="max-width:600px;margin:0 auto;border:1px solid #e2e8f0;border-radius:8px;padding:24px;background:#ffffff">
+    <h2 style="color:#3b1f8c;margin-top:0">Pendaftaran Diterima</h2>
+    <p>Halo <strong>{$userName}</strong>,</p>
+    <p>Pendaftaran perusahaan <strong>{$companyName}</strong> telah berhasil kami terima.</p>
+    <div style="background:#f8fafc;padding:16px;border-radius:6px;border-left:4px solid #3b1f8c;margin:16px 0">
+      <p style="margin:4px 0"><strong>Status Akun:</strong> PENDING_APPROVAL (Menunggu Verifikasi Admin)</p>
+      <p style="margin:4px 0"><strong>Status Tenant:</strong> NOT_CREATED (Belum Dibuat)</p>
+      <p style="margin:4px 0"><strong>Bukti Pembayaran:</strong> Dalam Pemeriksaan</p>
+    </div>
+    <p>Tim Super Admin kami sedang memeriksa berkas pendaftaran dan bukti pembayaran Anda. Anda akan menerima notifikasi email lanjutan setelah proses verifikasi selesai.</p>
+    <p style="color:#64748b;font-size:13px">Catatan: Password dan akses login tenant belum dibuat pada tahap ini.</p>
+  </div>
+</body></html>
+HTML);
+                return (bool) @$email->send();
+            }
+
+            if ($template === 'admin_registration_notification') {
+                $superAdminEmail = (string) (env('email.adminNotification') ?: env('email.fromEmail') ?: 'superadmin@central.com');
+                $paymentProofUrl = htmlspecialchars($company['payment_proof_path'] ?? '-', ENT_QUOTES, 'UTF-8');
+                $planName = htmlspecialchars($company['subscription_plan'] ?? 'Professional', ENT_QUOTES, 'UTF-8');
+                $approvalUrl = $baseUrl . '/pages/users.html';
+
+                $email->setFrom($fromEmail, $fromName);
+                $email->setTo($superAdminEmail);
+                $email->setSubject("🔔 Pendaftaran Perusahaan Baru: {$companyName}");
+                $email->setMessage(<<<HTML
+<!doctype html>
+<html><body style="font-family:Arial,sans-serif;color:#1e293b;line-height:1.6">
+  <div style="max-width:600px;margin:0 auto;border:1px solid #e2e8f0;border-radius:8px;padding:24px;background:#ffffff">
+    <h2 style="color:#3b1f8c;margin-top:0">Pendaftaran Perusahaan Baru</h2>
+    <p>Terdapat permohonan registrasi perusahaan baru yang memerlukan persetujuan Super Admin:</p>
+    <ul>
+      <li><strong>Nama Perusahaan:</strong> {$companyName}</li>
+      <li><strong>Nama Administrator/PIC:</strong> {$userName}</li>
+      <li><strong>Email:</strong> {$userEmail}</li>
+      <li><strong>Paket Subscription:</strong> {$planName}</li>
+      <li><strong>Bukti Pembayaran:</strong> <a href="{$paymentProofUrl}" target="_blank">Lihat Bukti Bayar</a></li>
+    </ul>
+    <p><a href="{$approvalUrl}" style="display:inline-block;padding:10px 18px;background:#3b1f8c;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:bold">Halaman Approval Admin</a></p>
+  </div>
+</body></html>
+HTML);
+                return (bool) @$email->send();
+            }
+
+            if ($template === 'user_registration_rejected' && $userEmail) {
+                $notes = htmlspecialchars($data['notes'] ?? 'Persyaratan belum terpenuhi.', ENT_QUOTES, 'UTF-8');
+                $email->setFrom($fromEmail, $fromName);
+                $email->setTo($userEmail);
+                $email->setSubject("Pendaftaran Perusahaan {$companyName} Ditolak");
+                $email->setMessage(<<<HTML
+<!doctype html>
+<html><body style="font-family:Arial,sans-serif;color:#1e293b;line-height:1.6">
+  <div style="max-width:600px;margin:0 auto;border:1px solid #e2e8f0;border-radius:8px;padding:24px;background:#ffffff">
+    <h2 style="color:#ef4444;margin-top:0">Pendaftaran Ditolak</h2>
+    <p>Halo <strong>{$userName}</strong>,</p>
+    <p>Mohon maaf, pendaftaran perusahaan <strong>{$companyName}</strong> belum dapat kami setujui.</p>
+    <div style="background:#fef2f2;padding:16px;border-radius:6px;border-left:4px solid #ef4444;margin:16px 0">
+      <p style="margin:0"><strong>Alasan Penolakan:</strong> {$notes}</p>
+    </div>
+    <p>Silakan melakukan pendaftaran ulang atau perbaiki data/bukti pembayaran melalui portal pendaftaran.</p>
+  </div>
+</body></html>
+HTML);
+                return (bool) @$email->send();
+            }
+
+            if ($template === 'user_registration_approved' && $userEmail) {
+                $slug = htmlspecialchars($company['route_slug'] ?? '', ENT_QUOTES, 'UTF-8');
+                $tempPassword = htmlspecialchars($data['tempPassword'] ?? '', ENT_QUOTES, 'UTF-8');
+                $loginUrl = $baseUrl . '/' . $slug . '/login';
+
+                $email->setFrom($fromEmail, $fromName);
+                $email->setTo($userEmail);
+                $email->setSubject("🎉 Selamat! Perusahaan {$companyName} Telah Aktif");
+                $email->setMessage(<<<HTML
+<!doctype html>
+<html><body style="font-family:Arial,sans-serif;color:#1e293b;line-height:1.6">
+  <div style="max-width:600px;margin:0 auto;border:1px solid #e2e8f0;border-radius:8px;padding:24px;background:#ffffff">
+    <h2 style="color:#10b981;margin-top:0">Perusahaan & Tenant Berhasil Aktif</h2>
+    <p>Halo <strong>{$userName}</strong>,</p>
+    <p>Selamat! Pendaftaran perusahaan <strong>{$companyName}</strong> telah disetujui dan tenant database Anda telah berhasil dibuat.</p>
+    <div style="background:#f0fdf4;padding:16px;border-radius:6px;border-left:4px solid #10b981;margin:16px 0">
+      <p style="margin:4px 0"><strong>URL Login:</strong> <a href="{$loginUrl}">{$loginUrl}</a></p>
+      <p style="margin:4px 0"><strong>Slug Company:</strong> {$slug}</p>
+      <p style="margin:4px 0"><strong>Username / Email:</strong> {$userEmail}</p>
+      <p style="margin:4px 0"><strong>Temporary Password:</strong> <code style="background:#e2e8f0;padding:2px 6px;border-radius:4px">{$tempPassword}</code></p>
+    </div>
+    <p style="color:#dc2626;font-weight:bold">⚠️ PENTING: Anda diwajibkan untuk langsung mengganti password sementara ini saat pertama kali melakukan login.</p>
+    <p><a href="{$loginUrl}" style="display:inline-block;padding:10px 18px;background:#10b981;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:bold">Login ke Perusahaan</a></p>
+  </div>
+</body></html>
+HTML);
+                return (bool) @$email->send();
+            }
+
+            if ($template === 'user_forgot_password' && $userEmail) {
+                $slug = htmlspecialchars($company['route_slug'] ?? '', ENT_QUOTES, 'UTF-8');
+                $tempPassword = htmlspecialchars($data['tempPassword'] ?? '', ENT_QUOTES, 'UTF-8');
+                $loginUrl = $slug ? ($baseUrl . '/' . $slug . '/login') : ($baseUrl . '/login');
+
+                $email->setFrom($fromEmail, $fromName);
+                $email->setTo($userEmail);
+                $email->setSubject("🔑 Password Sementara Akun Anda - IF Instrument");
+                $email->setMessage(<<<HTML
+<!doctype html>
+<html><body style="font-family:Arial,sans-serif;color:#1e293b;line-height:1.6">
+  <div style="max-width:600px;margin:0 auto;border:1px solid #e2e8f0;border-radius:8px;padding:24px;background:#ffffff">
+    <h2 style="color:#3b1f8c;margin-top:0">Permintaan Reset Password</h2>
+    <p>Halo <strong>{$userName}</strong>,</p>
+    <p>Kami menerima permintaan untuk mereset password akun Anda. Password sementara baru Anda telah berhasil dibuat.</p>
+    <div style="background:#f8fafc;padding:16px;border-radius:6px;border-left:4px solid #3b1f8c;margin:16px 0">
+      <p style="margin:4px 0"><strong>URL Login:</strong> <a href="{$loginUrl}">{$loginUrl}</a></p>
+      <p style="margin:4px 0"><strong>Email Akun:</strong> {$userEmail}</p>
+      <p style="margin:4px 0"><strong>Password Sementara:</strong> <code style="background:#e2e8f0;padding:2px 6px;border-radius:4px">{$tempPassword}</code></p>
+    </div>
+    <p style="color:#dc2626;font-weight:bold">⚠️ PENTING: Saat pertama kali login menggunakan password sementara ini, Anda akan secara otomatis diminta untuk membuat password baru yang aman.</p>
+    <p><a href="{$loginUrl}" style="display:inline-block;padding:10px 18px;background:#3b1f8c;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:bold">Login Sekarang</a></p>
+  </div>
+</body></html>
+HTML);
+                return (bool) @$email->send();
+            }
+
+            return false;
+        } catch (\Throwable $e) {
+            log_message('error', 'Gagal mengirim email: ' . $e->getMessage());
+            return false;
+        }
     }
 
     public function saveOutlet(array $payload): array
@@ -731,6 +1346,31 @@ class AccessManagementService
         }
     }
 
+    private function generateUniqueCompanySlug(string $name, int $companyId = 0): string
+    {
+        $baseSlug = strtolower($this->slugify($name)) ?: 'company';
+        $reserved = ['api', 'assets', 'pages', 'scripts', 'uploads', 'sales', 'products', 'inventory', 'reports', 'admin', 'invitation', 'login', 'login.html', 'index.html'];
+
+        $candidate = $baseSlug;
+        $counter = 1;
+
+        while (true) {
+            $isReserved = in_array($candidate, $reserved, true);
+            $builder = Database::connect()->table('companies')->where('route_slug', $candidate);
+            if ($companyId > 0) {
+                $builder->where('id !=', $companyId);
+            }
+            $exists = $builder->countAllResults() > 0;
+
+            if (! $isReserved && ! $exists) {
+                return $candidate;
+            }
+
+            $candidate = $baseSlug . '-' . $counter;
+            $counter++;
+        }
+    }
+
     private function assertUniqueCompanySlug(string $slug, int $companyId = 0): void
     {
         $reserved = ['api', 'assets', 'pages', 'scripts', 'uploads', 'sales', 'products', 'inventory', 'reports', 'admin', 'invitation', 'login', 'login.html', 'index.html'];
@@ -776,5 +1416,83 @@ class AccessManagementService
             $model->where('company_id', $companyId);
         }
         return $model->findAll();
+    }
+
+    public function centralPaymentAccounts(): array
+    {
+        try {
+            $db = Database::connect();
+            if (! $db->tableExists('central_payment_accounts')) {
+                return [];
+            }
+            $rows = $db->table('central_payment_accounts')
+                ->whereIn('status', [StatusCodeService::ACTIVE, 'active', '10'])
+                ->orderBy('id')
+                ->get()
+                ->getResultArray();
+
+            return array_map(fn ($row) => [
+                'id' => (int) $row['id'],
+                'bankName' => $row['bank_name'] ?? '',
+                'accountNumber' => $row['account_number'] ?? '',
+                'accountHolder' => $row['account_holder'] ?? '',
+                'notes' => $row['notes'] ?? '',
+                'qrisImageUrl' => $row['qris_image_url'] ?? '',
+                'status' => StatusCodeService::common($row['status'] ?? ''),
+            ], $rows);
+        } catch (\Throwable $exception) {
+            return [];
+        }
+    }
+
+    public function saveCentralPaymentAccount(array $payload): array
+    {
+        $db = Database::connect();
+        if (! $db->tableExists('central_payment_accounts')) {
+            throw new \RuntimeException('Tabel central_payment_accounts belum ada.');
+        }
+
+        $bankName = trim((string) ($payload['bankName'] ?? ''));
+        $accountNumber = trim((string) ($payload['accountNumber'] ?? ''));
+        $accountHolder = trim((string) ($payload['accountHolder'] ?? ''));
+        $notes = trim((string) ($payload['notes'] ?? ''));
+        $qrisImageUrl = trim((string) ($payload['qrisImageUrl'] ?? $payload['qris_image_url'] ?? ''));
+        $status = StatusCodeService::common($payload['status'] ?? 'active');
+
+        if (! $bankName || ! $accountNumber || ! $accountHolder) {
+            throw new \InvalidArgumentException('Nama Bank, Nomor Rekening, dan Nama Pemilik wajib diisi.');
+        }
+
+        $row = [
+            'bank_name' => $bankName,
+            'account_number' => $accountNumber,
+            'account_holder' => $accountHolder,
+            'notes' => $notes,
+            'qris_image_url' => $qrisImageUrl,
+            'status' => $status,
+            'updated_at' => date('Y-m-d H:i:s'),
+        ];
+
+        $id = (int) ($payload['id'] ?? 0);
+        if ($id > 0) {
+            $db->table('central_payment_accounts')->where('id', $id)->update($row);
+        } else {
+            $row['created_at'] = date('Y-m-d H:i:s');
+            $db->table('central_payment_accounts')->insert($row);
+        }
+
+        return $this->centralPaymentAccounts();
+    }
+
+    public function deactivateCentralPaymentAccount(string $id): array
+    {
+        $db = Database::connect();
+        if ($db->tableExists('central_payment_accounts')) {
+            $db->table('central_payment_accounts')->where('id', (int) $id)->update([
+                'status' => StatusCodeService::INACTIVE,
+                'updated_at' => date('Y-m-d H:i:s'),
+            ]);
+        }
+        return $this->centralPaymentAccounts();
     }
 }

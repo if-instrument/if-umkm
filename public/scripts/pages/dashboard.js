@@ -1,5 +1,5 @@
-import { renderLayout } from "../layout.js?v=1784794256";
-import { apiGet, canUsePermission, loadSession, loadState, scopedApiUrl } from "../store.js?v=1784794256";
+import { renderLayout } from "../layout.js";
+import { apiGet, canUsePermission, loadSession, loadState, scopedApiUrl } from "../store.js";
 import { money } from "../format.js";
 import { byId } from "../dom.js";
 

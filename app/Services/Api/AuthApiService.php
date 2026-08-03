@@ -44,10 +44,30 @@ class AuthApiService
             ];
         }
 
+        try {
+            $companies = $this->tenants();
+        } catch (\Throwable $exception) {
+            $companies = [];
+        }
+
+        try {
+            $saasPlans = (new \App\Services\AccessManagementService())->saasPlans();
+        } catch (\Throwable $exception) {
+            $saasPlans = [];
+        }
+
+        try {
+            $centralPaymentAccounts = (new \App\Services\AccessManagementService())->centralPaymentAccounts();
+        } catch (\Throwable $exception) {
+            $centralPaymentAccounts = [];
+        }
+
         return [
             'mode' => 'global',
             'company' => null,
-            'companies' => $this->tenants(),
+            'companies' => $companies,
+            'saasPlans' => $saasPlans,
+            'centralPaymentAccounts' => $centralPaymentAccounts,
         ];
     }
 
@@ -72,20 +92,24 @@ class AuthApiService
 
     public function tenants(): array
     {
-        $companies = (new CompanyModel())
-            ->whereIn('status', [StatusCodeService::ACTIVE, 'active'])
-            ->orderBy('name', 'ASC')
-            ->findAll();
+        try {
+            $companies = (new CompanyModel())
+                ->whereIn('status', [StatusCodeService::ACTIVE, 'active'])
+                ->orderBy('name', 'ASC')
+                ->findAll();
 
-        return array_values(array_map(fn ($company) => [
-            'name' => $company['name'],
-            'brandName' => $company['brand_name'] ?: $company['name'],
-            'routeSlug' => $company['route_slug'],
-            'routeUrl' => '/' . $company['route_slug'] . '/login',
-            'logoUrl' => $company['logo_path'] ?? '',
-            'themeColor' => $company['theme_color'] ?? '#6e3a16',
-            'tagline' => $company['tagline'] ?: 'UMKM Solution',
-        ], array_filter($companies, fn ($company) => ! empty($company['route_slug']))));
+            return array_values(array_map(fn ($company) => [
+                'name' => $company['name'],
+                'brandName' => $company['brand_name'] ?: $company['name'],
+                'routeSlug' => $company['route_slug'],
+                'routeUrl' => '/' . $company['route_slug'] . '/login',
+                'logoUrl' => $company['logo_path'] ?? '',
+                'themeColor' => $company['theme_color'] ?? '#6e3a16',
+                'tagline' => $company['tagline'] ?: 'UMKM Solution',
+            ], array_filter($companies, fn ($company) => ! empty($company['route_slug']))));
+        } catch (\Throwable $exception) {
+            return [];
+        }
     }
 
     private function companyRouteForEmail(string $email): string

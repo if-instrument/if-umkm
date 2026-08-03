@@ -1,5 +1,5 @@
-import { renderLayout } from "../layout.js?v=1784794256";
-import { apiGet, appPath, applyPermissionControls, loadSession, loadState, scopedApiUrl, visibleForSession } from "../store.js?v=1784794256";
+import { renderLayout } from "../layout.js";
+import { apiGet, appPath, applyPermissionControls, loadSession, loadState, scopedApiUrl, visibleForSession } from "../store.js";
 import { money } from "../format.js";
 import { byId } from "../dom.js";
 import { ORDER_STATUS, openOrderStatuses, orderStatusClass, orderStatusCode, orderStatusIn, orderStatusIs, orderStatusLabel, statusLabel } from "../status-codes.js";

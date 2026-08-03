@@ -1,6 +1,6 @@
-import { renderLayout } from "../layout.js?v=1784794256";
-import { apiGet, apiPost, apiPut, applyPermissionControls, canUsePermission, loadSession, loadState, primaryOutletId, scopedApiUrl, scopedPayload, visibleForSession } from "../store.js?v=1784794256";
-import { applyPageBootstrap, loadPageBootstrap, pageDateValue } from "../page-engine.js?v=1784794256";
+import { renderLayout } from "../layout.js";
+import { apiGet, apiPost, apiPut, applyPermissionControls, canUsePermission, loadSession, loadState, primaryOutletId, scopedApiUrl, scopedPayload, visibleForSession } from "../store.js";
+import { applyPageBootstrap, loadPageBootstrap, pageDateValue } from "../page-engine.js";
 import { formatQty, money } from "../format.js";
 import { costingMethod, effectiveRecipe, ingredientCostForQty, ingredientUnitCost, isPreorderStockedProduct, isStockedProduct, modifierPrice, productAvailability, productAvailabilityWithModifiers, productById, productCogs, productCogsWithModifiers, productModifierOptions, realProductAvailability } from "../inventory.js";
 import { byId, showAlert } from "../dom.js";

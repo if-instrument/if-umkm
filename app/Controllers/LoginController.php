@@ -53,6 +53,104 @@ class LoginController extends BaseController
         });
     }
 
+    public function publicSaasPlans()
+    {
+        return $this->jsonAction(function () {
+            $plans = (new \App\Services\AccessManagementService())->saasPlans();
+            return array_values(array_filter($plans, fn ($p) => (string) ($p['status'] ?? '10') === '10'));
+        });
+    }
+
+    public function publicCentralPaymentAccounts()
+    {
+        return $this->jsonAction(function () {
+            $accounts = (new \App\Services\AccessManagementService())->centralPaymentAccounts();
+            return array_values(array_filter($accounts, fn ($a) => (string) ($a['status'] ?? '10') === '10'));
+        });
+    }
+
+    public function publicRegisterCompany()
+    {
+        return $this->jsonAction(function () {
+            $payload = $this->request->getJSON(true) ?: [];
+            return (new \App\Services\AccessManagementService())->publicRegisterCompany($payload);
+        });
+    }
+
+    public function publicForgotPassword()
+    {
+        return $this->jsonAction(function () {
+            $payload = $this->request->getJSON(true) ?: [];
+            return (new \App\Services\AccessManagementService())->publicForgotPassword($payload);
+        });
+    }
+
+    public function uploadPaymentProof()
+    {
+        return (new \App\Controllers\Api\AccessController())->uploadPaymentProof();
+    }
+
+    public function uploadCompanyLogo()
+    {
+        return (new \App\Controllers\Api\AccessController())->uploadLogo();
+    }
+
+    public function changePassword()
+    {
+        return $this->jsonAction(function () {
+            $payload = $this->request->getJSON(true) ?: [];
+            $email = strtolower(trim((string) ($payload['email'] ?? '')));
+            $currentPassword = (string) ($payload['currentPassword'] ?? '');
+            $newPassword = (string) ($payload['newPassword'] ?? '');
+            $companySlug = trim((string) ($payload['companySlug'] ?? ''));
+
+            if (! $email || ! $newPassword) {
+                throw new \InvalidArgumentException('Email dan Password baru wajib diisi.');
+            }
+            if (strlen($newPassword) < 8) {
+                throw new \InvalidArgumentException('Password baru minimal 8 karakter.');
+            }
+
+            $userModel = new \App\Models\UserModel();
+            $user = $userModel->where('email', $email)->first();
+            if (! $user) {
+                throw new \InvalidArgumentException('User tidak ditemukan.');
+            }
+
+            if (! password_verify($currentPassword, $user['password_hash'])) {
+                throw new \InvalidArgumentException('Password saat ini/sementara tidak sesuai.');
+            }
+
+            log_message('info', "Attempting password change for email: {$email}, companySlug: {$companySlug}");
+
+            $newHash = password_hash($newPassword, PASSWORD_DEFAULT);
+            $userModel->update($user['id'], [
+                'password_hash' => $newHash,
+                'must_change_password' => 0,
+                'updated_at' => date('Y-m-d H:i:s'),
+            ]);
+
+            if ($companySlug) {
+                $tenantDb = (new \App\Services\TenantDatabaseService())->connectionForCompanySlug($companySlug);
+                if ($tenantDb && $tenantDb->tableExists('users')) {
+                    $tenantDb->table('users')->where('email', $email)->update([
+                        'password_hash' => $newHash,
+                        'must_change_password' => 0,
+                        'updated_at' => date('Y-m-d H:i:s'),
+                    ]);
+                }
+            }
+
+            log_message('info', "Password successfully changed for email: {$email}. must_change_password set to 0 in both Central and Tenant DB.");
+            (new \App\Services\AccessManagementService())->recordAuditLog((int) ($user['company_id'] ?? 0), (int) $user['id'], 'PASSWORD_CHANGED_FIRST_LOGIN', 'Pengguna berhasil mengganti password sementara.');
+
+            return [
+                'ok' => true,
+                'message' => 'Password berhasil diperbarui. Silakan login dengan password baru Anda.',
+            ];
+        });
+    }
+
     public function submit()
     {
         $payload = $this->request->getJSON(true) ?: [];

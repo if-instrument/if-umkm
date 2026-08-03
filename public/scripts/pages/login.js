@@ -1,158 +1,275 @@
-import { apiGet, apiPost, appPath, currentCompanySlug, loadSession, saveSession } from "../store.js?v=1784794256";
-import { byId, setText, showFeedback } from "../dom.js";
+import { applyBrandTheme } from "../layout.js";
+import { apiGet, apiPost, apiUpload, appPath, loadSession, saveSession } from "../store.js";
+import { byId, setText, showAlert, showFeedback } from "../dom.js";
+import { loadPageBootstrap } from "../page-engine.js";
 
-const session = loadSession();
-const companySlug = currentCompanySlug();
-const loginBootstrapQuery = companySlug ? `?companySlug=${encodeURIComponent(companySlug)}` : "";
-const loginBootstrap = apiGet(`/api/page/login/bootstrap${loginBootstrapQuery}`)?.data || {};
-const tenant = loginBootstrap.company || null;
-const tenants = loginBootstrap.companies || [];
+const companySlug = window.__COMPANY_SLUG__ || "";
+let loginBootstrap = null;
 
-if (session) {
-  window.location.href = session.authType === "super_admin" ? "/pages/users.html" : appPath("/index.html");
-}
+function applyCompanyTheme(company) {
+  if (!company) return;
+  const companyName = company.name || company.brandName || "Perusahaan";
+  const hex = company.themeColor || company.theme_color || "#3B1F8C";
+  applyBrandTheme(hex);
 
-if (companySlug && !tenant) {
-  setText("login-preview", "Route perusahaan tidak ditemukan atau belum aktif.");
-}
+  // Dynamically set page title
+  document.title = `Login - ${companyName}`;
 
-function updateFavicon(iconUrl) {
-  if (!iconUrl) return;
-  let link = document.querySelector("link[rel*='icon']");
-  if (!link) {
-    link = document.createElement("link");
-    link.rel = "icon";
-    document.head.appendChild(link);
-  }
-  link.href = iconUrl;
-}
+  const brandHeader = document.querySelector(".login-brand");
+  if (brandHeader) {
+    const brandLogo = brandHeader.querySelector(".app-brand-logo");
+    const brandTitle = brandHeader.querySelector("h1");
+    const brandSub = brandHeader.querySelector("p");
 
-if (tenant) {
-  applyCompanyTheme(tenant.themeColor || "#3B1F8C");
-  const logo = document.querySelector(".login-brand .brand-mark");
-  const title = document.querySelector(".login-brand h1");
-  const tagline = document.querySelector(".login-brand p");
-  const copyTitle = document.querySelector(".login-copy h2");
-  const copyText = document.querySelector(".login-copy p");
-  if (logo) logo.innerHTML = tenant.logoUrl ? `<img src="${tenant.logoUrl}" alt="${tenant.name}">` : tenant.name.slice(0, 2).toUpperCase();
-  if (title) title.textContent = tenant.name;
-  if (tagline) tagline.textContent = tenant.tagline || "UMKM Solution";
-  if (copyTitle) copyTitle.textContent = `Masuk ke ${tenant.name}`;
-  if (copyText) copyText.textContent = "Gunakan email dan password user yang terdaftar pada perusahaan ini.";
-  document.title = `Login - ${tenant.name}`;
-  updateFavicon(tenant.logoUrl || "/assets/if-instrument-logo.jpg");
-  document.querySelectorAll('[data-sample-login]').forEach((button) => button.remove());
-  byId("tenant-login-panel").hidden = true;
-} else {
-  document.title = `Login - IF Instrument`;
-  updateFavicon("/assets/if-instrument-logo.jpg");
-  document.querySelectorAll('[data-sample-login]:not([data-sample-login="super"])').forEach((button) => { button.hidden = true; });
-  byId("tenant-login-panel").hidden = false;
-  renderTenantList();
-}
-
-/**
- * Apply company theme hex color.
- * Default color for Super Admin is derived from app logo (#3B1F8C).
- * For company, calculates 4 distinct intensity levels based on company's themeColor.
- */
-function applyCompanyTheme(hex) {
-  if (!hex || !hex.startsWith("#")) hex = "#3B1F8C";
-  const root = document.documentElement;
-  root.style.setProperty("--brand", hex);
-
-  const { h, s, l } = hexToHsl(hex);
-  
-  // Intensitas 1: Strong (Deep)
-  const strongL = Math.max(l - 16, 5);
-  root.style.setProperty("--brand-strong", hslToHex(h, s, strongL));
-
-  // Intensitas 2: Hover
-  const hoverL = Math.max(l - 8, 8);
-  root.style.setProperty("--brand-hover", hslToHex(h, s, hoverL));
-
-  // Intensitas 3: Soft (Pastel)
-  const softL = Math.min(l + 42, 95);
-  const softS = Math.max(s - 15, 10);
-  root.style.setProperty("--brand-soft", hslToHex(h, softS, softL));
-
-  // Intensitas 4: Sidebar Dark Background
-  const sidebarBgL = Math.max(Math.min(l - 35, 11), 6);
-  const sidebarBgS = Math.min(s, 35);
-  root.style.setProperty("--sidebar-bg", hslToHex(h, sidebarBgS, sidebarBgL));
-
-  // RGB triplet untuk alpha-channel opacity
-  const sr = parseInt(hex.slice(1,3), 16) || 59;
-  const sg = parseInt(hex.slice(3,5), 16) || 31;
-  const sb = parseInt(hex.slice(5,7), 16) || 140;
-  root.style.setProperty("--brand-rgb", `${sr}, ${sg}, ${sb}`);
-}
-
-/** Convert hex to HSL object */
-function hexToHsl(hex) {
-  let r = parseInt(hex.slice(1,3),16)/255;
-  let g = parseInt(hex.slice(3,5),16)/255;
-  let b = parseInt(hex.slice(5,7),16)/255;
-  const max = Math.max(r,g,b), min = Math.min(r,g,b);
-  let h, s, l = (max+min)/2;
-  if (max === min) { h = s = 0; }
-  else {
-    const d = max - min;
-    s = l > 0.5 ? d/(2-max-min) : d/(max+min);
-    switch(max) {
-      case r: h = ((g-b)/d + (g<b?6:0))/6; break;
-      case g: h = ((b-r)/d + 2)/6; break;
-      default: h = ((r-g)/d + 4)/6;
+    if (brandTitle) brandTitle.textContent = companyName;
+    if (brandSub) brandSub.textContent = company.tagline || "Portal Admin Perusahaan";
+    if (brandLogo) {
+      if (company.logoUrl) {
+        brandLogo.innerHTML = `<img src="${escapeHtml(company.logoUrl)}" alt="${escapeHtml(companyName)}" />`;
+      } else {
+        const initial = companyName.charAt(0).toUpperCase();
+        brandLogo.innerHTML = `<span class="company-initial-badge" style="display:flex; align-items:center; justify-content:center; width:100%; height:100%; background:var(--brand, #3B1F8C); color:#ffffff; font-weight:800; font-size:18px; border-radius:8px;">${initial}</span>`;
+      }
     }
   }
-  return { h: Math.round(h*360), s: Math.round(s*100), l: Math.round(l*100) };
 }
 
-/** Convert HSL to hex string */
-function hslToHex(h, s, l) {
-  s /= 100; l /= 100;
-  const a = s * Math.min(l, 1-l);
-  const f = n => {
-    const k = (n + h/30) % 12;
-    const c = l - a * Math.max(Math.min(k-3, 9-k, 1), -1);
-    return Math.round(255*c).toString(16).padStart(2,'0');
-  };
-  return `#${f(0)}${f(8)}${f(4)}`;
+function renderCompanyShowcase(company) {
+  const showcase = byId("company-login-showcase");
+  if (!showcase || !company) return;
+
+  setText("company-showcase-name", company.name || company.brandName || "Nama Perusahaan");
+  setText("company-showcase-tagline", company.tagline || "Solusi Bisnis & Operasional UMKM");
+
+  const haloBox = document.querySelector(".company-logo-halo");
+  if (haloBox) {
+    if (company.logoUrl) {
+      haloBox.innerHTML = `<img id="company-showcase-logo" src="${escapeHtml(company.logoUrl)}" alt="${escapeHtml(company.name || "Logo")}" />`;
+    } else {
+      const initial = (company.name || "C").charAt(0).toUpperCase();
+      haloBox.innerHTML = `<div class="company-halo-initial" style="display:flex; align-items:center; justify-content:center; width:100%; height:100%; background:linear-gradient(135deg, var(--brand, #3B1F8C), var(--brand-strong, #1e1b4b)); color:#ffffff; font-weight:900; font-size:36px; border-radius:50%; border:2px solid #ffffff; text-shadow:0 2px 6px rgba(0,0,0,0.3);">${initial}</div>`;
+    }
+  }
+
+  showcase.hidden = false;
 }
 
+function escapeHtml(value = "") {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
 
-function renderTenantList() {
+function renderTenantList(companies = []) {
   const list = byId("tenant-login-list");
-  if (!list) return;
-  list.innerHTML = tenants.length
-    ? tenants.map((company) => `
-      <button class="tenant-login-card" data-company-login="${company.routeSlug}" type="button">
-        <span class="tenant-logo" style="--tenant-color:${company.themeColor || "#3B1F8C"}">${company.logoUrl ? `<img src="${company.logoUrl}" alt="${company.name}">` : company.name.slice(0, 2).toUpperCase()}</span>
-        <span><strong>${company.name}</strong><small>/${company.routeSlug}</small></span>
+  const panel = byId("tenant-login-panel");
+  if (!list || !panel) return;
+  if (!companies || !companies.length) {
+    panel.hidden = true;
+    return;
+  }
+
+  list.innerHTML = companies.map((c) => {
+    const slug = c.routeSlug || "";
+    return `
+      <button class="tenant-login-card stacked-card" data-company-login="${escapeHtml(slug)}" type="button" title="Masuk ke portal ${escapeHtml(c.name || slug)}" style="cursor: pointer;">
+        <div class="tenant-logo-mini">
+          ${c.logoUrl ? `<img src="${escapeHtml(c.logoUrl)}" alt="${escapeHtml(c.name || "Perusahaan")}" />` : `<span>${escapeHtml((c.name || "C").charAt(0))}</span>`}
+        </div>
+        <strong style="display: block; font-size: 13px; margin-top: 6px;">${escapeHtml(c.name || "")}</strong>
+        <small style="color: var(--muted); font-size: 11px;">${escapeHtml(slug)}</small>
       </button>
-    `).join("")
-    : `<p class="form-preview">Belum ada perusahaan aktif.</p>`;
+    `;
+  }).join("");
+
+  list.querySelectorAll("[data-company-login]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const slug = btn.dataset.companyLogin;
+      if (slug) {
+        window.location.href = appPath(`/${slug}/login`);
+      }
+    });
+  });
+
+  panel.hidden = false;
 }
 
-function sampleUser(type) {
-  const sampleUsers = {
-    super: { name: "Super Admin SaaS", email: "superadmin@app.test", password: "super123" },
-    company: { name: "Admin Perusahaan", email: "admin@ifresso.id", password: "admin123" },
-    area: { name: "Area Manager", email: "area@ifresso.id", password: "area123" },
-    manager: { name: "Outlet Manager Utama", email: "manager@ifresso.id", password: "manager123" },
-    cashier: { name: "Kasir Outlet Utama", email: "kasir@ifresso.id", password: "kasir123" },
-    kitchen: { name: "Kitchen Outlet Utama", email: "kitchen@ifresso.id", password: "kitchen123" },
-    inventory: { name: "Inventory Staff Utama", email: "inventory@ifresso.id", password: "inventory123" }
-  };
-  return sampleUsers[type] || sampleUsers.company;
+function renderSaasPlans(plans = []) {
+  const container = byId("saas-plan-cards");
+  if (!container) return;
+  if (!plans || !plans.length) {
+    container.innerHTML = `<p style="font-size: 12px; color: var(--muted); margin: 0;">Tidak ada paket subscription aktif.</p>`;
+    return;
+  }
+
+  container.innerHTML = plans.map((p) => {
+    const isFeatured = Boolean(p.isFeatured || p.is_featured || String(p.code).toLowerCase() === "professional");
+    const recommendedBadge = isFeatured
+      ? `<span class="plan-recommended-badge">⭐ Recommended</span>`
+      : "";
+
+    return `
+      <div class="saas-plan-card ${isFeatured ? "featured-plan" : ""}" data-plan-code="${escapeHtml(p.code || "")}" style="cursor: pointer;" title="Klik untuk mendaftar paket ${escapeHtml(p.name || p.code || "")}">
+        <div class="saas-plan-header">
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <strong>${escapeHtml(p.name || p.code || "")}</strong>
+            ${recommendedBadge}
+          </div>
+          <span class="saas-plan-price">${Number(p.price || 0) <= 0 ? "Gratis" : "Rp " + Number(p.price).toLocaleString("id-ID") + " / th"}</span>
+        </div>
+        <small class="saas-plan-meta">${Number(p.maxOutlets || 0) >= 999 ? "Unlimited Outlet" : "Max " + (p.maxOutlets || 0) + " Outlet"} · ${p.durationDays ? p.durationDays + " Hari" : "Masa Aktif Selamanya"}</small>
+      </div>
+    `;
+  }).join("");
+
+  container.querySelectorAll(".saas-plan-card").forEach((card) => {
+    card.addEventListener("click", () => {
+      const code = card.dataset.planCode;
+      openRegisterModal(code);
+    });
+  });
+}
+
+function renderRegisterPlanDropdown(plans = []) {
+  const select = byId("reg-subscription-plan");
+  if (!select) return;
+  if (!plans || !plans.length) {
+    select.innerHTML = `<option value="">Tidak ada paket tersedia</option>`;
+    return;
+  }
+
+  const recommendedPlan = plans.find((p) => Boolean(p.isFeatured || p.is_featured || String(p.code).toLowerCase() === "professional")) || plans[0];
+
+  select.innerHTML = plans.map((p) => {
+    const isFeatured = Boolean(p.isFeatured || p.is_featured || String(p.code).toLowerCase() === "professional");
+    const recText = isFeatured ? " ⭐ (Recommended)" : "";
+    const isSelected = p.code === recommendedPlan.code ? "selected" : "";
+    return `
+      <option value="${escapeHtml(p.code || "")}" ${isSelected}>
+        ${escapeHtml(p.name || p.code || "")}${recText} - ${Number(p.price || 0) <= 0 ? "Gratis" : "Rp " + Number(p.price).toLocaleString("id-ID")} (${Number(p.maxOutlets || 0) >= 999 ? "Unlimited Outlet" : "Max " + (p.maxOutlets || 0) + " Outlet"})
+      </option>
+    `;
+  }).join("");
+}
+
+function renderCentralPaymentAccounts(accounts = []) {
+  const container = byId("reg-payment-accounts-list");
+  if (!container) return;
+
+  const activeAccounts = (accounts || []).filter((acc) => {
+    const s = String(acc.status || "").toLowerCase();
+    return s === "10" || s === "active" || s === "aktif" || !acc.status;
+  });
+
+  if (!activeAccounts.length) {
+    container.innerHTML = `<p style="font-size: 12px; color: var(--muted); margin: 0;">Hubungi Super Admin untuk rincian rekening pembayaran aktif.</p>`;
+    return;
+  }
+
+  container.innerHTML = activeAccounts.map((acc) => {
+    const bank = escapeHtml(acc.bankName || acc.bank_name || "Bank Transfer");
+    const accNo = escapeHtml(acc.accountNumber || acc.account_number || "");
+    const accHolder = escapeHtml(acc.accountHolder || acc.account_name || "");
+    const qrisUrl = acc.qrisImageUrl || acc.qris_image_url || "";
+    const isQris = Boolean(qrisUrl || bank.toUpperCase().includes("QRIS"));
+
+    if (isQris && qrisUrl) {
+      return `
+        <div class="payment-account-card qris-card" style="font-size: 12px; background: #ffffff; padding: 12px; border-radius: 8px; border: 1px solid #cbd5e1; display: flex; flex-direction: column; gap: 8px; align-items: center; text-align: center;">
+          <div style="width: 100%; display: flex; justify-content: space-between; align-items: center;">
+            <strong style="color: var(--brand); font-size: 13px;">📱 ${bank}</strong>
+            <span class="status-pill status-active" style="font-size: 10px; padding: 2px 6px;">QRIS Statis</span>
+          </div>
+          <div style="background: #f8fafc; padding: 8px; border-radius: 8px; border: 1px dashed #cbd5e1; width: 100%; display: flex; justify-content: center;">
+            <img src="${escapeHtml(qrisUrl)}" alt="QRIS ${bank}" style="max-width: 180px; width: 100%; height: auto; border-radius: 6px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);" />
+          </div>
+          ${accHolder ? `<small style="color: #64748b; font-weight: 600;">a.n. ${accHolder}</small>` : ""}
+          <div style="display: flex; gap: 6px; width: 100%; margin-top: 4px;">
+            <a href="${escapeHtml(qrisUrl)}" download="QRIS-Pembayaran.png" target="_blank" class="ghost-button" style="flex: 1; font-size: 11px; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; gap: 4px; padding: 6px;">
+              ⬇️ Download QRIS
+            </a>
+            <button type="button" class="share-qris-btn ghost-button" data-qris-url="${escapeHtml(qrisUrl)}" data-qris-title="${bank}" style="flex: 1; font-size: 11px; display: inline-flex; align-items: center; justify-content: center; gap: 4px; padding: 6px;">
+              🔗 Share QRIS
+            </button>
+          </div>
+        </div>
+      `;
+    }
+
+    return `
+      <div class="payment-account-card bank-card" style="font-size: 12px; background: #ffffff; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--line); display: flex; flex-direction: column; gap: 4px;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <strong style="color: var(--brand); font-size: 13px;">🏦 ${bank}</strong>
+          ${accNo ? `<button type="button" class="copy-acc-btn ghost-button" data-copy="${accNo}" style="padding: 2px 8px; font-size: 10px; height: auto;">📋 Salin No. Rek</button>` : ""}
+        </div>
+        ${accNo ? `<div style="font-family: monospace; font-size: 14px; font-weight: 800; color: #0f172a;">${accNo}</div>` : ""}
+        ${accHolder ? `<small style="color: #64748b;">a.n. ${accHolder}</small>` : ""}
+      </div>
+    `;
+  }).join("");
+
+  container.querySelectorAll(".copy-acc-btn").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.preventDefault();
+      const num = btn.dataset.copy;
+      if (num && navigator.clipboard) {
+        navigator.clipboard.writeText(num);
+        btn.textContent = "✓ Tersalin";
+        setTimeout(() => { btn.textContent = "📋 Salin No. Rek"; }, 1500);
+      }
+    });
+  });
+
+  container.querySelectorAll(".share-qris-btn").forEach((btn) => {
+    btn.addEventListener("click", async (e) => {
+      e.preventDefault();
+      const url = btn.dataset.qrisUrl;
+      const title = btn.dataset.qrisTitle || "QRIS Pembayaran";
+
+      if (navigator.share) {
+        try {
+          await navigator.share({
+            title: title,
+            text: `Scan / Upload QRIS ini untuk pembayaran SaaS ${title}`,
+            url: url
+          });
+        } catch {
+          copyQrisLink(btn, url);
+        }
+      } else {
+        copyQrisLink(btn, url);
+      }
+    });
+  });
+}
+
+function copyQrisLink(btn, url) {
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(url);
+    btn.textContent = "✓ Link QRIS Tersalin";
+    setTimeout(() => { btn.textContent = "🔗 Share QRIS"; }, 1500);
+  }
 }
 
 function fillSample(type) {
-  const user = sampleUser(type);
-  if (!user) return;
-  byId("login-email").value = user.email;
-  byId("login-password").value = user.password;
-  setText("login-preview", `${user.name}: ${user.email} / ${user.password}`);
+  const isTenant = Boolean(companySlug);
+  const emails = {
+    super: "superadmin@central.com",
+    company: isTenant ? `admin@${companySlug}.com` : "admin@kappi.com",
+    area: isTenant ? `area@${companySlug}.com` : "area@kappi.com",
+    manager: isTenant ? `manager@${companySlug}.com` : "manager@kappi.com",
+    cashier: isTenant ? `kasir@${companySlug}.com` : "kasir@kappi.com",
+    kitchen: isTenant ? `kitchen@${companySlug}.com` : "kitchen@kappi.com",
+    inventory: isTenant ? `inventory@${companySlug}.com` : "inventory@kappi.com"
+  };
+  const email = emails[type] || emails.company;
+  const password = type === "super" ? "SuperAdmin#123" : "Admin#123";
+
+  if (byId("login-email")) byId("login-email").value = email;
+  if (byId("login-password")) byId("login-password").value = password;
 }
 
 function login(email, password) {
@@ -166,10 +283,12 @@ function login(email, password) {
     }
     return false;
   }
+
   const user = result.user;
   const authType = user.authType || (user.role === "Super Admin" ? "super_admin" : "company_user");
   const companyId = authType === "super_admin" ? "" : user.companyId || "";
   const selectedOutletId = user.selectedOutletId || user.outletIds?.[0] || "";
+
   saveSession({
     userId: user.id,
     name: user.name,
@@ -189,29 +308,422 @@ function login(email, password) {
     token: result.token,
     loggedInAt: new Date().toISOString()
   });
+
+  if (user.mustChangePassword) {
+    if (byId("pwd-change-email")) byId("pwd-change-email").value = user.email;
+    if (byId("pwd-change-current")) byId("pwd-change-current").value = password;
+    if (byId("password-change-modal-backdrop")) byId("password-change-modal-backdrop").hidden = false;
+    if (byId("must-change-password-modal")) byId("must-change-password-modal").hidden = false;
+    document.body.classList.add("modal-open");
+    showFeedback("login-feedback", "Anda menggunakan password sementara. Wajib perbarui password Anda.");
+    return true;
+  }
+
   if (authType === "super_admin") window.location.href = "/pages/users.html";
   else if (authType === "company_admin" && user.onboardingRequired) window.location.href = appPath("/pages/onboarding.html");
   else if (user.permissions?.includes("kitchen") && !user.permissions.includes("pos")) window.location.href = appPath("/pages/orders.html");
   else window.location.href = appPath("/index.html");
+
   return true;
 }
 
-document.addEventListener("click", (event) => {
-  const companyLogin = event.target.closest("[data-company-login]");
-  if (companyLogin) {
-    window.location.href = `/${companyLogin.dataset.companyLogin}/login`;
-    return;
+// ─── Registration Modal ──────────────────────────────────────────────────────
+function updateRegisterPlanSummary() {
+  const select = byId("reg-subscription-plan");
+  const summaryName = byId("reg-summary-plan-name");
+  const summaryPrice = byId("reg-summary-plan-price");
+  const proofFile = byId("reg-payment-proof-file");
+  const paymentSection = byId("reg-payment-section");
+  if (!select) return;
+
+  const plans = loginBootstrap?.saasPlans || [];
+  const selectedCode = select.value;
+  const plan = plans.find((p) => String(p.code).toLowerCase() === String(selectedCode).toLowerCase()) || plans[0];
+
+  const priceVal = Number(plan?.price || 0);
+  const isPaid = priceVal > 0;
+
+  if (summaryName) summaryName.textContent = plan?.name || selectedCode || "Starter Plan";
+  if (summaryPrice) {
+    summaryPrice.textContent = !isPaid ? "Gratis (Bebas Biaya)" : "Rp " + priceVal.toLocaleString("id-ID") + " / th";
   }
 
-  const sample = event.target.closest("[data-sample-login]");
-  if (sample) fillSample(sample.dataset.sampleLogin);
+  if (paymentSection) {
+    paymentSection.hidden = !isPaid;
+  }
+
+  if (proofFile) {
+    proofFile.required = isPaid;
+    if (!isPaid) {
+      proofFile.value = "";
+    }
+  }
+}
+
+function openRegisterModal(selectedPlanCode = "") {
+  const plans = loginBootstrap?.saasPlans || [];
+  renderRegisterPlanDropdown(plans);
+  renderCentralPaymentAccounts(loginBootstrap?.centralPaymentAccounts);
+
+  const select = byId("reg-subscription-plan");
+  if (select) {
+    if (selectedPlanCode) {
+      select.value = selectedPlanCode;
+    } else {
+      const recommendedPlan = plans.find((p) => Boolean(p.isFeatured || p.is_featured || String(p.code).toLowerCase() === "professional"));
+      if (recommendedPlan) {
+        select.value = recommendedPlan.code;
+      }
+    }
+  }
+
+  updateRegisterPlanSummary();
+
+  showFeedback("register-feedback", "");
+  if (byId("register-modal-backdrop")) byId("register-modal-backdrop").hidden = false;
+  if (byId("public-register-modal")) byId("public-register-modal").hidden = false;
+  document.body.classList.add("modal-open");
+}
+
+function closeRegisterModal() {
+  if (byId("register-modal-backdrop")) byId("register-modal-backdrop").hidden = true;
+  if (byId("public-register-modal")) byId("public-register-modal").hidden = true;
+  document.body.classList.remove("modal-open");
+}
+
+// ─── Forgot Password Modal ───────────────────────────────────────────────────
+function openForgotModal() {
+  const loginEmail = byId("login-email")?.value;
+  if (loginEmail && byId("forgot-email")) {
+    byId("forgot-email").value = loginEmail;
+  }
+  showFeedback("forgot-feedback", "");
+  if (byId("forgot-modal-backdrop")) byId("forgot-modal-backdrop").hidden = false;
+  if (byId("forgot-password-modal")) byId("forgot-password-modal").hidden = false;
+  document.body.classList.add("modal-open");
+}
+
+function closeForgotModal() {
+  if (byId("forgot-modal-backdrop")) byId("forgot-modal-backdrop").hidden = true;
+  if (byId("forgot-password-modal")) byId("forgot-password-modal").hidden = true;
+  document.body.classList.remove("modal-open");
+  showFeedback("forgot-feedback", "");
+}
+
+// ─── Password Toggle ─────────────────────────────────────────────────────────
+byId("toggle-login-password")?.addEventListener("click", () => {
+  const input = byId("login-password");
+  const openIcon = document.querySelector("#toggle-login-password .eye-open");
+  const closedIcon = document.querySelector("#toggle-login-password .eye-closed");
+  if (!input || !openIcon || !closedIcon) return;
+
+  const isPassword = input.type === "password";
+  input.type = isPassword ? "text" : "password";
+  openIcon.style.display = isPassword ? "none" : "";
+  closedIcon.style.display = isPassword ? "" : "none";
 });
 
-byId("login-form").addEventListener("submit", (event) => {
-  event.preventDefault();
-  const email = byId("login-email").value.trim().toLowerCase();
-  const password = byId("login-password").value;
-  if (!login(email, password)) showFeedback("login-feedback", "Email atau password tidak sesuai.");
-});
+// ─── Page Initializer ────────────────────────────────────────────────────────
+(function initLoginPage() {
+  const response = loadPageBootstrap("login", {}, loadSession(), { companySlug });
+  if (response?.ok && response.data) {
+    loginBootstrap = response.data;
+    if (companySlug && response.data.company) {
+      applyCompanyTheme(response.data.company);
+      renderCompanyShowcase(response.data.company);
 
-if (!companySlug) fillSample("super");
+      const topBrand = document.querySelector(".login-brand");
+      if (topBrand) topBrand.hidden = true;
+      const copy = byId("central-login-copy");
+      if (copy) copy.hidden = true;
+      const mainRow = byId("login-main-row");
+      if (mainRow) mainRow.hidden = true;
+      const prompt = byId("central-register-prompt-container");
+      if (prompt) prompt.hidden = true;
+
+      const orderContainer = byId("company-public-order-container");
+      const orderBtn = byId("btn-company-public-order");
+      if (orderContainer && orderBtn) {
+        orderBtn.href = appPath("/order");
+        orderContainer.hidden = false;
+      }
+
+      const formKicker = byId("form-hero-kicker");
+      const formTitle = byId("form-hero-title");
+      const companyName = response.data.company.name || response.data.company.brandName || "Perusahaan";
+      if (formKicker) formKicker.textContent = companyName.toUpperCase();
+      if (formTitle) formTitle.textContent = `Masuk ke Portal ${companyName}`;
+    } else {
+      renderSaasPlans(response.data.saasPlans);
+      renderTenantList(response.data.companies);
+    }
+  }
+
+  byId("login-form")?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const email = byId("login-email")?.value?.trim() || "";
+    const password = byId("login-password")?.value || "";
+    login(email, password);
+  });
+
+  byId("btn-open-register-modal")?.addEventListener("click", () => openRegisterModal());
+  byId("btn-close-register-modal")?.addEventListener("click", closeRegisterModal);
+  byId("btn-cancel-register")?.addEventListener("click", closeRegisterModal);
+  byId("reg-subscription-plan")?.addEventListener("change", updateRegisterPlanSummary);
+
+  byId("btn-open-forgot-modal")?.addEventListener("click", (e) => {
+    e.preventDefault();
+    openForgotModal();
+  });
+  byId("btn-close-forgot-modal")?.addEventListener("click", closeForgotModal);
+  byId("btn-cancel-forgot-modal")?.addEventListener("click", closeForgotModal);
+
+  // Preset Theme Color buttons
+  document.querySelectorAll(".theme-preset-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const color = btn.dataset.color;
+      const input = byId("reg-theme-color");
+      if (input && color) input.value = color;
+    });
+  });
+
+  // Upload Logo
+  byId("reg-company-logo-file")?.addEventListener("change", (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const formData = new FormData();
+    formData.append("file", file);
+    const result = apiUpload("/api/public/upload-company-logo", formData);
+    if (result?.ok && result.url) {
+      if (byId("reg-company-logo-url")) byId("reg-company-logo-url").value = result.url;
+      const preview = byId("reg-company-logo-preview");
+      if (preview) {
+        preview.style.backgroundImage = `url('${result.url}')`;
+        preview.style.backgroundSize = "cover";
+        preview.textContent = "";
+      }
+    } else {
+      showAlert(result?.message || "Gagal mengunggah logo perusahaan.");
+    }
+  });
+
+  // Upload Payment Proof
+  byId("reg-payment-proof-file")?.addEventListener("change", (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const formData = new FormData();
+    formData.append("file", file);
+    const result = apiUpload("/api/public/upload-payment-proof", formData);
+    if (result?.ok && result.url) {
+      if (byId("reg-payment-proof-url")) byId("reg-payment-proof-url").value = result.url;
+      const preview = byId("reg-payment-proof-preview");
+      if (preview) {
+        preview.style.backgroundImage = `url('${result.url}')`;
+        preview.style.backgroundSize = "cover";
+        preview.textContent = "";
+      }
+    } else {
+      showAlert(result?.message || "Gagal mengunggah bukti pembayaran.");
+    }
+  });
+
+  // Submit Register Form
+  byId("public-register-form")?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const payload = {
+      name: byId("reg-company-name")?.value?.trim() || "",
+      logoUrl: byId("reg-company-logo-url")?.value?.trim() || "",
+      themeColor: byId("reg-theme-color")?.value || "#3B1F8C",
+      adminName: byId("reg-admin-name")?.value?.trim() || "",
+      adminEmail: byId("reg-admin-email")?.value?.trim()?.toLowerCase() || "",
+      subscriptionPlan: byId("reg-subscription-plan")?.value || "Starter",
+      paymentProofUrl: byId("reg-payment-proof-url")?.value || ""
+    };
+
+    if (!payload.name) {
+      showFeedback("register-feedback", "Nama perusahaan wajib diisi.");
+      return;
+    }
+
+    const result = apiPost("/api/public/register-company", payload);
+    if (result?.ok) {
+      showFeedback("register-feedback", result.message || "Pendaftaran berhasil!");
+      window.setTimeout(() => {
+        closeRegisterModal();
+        showFeedback("login-feedback", "Pendaftaran berhasil dikirim! Silakan tunggu verifikasi Super Admin.");
+      }, 2000);
+    } else {
+      showFeedback("register-feedback", result?.message || "Pendaftaran gagal.");
+    }
+  });
+
+  // Submit Must Change Password Form
+  byId("must-change-password-form")?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const email = byId("pwd-change-email")?.value;
+    const currentPassword = byId("pwd-change-current")?.value;
+    const newPassword = byId("pwd-change-new")?.value;
+    const confirmPassword = byId("pwd-change-confirm")?.value;
+
+    if (!newPassword || newPassword.length < 8) {
+      showFeedback("pwd-change-feedback", "Password baru minimal 8 karakter.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      showFeedback("pwd-change-feedback", "Konfirmasi password baru tidak cocok.");
+      return;
+    }
+
+    const result = apiPost("/api/public/change-password", {
+      email,
+      currentPassword,
+      newPassword,
+      companySlug
+    });
+
+    if (result?.ok) {
+      showFeedback("pwd-change-feedback", result.message || "Password berhasil diperbarui!");
+      window.setTimeout(() => {
+        if (byId("password-change-modal-backdrop")) byId("password-change-modal-backdrop").hidden = true;
+        if (byId("must-change-password-modal")) byId("must-change-password-modal").hidden = true;
+        document.body.classList.remove("modal-open");
+        login(email, newPassword);
+      }, 1500);
+    } else {
+      showFeedback("pwd-change-feedback", result?.message || "Gagal memperbarui password.");
+    }
+  });
+
+  // Submit Forgot Password Form
+  byId("forgot-password-form")?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const email = byId("forgot-email")?.value?.trim();
+    if (!email) {
+      showFeedback("forgot-feedback", "Masukkan alamat email terdaftar.");
+      return;
+    }
+
+    const submitBtn = document.querySelector("#forgot-password-form button[type='submit']");
+    const originalText = submitBtn ? submitBtn.textContent : "Kirim Password Sementara";
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.textContent = "⏳ Memproses...";
+    }
+
+    const result = apiPost("/api/public/forgot-password", { email, companySlug });
+    if (result?.ok) {
+      showFeedback("forgot-feedback", result.message || "Password sementara telah dikirim ke email Anda.");
+      if (byId("login-email")) byId("login-email").value = email;
+      window.setTimeout(() => {
+        closeForgotModal();
+        showFeedback("login-feedback", "Password sementara dikirim ke email Anda. Gunakan password sementara tersebut untuk masuk.");
+      }, 2000);
+    } else {
+      showFeedback("forgot-feedback", result?.message || "Gagal memproses reset password.");
+    }
+
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.textContent = originalText;
+    }
+  });
+})();
+
+// ─── App Preview Slideshow — central login only ──────────────────────────────
+(function initSlideshow() {
+  if (companySlug) return; // only on central login
+
+  const track = byId("slideshow-track");
+  const dots = document.querySelectorAll(".slide-dot");
+  const showcase = byId("app-preview-slideshow");
+  if (!track || !dots.length || !showcase) return;
+
+  const SLIDE_COUNT = dots.length;
+  const INTERVAL_MS = 4500;
+  let currentSlide = 0;
+  let timer = null;
+  let paused = false;
+
+  const progressBar = document.createElement("div");
+  progressBar.className = "slideshow-progress";
+  progressBar.style.width = "0%";
+  showcase.appendChild(progressBar);
+
+  function goTo(index) {
+    currentSlide = (index + SLIDE_COUNT) % SLIDE_COUNT;
+    track.style.transform = `translateX(-${currentSlide * 100}%)`;
+    dots.forEach((d, i) => d.classList.toggle("active", i === currentSlide));
+    progressBar.style.transition = "none";
+    progressBar.style.width = "0%";
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        progressBar.style.transition = `width ${INTERVAL_MS}ms linear`;
+        progressBar.style.width = "100%";
+      });
+    });
+  }
+
+  function startAuto() {
+    clearInterval(timer);
+    timer = setInterval(() => {
+      if (!paused) goTo(currentSlide + 1);
+    }, INTERVAL_MS);
+  }
+
+  dots.forEach((dot) => {
+    dot.addEventListener("click", () => {
+      goTo(Number(dot.dataset.slide));
+      startAuto();
+    });
+  });
+
+  showcase.addEventListener("mouseenter", () => { paused = true; });
+  showcase.addEventListener("mouseleave", () => { paused = false; });
+
+  let touchStartX = 0;
+  showcase.addEventListener("touchstart", (e) => { touchStartX = e.touches[0].clientX; }, { passive: true });
+  showcase.addEventListener("touchend", (e) => {
+    const dx = e.changedTouches[0].clientX - touchStartX;
+    if (Math.abs(dx) > 40) {
+      goTo(currentSlide + (dx < 0 ? 1 : -1));
+      startAuto();
+    }
+  });
+
+  // Lightbox Zoom
+  const lightbox = document.getElementById("slide-lightbox");
+  const lightboxImg = document.getElementById("slide-lightbox-img");
+  const lightboxClose = document.getElementById("slide-lightbox-close");
+
+  if (lightbox && lightboxImg) {
+    showcase.addEventListener("click", (e) => {
+      const wrap = e.target.closest(".slide-img-wrap");
+      if (!wrap) return;
+      const img = wrap.querySelector("img");
+      if (!img || !img.src) return;
+      lightboxImg.src = img.src;
+      lightboxImg.alt = img.alt || "Preview Aplikasi";
+      lightbox.classList.remove("hidden");
+      document.body.classList.add("modal-open");
+    });
+
+    function closeLightbox() {
+      lightbox.classList.add("hidden");
+      lightboxImg.src = "";
+      document.body.classList.remove("modal-open");
+    }
+
+    lightbox.addEventListener("click", (e) => {
+      if (e.target === lightbox) closeLightbox();
+    });
+
+    lightboxClose?.addEventListener("click", closeLightbox);
+
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && !lightbox.classList.contains("hidden")) closeLightbox();
+    });
+  }
+
+  goTo(0);
+  startAuto();
+})();

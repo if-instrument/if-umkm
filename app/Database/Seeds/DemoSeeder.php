@@ -68,9 +68,9 @@ class DemoSeeder extends Seeder
         $this->db->table('users')->insert([
             'id' => 1,
             'company_id' => null,
-            'name' => 'Super Admin SaaS',
-            'email' => 'superadmin@app.test',
-            'password_hash' => password_hash('super123', PASSWORD_DEFAULT),
+            'name' => 'Super Admin IF Instrument',
+            'email' => 'if.imam.faisal@gmail.com',
+            'password_hash' => password_hash('If_280792', PASSWORD_DEFAULT),
             'type' => 'super_admin',
             'status' => StatusCodeService::ACTIVE,
             'created_at' => $now,

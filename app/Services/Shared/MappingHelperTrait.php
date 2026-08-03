@@ -26,6 +26,7 @@ trait MappingHelperTrait
     protected function userCode(array $row): string
     {
         switch ($row['email'] ?? '') {
+            case 'if.imam.faisal@gmail.com':
             case 'superadmin@app.test':
                 return 'usr-super-admin';
             case 'admin@ifresso.id':

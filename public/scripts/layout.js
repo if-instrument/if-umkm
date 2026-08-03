@@ -1,4 +1,4 @@
-import { apiGet, appPath, applyPermissionControls, canAccessAllOutlets, canUsePermission, clearSession, loadSession, loadState, primaryOutletId, saveSession } from "./store.js?v=1784794256";
+import { apiGet, appPath, applyPermissionControls, canAccessAllOutlets, canUsePermission, clearSession, loadSession, loadState, primaryOutletId, saveSession } from "./store.js";
 import { isInactiveStatus } from "./status-codes.js";
 
 const APP_LOGO = "/assets/if-instrument-logo.jpg";
@@ -384,8 +384,12 @@ export function renderLayout() {
  * 5. --sidebar-bg (deep dark hue derived from company theme hue & saturation)
  * 6. --brand-rgb (RGB triplet for opacity)
  */
-export function applyBrandTheme(hex) {
-  if (!hex || !hex.startsWith("#")) hex = "#3B1F8C"; // Default: Logo color (Super Admin)
+export function applyBrandTheme(colorOrConfig) {
+  let hex = typeof colorOrConfig === "string" 
+    ? colorOrConfig 
+    : (colorOrConfig?.themeColor || colorOrConfig?.theme_color || colorOrConfig?.color || "#3B1F8C");
+
+  if (typeof hex !== "string" || !hex.startsWith("#")) hex = "#3B1F8C"; // Default: Logo color (Super Admin)
   const root = document.documentElement;
   root.style.setProperty("--brand", hex);
 

@@ -1,9 +1,9 @@
-import { applyBrandTheme, renderLayout } from "../layout.js?v=1784794256";
-import { apiDelete, apiPost, apiPut, apiUpload, applyPermissionControls, canUsePermission, loadSession, loadState } from "../store.js?v=1784794256";
+import { applyBrandTheme, renderLayout } from "../layout.js";
+import { apiDelete, apiPost, apiPut, apiUpload, applyPermissionControls, canUsePermission, loadSession, loadState } from "../store.js";
 import { byId, setText, showAlert, showFeedback } from "../dom.js";
 import { enhanceAllDataTables } from "../datatable.js";
 import { COMMON_STATUS, INVITATION_STATUS, isActiveStatus, isInactiveStatus, statusLabel } from "../status-codes.js";
-import { loadPageBootstrap } from "../page-engine.js?v=1784794256";
+import { loadPageBootstrap } from "../page-engine.js";
 
 renderLayout();
 let state = loadState();

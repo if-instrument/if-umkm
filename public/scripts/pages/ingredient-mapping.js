@@ -1,10 +1,10 @@
-import { renderLayout } from "../layout.js?v=1784794256";
-import { apiPut, appPath, applyPermissionControls, canUsePermission, loadSession, loadState, scopedPayload, visibleForSession } from "../store.js?v=1784794256";
+import { renderLayout } from "../layout.js";
+import { apiPut, appPath, applyPermissionControls, canUsePermission, loadSession, loadState, scopedPayload, visibleForSession } from "../store.js";
 import { formatQty } from "../format.js";
 import { byId, setText, showAlert } from "../dom.js";
 import { enhanceAllDataTables } from "../datatable.js";
 import { isInactiveStatus } from "../status-codes.js";
-import { loadPageBootstrap } from "../page-engine.js?v=1784794256";
+import { loadPageBootstrap } from "../page-engine.js";
 
 renderLayout();
 

@@ -1,6 +1,7 @@
-import { apiGet, scopedApiUrl } from "./store.js?v=1784794256";
+import { apiGet, scopedApiUrl } from "./store.js";
 
 const PAGE_ENDPOINTS = {
+  login: "/api/page/login/bootstrap",
   pos: "/api/page/pos/bootstrap",
   settings: "/api/page/settings/bootstrap",
   users: "/api/page/users/bootstrap",

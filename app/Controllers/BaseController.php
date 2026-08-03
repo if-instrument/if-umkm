@@ -72,7 +72,7 @@ abstract class BaseController extends Controller
 
         // Dynamic timestamp script & stylesheet versioning to prevent browser cache issues
         $timestamp = time();
-        $html = preg_replace('/(\.(?:js|css))\?v=[^"\'\s>]+/i', '$1?v=' . $timestamp, $html);
+        $html = preg_replace('/(src|href)=(["\'])([^"\']+\.(?:js|css))(?:\?v=[^"\']*)?\2/i', '$1=$2$3?v=' . $timestamp . '$2', $html);
 
         $response = $this->response ?? response();
         return $response->setContentType('text/html')->setBody($html);

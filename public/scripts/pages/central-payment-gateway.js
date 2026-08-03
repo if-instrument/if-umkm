@@ -1,7 +1,7 @@
-import { applyBrandTheme, renderLayout } from "../layout.js?v=1784794256";
-import { apiGet, apiPut, loadSession, loadState } from "../store.js?v=1784794256";
+import { applyBrandTheme, renderLayout } from "../layout.js";
+import { apiGet, apiPut, loadSession, loadState } from "../store.js";
 import { byId, showFeedback } from "../dom.js";
-import { loadPageBootstrap } from "../page-engine.js?v=1784794256";
+import { loadPageBootstrap } from "../page-engine.js";
 
 applyBrandTheme("#3B1F8C");
 renderLayout();

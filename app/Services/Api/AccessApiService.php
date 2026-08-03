@@ -37,6 +37,7 @@ class AccessApiService
             return [
                 'activeCompanyId' => $data['companies'][0]['id'] ?? 'company-main',
                 'companies' => $data['companies'] ?? [],
+                'saasPlans' => $data['saasPlans'] ?? [],
                 'outlets' => [],
                 'companyRoles' => [],
                 'users' => [],

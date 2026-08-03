@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Master Paket Subscription - IF Instrument</title>
+    <link rel="stylesheet" href="../styles.css" />
+  </head>
+  <body data-page="saas-plans" data-title="Master Paket Subscription" data-eyebrow="SaaS Pusat">
+    <template id="page-content">
+      <section class="content-grid single">
+        <div class="hero-summary-banner">
+          <div class="hero-summary-copy">
+            <span class="hero-kicker">SaaS Central Management</span>
+            <h2>Master Paket Subscription SaaS</h2>
+            <p>Kelola pilihan paket langganan pusat, batas kuota outlet, dan aturan lisensi yang dapat dipilih untuk setiap perusahaan.</p>
+          </div>
+          <div class="hero-summary-stats">
+            <button class="primary-button" id="btn-add-saas-plan" type="button">+ Tambah Paket SaaS Baru</button>
+          </div>
+        </div>
+
+        <p class="form-feedback full-row" id="saas-plan-feedback"></p>
+
+        <section class="workspace-panel wide">
+          <div class="panel-heading">
+            <div>
+              <h3>Daftar Paket Subscription Aktif</h3>
+              <p>Paket langganan yang aktif di bawah ini secara otomatis tersedia pada pilihan dropdown pendaftaran perusahaan baru.</p>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Nama Paket</th>
+                  <th>Kode Slug</th>
+                  <th>Harga Paket (Rp)</th>
+                  <th>Kuota Max Outlet</th>
+                  <th>Default Masa Aktif</th>
+                  <th>Status</th>
+                  <th>Featured Badge</th>
+                  <th>Aksi</th>
+                </tr>
+              </thead>
+              <tbody id="saas-plan-standalone-table"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <div class="modal-backdrop" data-app-modal hidden>
+          <div class="modal-container">
+            <section class="modal-dialog" id="saas-plan-standalone-modal" aria-modal="true" role="dialog" aria-labelledby="saas-plan-modal-title" hidden>
+              <header class="modal-header">
+                <div>
+                  <span class="hero-kicker">Super Admin</span>
+                  <h3 id="saas-plan-modal-title">Tambah Paket SaaS Subscription</h3>
+                  <p>Atur nama paket, harga berlangganan, kuota outlet, durasi masa aktif, dan deskripsi lisensi langganan pusat.</p>
+                </div>
+                <button class="icon-button" data-close-modal type="button" aria-label="Tutup modal">x</button>
+              </header>
+              <form class="form-grid input-workflow two-column-form" id="saas-plan-standalone-form">
+                <input id="saas-plan-id" type="hidden" />
+                <label>Nama Paket <input id="saas-plan-name" placeholder="misal: Professional Plan" required type="text" /></label>
+                <label>Kode Slug Paket <input id="saas-plan-code" pattern="[A-Za-z0-9_-]+" placeholder="misal: Professional" required type="text" /></label>
+                <label>Harga Berlangganan (Rp)
+                  <input id="saas-plan-price" min="0" step="1000" placeholder="misal: 350000 (Isi 0 jika Gratis)" type="number" value="350000" required />
+                </label>
+                <label>Maksimal Outlet <input id="saas-plan-max-outlets" min="1" max="999" value="10" required type="number" /></label>
+                <label>Default Masa Aktif (Durasi Hari)
+                  <input id="saas-plan-duration-days" min="0" max="3650" placeholder="365 (Isi 0 jika Unlimited)" type="number" value="365" required />
+                </label>
+                <label>Status <select id="saas-plan-status"><option value="10">Aktif</option><option value="90">Nonaktif</option></select></label>
+                <label class="checkbox-field full-row">
+                  <input id="saas-plan-featured" type="checkbox" />
+                  <span><strong>Tandai sebagai Paket Unggulan (Featured)</strong><small>Paket unggulan akan disorot pada landing page autentikasi portal Super Admin.</small></span>
+                </label>
+                <label class="full-row">Deskripsi Ringkas Paket
+                  <textarea id="saas-plan-description" rows="2" placeholder="Tuliskan keuntungan dan fitur utama paket ini..."></textarea>
+                </label>
+                <div class="modal-actions full-row">
+                  <button class="ghost-button" data-close-modal type="button">Batal</button>
+                  <button class="primary-button" type="submit">Simpan Paket SaaS</button>
+                </div>
+              </form>
+            </section>
+          </div>
+        </div>
+      </section>
+    </template>
+    <script type="module" src="../scripts/pages/saas-plans.js"></script>
+  </body>
+</html>

@@ -1,8 +1,8 @@
-import { renderLayout } from "../layout.js?v=1784794256";
-import { apiDelete, apiPost, apiPut, applyPermissionControls, canManageCompanyMasters, canUsePermission, legacyOutletDbId, loadSession, loadState, primaryOutletId, scopedPayload, stampScopedMaster, visibleForSession } from "../store.js?v=1784794256";
+import { renderLayout } from "../layout.js";
+import { apiDelete, apiPost, apiPut, applyPermissionControls, canManageCompanyMasters, canUsePermission, legacyOutletDbId, loadSession, loadState, primaryOutletId, scopedPayload, stampScopedMaster, visibleForSession } from "../store.js";
 import { byId, showAlert, showFeedback } from "../dom.js";
 import { COMMON_STATUS, isActiveStatus, isInactiveStatus } from "../status-codes.js";
-import { loadPageBootstrap } from "../page-engine.js?v=1784794256";
+import { loadPageBootstrap } from "../page-engine.js";
 
 renderLayout();
 

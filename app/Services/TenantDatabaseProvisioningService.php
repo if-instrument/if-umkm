@@ -24,6 +24,7 @@ class TenantDatabaseProvisioningService
 
     public function provision(string $databaseName, array $company, array $admin): array
     {
+        log_message('info', "Starting tenant database provisioning for '{$databaseName}'.");
         $this->assertSafeIdentifier($databaseName);
         $this->createDatabase($databaseName);
         $this->runTenantMigrations($databaseName);
@@ -31,6 +32,7 @@ class TenantDatabaseProvisioningService
         $this->dropTenantCompanyIdColumns($tenant);
         $this->seedTenantCompany($tenant, $company);
         $this->seedTenantAdmin($tenant, $company, $admin);
+        log_message('info', "Tenant database provisioning completed successfully for '{$databaseName}'. Admin email: " . ($admin['email'] ?? 'n/a'));
 
         return $this->tenantConfig($databaseName);
     }
@@ -133,6 +135,7 @@ class TenantDatabaseProvisioningService
             'password_hash' => $admin['password_hash'] ?? password_hash(bin2hex(random_bytes(32)), PASSWORD_DEFAULT),
             'type' => 'company_admin',
             'status' => StatusCodeService::common($admin['status'] ?? 'invited', StatusCodeService::DRAFT),
+            'must_change_password' => (int) ($admin['must_change_password'] ?? 1),
             'created_at' => $now,
             'updated_at' => $now,
         ], $companyId));

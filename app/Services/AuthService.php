@@ -81,6 +81,7 @@ class AuthService
                 'outletIds' => $outletIds,
                 'selectedOutletId' => $defaultOutletId,
                 'onboardingRequired' => $onboardingRequired,
+                'mustChangePassword' => ! empty($user['must_change_password']),
                 'permissions' => $permissions,
                 'permissionMatrix' => $permissionMatrix,
         ];

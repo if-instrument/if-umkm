@@ -10,6 +10,8 @@ class LoginPagePresenter
             'mode' => $data['mode'] ?? 'global',
             'company' => $data['company'] ? $this->company($data['company']) : null,
             'companies' => array_values(array_map(fn ($row) => $this->company($row), $data['companies'] ?? [])),
+            'saasPlans' => $data['saasPlans'] ?? [],
+            'centralPaymentAccounts' => $data['centralPaymentAccounts'] ?? [],
         ];
     }
 
