@@ -224,7 +224,42 @@
             <table><thead><tr><th>Jumlah Item Pesanan</th><th>Item Kemasan Otomatis</th><th>Aksi</th></tr></thead><tbody id="packaging-rule-table"></tbody></table>
           </div>
         </div>
-      </section>
+      <!-- Modal QR Code Meja -->
+      <div class="modal-backdrop" id="dining-table-qr-modal-backdrop" hidden>
+        <div class="modal-container">
+          <section class="modal-dialog" id="dining-table-qr-modal" style="max-width: 480px;" hidden>
+            <header class="modal-header">
+              <div>
+                <span class="hero-kicker">QR Code Meja Outlet</span>
+                <h3 id="dining-table-qr-title">QR Code Meja 01</h3>
+                <p id="dining-table-qr-sub">Scan QR Code ini untuk langsung pesan dari Meja 01.</p>
+              </div>
+              <button class="icon-button" id="btn-close-dining-table-qr" type="button">✕</button>
+            </header>
+            <div style="display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 16px; text-align: center;">
+              <div style="background: #ffffff; padding: 12px; border-radius: 14px; border: 2px solid var(--brand, #3B1F8C); box-shadow: 0 8px 24px rgba(0,0,0,0.08);">
+                <img id="dining-table-qr-img" src="" alt="QR Code Meja" style="width: 210px; height: 210px; border-radius: 8px;" />
+              </div>
+              <div style="width: 100%; text-align: left;">
+                <label style="font-size: 11px; font-weight: 700; color: #64748b; margin-bottom: 4px; display: block;">Link Order QR Code Meja:</label>
+                <div style="display: flex; gap: 6px;">
+                  <input id="dining-table-qr-url" readonly type="text" style="font-size: 11px; font-family: monospace; flex: 1;" />
+                  <button id="btn-copy-dining-table-qr-url" type="button" class="ghost-button compact-button">📋 Salin Link</button>
+                </div>
+              </div>
+              <div style="display: flex; gap: 8px; width: 100%; margin-top: 4px;">
+                <a id="btn-download-dining-table-qr" href="#" download="QR-Meja.png" target="_blank" class="primary-button" style="flex: 1; text-decoration: none; text-align: center; font-size: 12px; display: inline-flex; align-items: center; justify-content: center; gap: 4px;">
+                  ⬇️ Download QR
+                </a>
+                <button id="btn-share-dining-table-qr" type="button" class="ghost-button" style="flex: 1; font-size: 12px; display: inline-flex; align-items: center; justify-content: center; gap: 4px;">
+                  🔗 Share QR
+                </button>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+
       <div class="modal-backdrop" data-modal-backdrop hidden>
         <section class="modal-dialog" id="packaging-rule-modal" aria-modal="true" role="dialog" aria-labelledby="packaging-rule-modal-title" hidden>
           <header class="modal-header"><div><span class="hero-kicker">Fulfillment</span><h3 id="packaging-rule-modal-title">Packaging Rule</h3><p>Pilih bahan kategori Packaging untuk kemasan tambahan level order. Kemasan per produk masuk ke Recipe.</p></div><button class="icon-button" data-close-modal type="button">x</button></header>

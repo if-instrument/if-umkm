@@ -228,16 +228,33 @@ function feePayerLabel(method) {
 
 function renderDiningTables() {
   const tables = sortedDiningTables();
-  byId("dining-table-table").innerHTML = tables.length ? tables.map((table) => `
-    <tr>
-      <td>${table.sort || "-"}</td>
-      <td><strong>${table.name}</strong></td>
-      <td>${table.area || "-"}</td>
-      <td>${formatQty(table.capacity || 1)} pax</td>
-      <td>${statusPill(table.status)}</td>
-      <td><div class="row-actions"><button class="ghost-button compact-button" data-edit-dining-table="${table.id}" data-permission="settings.tables:update" type="button">Edit</button><button class="ghost-button compact-button" data-delete-dining-table="${table.id}" data-permission="settings.tables:delete" type="button">${isActiveStatus(table.status) ? "Nonaktifkan" : "Aktifkan"}</button></div></td>
-    </tr>
-  `).join("") : `<tr><td colspan="6">Belum ada meja.</td></tr>`;
+  const tableBody = byId("dining-table-table");
+  if (tableBody) {
+    tableBody.innerHTML = tables.length ? tables.map((table) => `
+      <tr>
+        <td>${table.sort || "-"}</td>
+        <td><strong>${table.name}</strong></td>
+        <td>${table.area || "-"}</td>
+        <td>${formatQty(table.capacity || 1)} pax</td>
+        <td>${statusPill(table.status)}</td>
+        <td>
+          <div class="row-actions">
+            <button class="ghost-button compact-button" data-qr-dining-table="${table.id}" type="button" style="color: var(--brand, #3B1F8C); font-weight: 700;">📱 QR Code</button>
+            <button class="ghost-button compact-button" data-edit-dining-table="${table.id}" data-permission="settings.tables:update" type="button">Edit</button>
+            <button class="ghost-button compact-button" data-delete-dining-table="${table.id}" data-permission="settings.tables:delete" type="button">${isActiveStatus(table.status) ? "Nonaktifkan" : "Aktifkan"}</button>
+          </div>
+        </td>
+      </tr>
+    `).join("") : `<tr><td colspan="6">Belum ada meja.</td></tr>`;
+
+    tableBody.querySelectorAll("[data-qr-dining-table]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const tableId = btn.dataset.qrDiningTable;
+        const table = (state.settings.diningTables || []).find((t) => String(t.id) === String(tableId));
+        if (table) openDiningTableQrModal(table);
+      });
+    });
+  }
 
   byId("table-layout-preview").innerHTML = tables.length ? tables.map((table) => `
     <article class="${isActiveStatus(table.status) ? "active" : "inactive"}">
@@ -245,6 +262,79 @@ function renderDiningTables() {
       <span>${table.area || "-"} · ${formatQty(table.capacity || 1)} pax</span>
     </article>
   `).join("") : `<p class="empty-state">Layout meja belum dibuat.</p>`;
+}
+
+function openDiningTableQrModal(table) {
+  const compSlug = session?.companySlug || state.activeCompanySlug || window.__COMPANY_SLUG__ || "";
+  const outletId = session?.outletId || state.activeOutletId || primaryOutletId(state, session) || "";
+
+  const tableOrderUrl = `${window.location.origin}${appPath(`/${compSlug}/order`)}?outletId=${encodeURIComponent(outletId)}&tableNo=${encodeURIComponent(table.name)}`;
+  const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(tableOrderUrl)}`;
+
+  setText("dining-table-qr-title", `QR Code ${table.name}`);
+  setText("dining-table-qr-sub", `Scan QR Code ini untuk langsung memesan ke ${table.name} (${table.area || "Area"}).`);
+
+  const img = byId("dining-table-qr-img");
+  const urlInput = byId("dining-table-qr-url");
+  const downloadBtn = byId("btn-download-dining-table-qr");
+  const shareBtn = byId("btn-share-dining-table-qr");
+  const copyUrlBtn = byId("btn-copy-dining-table-qr-url");
+  const closeBtn = byId("btn-close-dining-table-qr");
+
+  if (img) img.src = qrApiUrl;
+  if (urlInput) urlInput.value = tableOrderUrl;
+  if (downloadBtn) {
+    downloadBtn.href = qrApiUrl;
+    downloadBtn.download = `QR-${table.name.replace(/\s+/g, "_")}.png`;
+  }
+
+  if (copyUrlBtn) {
+    copyUrlBtn.onclick = () => {
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(tableOrderUrl);
+        copyUrlBtn.textContent = "✓ Tersalin";
+        setTimeout(() => { copyUrlBtn.textContent = "📋 Salin Link"; }, 1500);
+      }
+    };
+  }
+
+  if (shareBtn) {
+    shareBtn.onclick = async () => {
+      if (navigator.share) {
+        try {
+          await navigator.share({
+            title: `QR Code ${table.name}`,
+            text: `Scan / Buka link ini untuk pesan langsung di ${table.name}:`,
+            url: tableOrderUrl
+          });
+        } catch {
+          if (navigator.clipboard) {
+            navigator.clipboard.writeText(tableOrderUrl);
+            shareBtn.textContent = "✓ Link Tersalin";
+            setTimeout(() => { shareBtn.textContent = "🔗 Share QR"; }, 1500);
+          }
+        }
+      } else if (navigator.clipboard) {
+        navigator.clipboard.writeText(tableOrderUrl);
+        shareBtn.textContent = "✓ Link Tersalin";
+        setTimeout(() => { shareBtn.textContent = "🔗 Share QR"; }, 1500);
+      }
+    };
+  }
+
+  if (closeBtn) {
+    closeBtn.onclick = closeDiningTableQrModal;
+  }
+
+  if (byId("dining-table-qr-modal-backdrop")) byId("dining-table-qr-modal-backdrop").hidden = false;
+  if (byId("dining-table-qr-modal")) byId("dining-table-qr-modal").hidden = false;
+  document.body.classList.add("modal-open");
+}
+
+function closeDiningTableQrModal() {
+  if (byId("dining-table-qr-modal-backdrop")) byId("dining-table-qr-modal-backdrop").hidden = true;
+  if (byId("dining-table-qr-modal")) byId("dining-table-qr-modal").hidden = true;
+  document.body.classList.remove("modal-open");
 }
 
 function renderPaymentMethods() {

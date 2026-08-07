@@ -27,7 +27,10 @@ export const state = {
   outletConfirmed: false,
   orderResult: null,
   orderStatus: "NEW_ORDER",
-  lastOrderNumber: ""
+  lastOrderNumber: "",
+  isOutletLocked: false,
+  isTableLocked: false,
+  isQrLocked: false
 };
 
 export const bookState = {

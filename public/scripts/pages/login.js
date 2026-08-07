@@ -46,10 +46,14 @@ function renderCompanyShowcase(company) {
     if (company.logoUrl) {
       haloBox.innerHTML = `<img id="company-showcase-logo" src="${escapeHtml(company.logoUrl)}" alt="${escapeHtml(company.name || "Logo")}" />`;
     } else {
+      // No logo: show initial letter on brand-gradient circle
       const initial = (company.name || "C").charAt(0).toUpperCase();
-      haloBox.innerHTML = `<div class="company-halo-initial" style="display:flex; align-items:center; justify-content:center; width:100%; height:100%; background:linear-gradient(135deg, var(--brand, #3B1F8C), var(--brand-strong, #1e1b4b)); color:#ffffff; font-weight:900; font-size:36px; border-radius:50%; border:2px solid #ffffff; text-shadow:0 2px 6px rgba(0,0,0,0.3);">${initial}</div>`;
+      haloBox.innerHTML = `<div class="company-halo-initial" style="display:flex;align-items:center;justify-content:center;width:100%;height:100%;color:#ffffff;font-weight:900;font-size:34px;border-radius:50%;text-shadow:0 2px 6px rgba(0,0,0,0.3);">${initial}</div>`;
     }
   }
+
+  // Add tenant-active class so left panel gets brand top-border accent
+  document.body.classList.add("tenant-active");
 
   showcase.hidden = false;
 }
@@ -444,7 +448,49 @@ byId("toggle-login-password")?.addEventListener("click", () => {
       const orderContainer = byId("company-public-order-container");
       const orderBtn = byId("btn-company-public-order");
       if (orderContainer && orderBtn) {
-        orderBtn.href = appPath("/order");
+        // appPath already prepends /{companySlug}/ — just pass /order
+        const orderUrl = window.location.origin + appPath("/order");
+        orderBtn.href = orderUrl;
+
+        const qrImg = byId("company-general-qr-img");
+        const downloadBtn = byId("btn-download-general-qr");
+        const shareBtn = byId("btn-share-general-qr");
+
+        if (qrImg) {
+          const qrCodeApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(orderUrl)}`;
+          qrImg.src = qrCodeApiUrl;
+          if (downloadBtn) {
+            downloadBtn.href = qrCodeApiUrl;
+            downloadBtn.download = `QR-Menu-${companySlug || "General"}.png`;
+          }
+        }
+
+        if (shareBtn) {
+          shareBtn.onclick = async (e) => {
+            e.preventDefault();
+            const compName = response.data.company?.name || "Katalog Menu";
+            if (navigator.share) {
+              try {
+                await navigator.share({
+                  title: `QR Menu Table ${compName}`,
+                  text: `Scan / Buka link ini untuk pesan makanan & minuman mandiri di ${compName}:`,
+                  url: orderUrl
+                });
+              } catch {
+                if (navigator.clipboard) {
+                  navigator.clipboard.writeText(orderUrl);
+                  shareBtn.textContent = "✓ Link QR Tersalin";
+                  setTimeout(() => { shareBtn.textContent = "🔗 Share QR"; }, 1500);
+                }
+              }
+            } else if (navigator.clipboard) {
+              navigator.clipboard.writeText(orderUrl);
+              shareBtn.textContent = "✓ Link QR Tersalin";
+              setTimeout(() => { shareBtn.textContent = "🔗 Share QR"; }, 1500);
+            }
+          };
+        }
+
         orderContainer.hidden = false;
       }
 

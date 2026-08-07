@@ -157,10 +157,39 @@ export async function requestJson(url, options = {}) {
   return payload.data;
 }
 
+export function getQrParams() {
+  const params = new URLSearchParams(window.location.search);
+  const rawOutlet = params.get("outletId") || params.get("outlet_id") || params.get("outlet") || "";
+  const rawTable = params.get("table") || params.get("tableNo") || params.get("table_no") || params.get("tableName") || params.get("table_name") || params.get("meja") || "";
+
+  let formattedTable = rawTable.trim();
+  if (formattedTable && !/^(meja|table)/i.test(formattedTable)) {
+    formattedTable = `Meja ${formattedTable}`;
+  }
+
+  return {
+    outletId: rawOutlet.trim(),
+    tableName: formattedTable.trim(),
+    isOutletLocked: Boolean(rawOutlet.trim()),
+    isTableLocked: Boolean(formattedTable.trim()),
+    isQrLocked: Boolean(rawOutlet.trim() || formattedTable.trim())
+  };
+}
+
 export async function loadOrderData(outletId = "") {
   setBusy(true, "Memuat data...");
   try {
     const saved = readOrderSession();
+    const qr = getQrParams();
+
+    state.isOutletLocked = qr.isOutletLocked;
+    state.isTableLocked = qr.isTableLocked;
+    state.isQrLocked = qr.isQrLocked;
+
+    if (qr.isTableLocked) {
+      state.serviceType = "Dine In";
+      state.tableName = qr.tableName;
+    }
     
     if (saved.orderStatus === "ORDER_CREATED" && saved.orderNumber) {
       const query = new URLSearchParams({ only: "outlets" });
@@ -169,8 +198,8 @@ export async function loadOrderData(outletId = "") {
       
       const statusQuery = new URLSearchParams({ q: saved.orderNumber });
       if (companySlug()) statusQuery.set("company", companySlug());
-      if (outletId) {
-        statusQuery.set("outlet_id", outletId);
+      if (outletId || qr.outletId) {
+        statusQuery.set("outlet_id", outletId || qr.outletId);
       } else if (data.outlets && data.outlets.length === 1) {
         statusQuery.set("outlet_id", data.outlets[0].id);
       }
@@ -185,10 +214,10 @@ export async function loadOrderData(outletId = "") {
         products: [],
         modifiers: [],
         ingredients: [],
-        outletId: orderResult?.order?.outletId || "",
+        outletId: orderResult?.order?.outletId || qr.outletId || "",
         outletConfirmed: true,
-        serviceType: orderResult?.order?.serviceType || "Take Away",
-        tableName: orderResult?.order?.tableName || "",
+        serviceType: orderResult?.order?.serviceType || (qr.isTableLocked ? "Dine In" : "Take Away"),
+        tableName: orderResult?.order?.tableName || (qr.isTableLocked ? qr.tableName : ""),
         categoryId: "all",
         paymentMethodId: orderResult?.order?.paymentMethodId || "",
         cartConfirmed: true,
@@ -209,7 +238,7 @@ export async function loadOrderData(outletId = "") {
     }
 
     // Normal path
-    const targetOutletId = outletId || saved.outletId || "";
+    const targetOutletId = outletId || qr.outletId || saved.outletId || "";
     
     if (!targetOutletId) {
       // 1. Cover page path: only load outlets and company

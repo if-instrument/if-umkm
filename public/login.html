@@ -79,6 +79,28 @@
               </div>
             </div>
           </div>
+
+          <!-- Order Online & General QR Code section — Left Column -->
+          <div id="company-public-order-container" style="margin-top: 10px; text-align: center; border-top: 1px dashed var(--line); padding-top: 14px;" hidden>
+            <p style="margin: 0 0 8px; font-size: 13px; color: var(--muted); font-weight: 500;">Ingin memesan makanan / minuman?</p>
+            <a id="btn-company-public-order" href="#" class="primary-button full" style="display: inline-flex; align-items: center; justify-content: center; background: #059669; border-color: #059669; font-weight: 800; text-decoration: none; padding: 12px; border-radius: 10px; font-size: 13px;">📱 Menu Order Online Pelanggan →</a>
+            
+            <div id="company-general-qr-section" style="margin-top: 14px; padding-top: 12px; border-top: 1px dashed rgba(var(--brand-rgb, 59, 31, 140), 0.2); display: flex; flex-direction: column; align-items: center; gap: 8px;">
+              <span style="font-size: 11px; font-weight: 800; color: var(--brand-strong, #3B1F8C); text-transform: uppercase; letter-spacing: 0.05em;">📱 QR Menu Table General</span>
+              <div style="background: #ffffff; padding: 8px; border-radius: 12px; border: 1px solid #cbd5e1; box-shadow: 0 4px 12px rgba(0,0,0,0.06); display: flex; justify-content: center;">
+                <img id="company-general-qr-img" src="" alt="QR Menu Table General" style="width: 130px; height: 130px; border-radius: 6px;" />
+              </div>
+              <small style="color: #64748b; font-size: 11px;">Scan QR untuk pesan menu online mandiri dari HP.</small>
+              <div style="display: flex; gap: 6px; width: 100%; margin-top: 2px;">
+                <a id="btn-download-general-qr" href="#" download="QR-Menu-General.png" target="_blank" class="ghost-button" style="flex: 1; font-size: 11px; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; gap: 4px; padding: 6px 10px;">
+                  ⬇️ Download QR
+                </a>
+                <button id="btn-share-general-qr" type="button" class="ghost-button" style="flex: 1; font-size: 11px; display: inline-flex; align-items: center; justify-content: center; gap: 4px; padding: 6px 10px;">
+                  🔗 Share QR
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- 2-Column Main Row — central login only (Slideshow & SaaS Plans) -->
@@ -194,11 +216,6 @@
           <div id="central-register-prompt-container" style="margin-top: 14px; text-align: center; border-top: 1px dashed var(--line); padding-top: 14px;">
             <p style="margin: 0 0 8px; font-size: 13px; color: var(--muted);">Ingin mendaftarkan Perusahaan Baru?</p>
             <button class="ghost-button full" id="btn-open-register-modal" type="button" style="border-color: var(--brand); color: var(--brand); font-weight: 800;">+ Register Perusahaan Baru</button>
-          </div>
-
-          <div id="company-public-order-container" style="margin-top: 14px; text-align: center; border-top: 1px dashed var(--line); padding-top: 14px;" hidden>
-            <p style="margin: 0 0 8px; font-size: 13px; color: var(--muted);">Ingin memesan makanan / minuman?</p>
-            <a id="btn-company-public-order" href="#" class="primary-button full" style="display: inline-block; background: #059669; border-color: #059669; font-weight: 800; text-decoration: none;">📱 Menu Order Online Pelanggan →</a>
           </div>
 
           <p class="form-feedback" id="login-feedback" role="status"></p>

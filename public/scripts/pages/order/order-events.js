@@ -339,6 +339,7 @@ export function registerGlobalClickDispatcher() {
 
     const serviceButton = event.target.closest("[data-service-type]");
     if (serviceButton) {
+      if (state.isTableLocked || state.isQrLocked) return;
       state.serviceType = serviceButton.dataset.serviceType;
       if (!needsServiceChoice()) state.tableName = "";
       renderServiceTypes();
@@ -349,6 +350,7 @@ export function registerGlobalClickDispatcher() {
 
     const tableButton = event.target.closest("[data-table-name]");
     if (tableButton) {
+      if (state.isTableLocked) return;
       state.tableName = tableButton.dataset.tableName || "";
       renderTables();
       renderSpread(false);
