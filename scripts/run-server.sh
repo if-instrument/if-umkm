@@ -25,9 +25,29 @@ PHP_BIN="$(detect_php)"
 HOST="${HOST:-0.0.0.0}"
 PORT="${PORT:-8081}"
 
+AI_PID=""
+cleanup() {
+  if [[ -n "$AI_PID" ]]; then
+    echo
+    echo "Menghentikan AI Microservice (PID: $AI_PID)..."
+    kill "$AI_PID" 2>/dev/null || true
+  fi
+}
+trap cleanup EXIT INT TERM
+
+if [[ -f scripts/run-ai-service.sh ]]; then
+  echo "Menjalankan AI Microservice (Python) di background..."
+  scripts/run-ai-service.sh &
+  AI_PID=$!
+  sleep 1
+fi
+
+echo "=================================================="
 echo "Menjalankan IF Instrument UMKM Solution"
-echo "URL lokal : http://127.0.0.1:${PORT}"
-echo "Bind     : ${HOST}:${PORT}"
+echo "URL Aplikasi POS : http://127.0.0.1:${PORT}"
+echo "URL AI Microservice: http://127.0.0.1:8000"
+echo "Bind            : ${HOST}:${PORT}"
+echo "=================================================="
 echo
 
-exec "$PHP_BIN" spark serve --host "$HOST" --port "$PORT"
+"$PHP_BIN" spark serve --host "$HOST" --port "$PORT"

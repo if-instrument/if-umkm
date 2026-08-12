@@ -128,6 +128,36 @@ Windows PowerShell:
 .\scripts\run-server.ps1
 ```
 
+### Menjalankan Python AI Microservice
+
+Setup awal AI Microservice:
+
+Linux/macOS:
+
+```bash
+scripts/setup-ai-service.sh
+```
+
+Windows PowerShell:
+
+```powershell
+.\scripts\setup-ai-service.ps1
+```
+
+Menjalankan AI Microservice (Port 8000):
+
+Linux/macOS:
+
+```bash
+scripts/run-ai-service.sh
+```
+
+Windows PowerShell:
+
+```powershell
+.\scripts\run-ai-service.ps1
+```
+
 Atau set port sendiri:
 
 ```bash
@@ -581,6 +611,15 @@ Payment gateway:
 XENDIT_SECRET_KEY =
 MIDTRANS_SERVER_KEY =
 PAYMENT_GATEWAY_TIMEOUT = 15
+```
+
+AI Microservice:
+
+```text
+AI_SERVICE_URL = 'http://127.0.0.1:8000'
+AI_SERVICE_API_KEY = 'pos_ai_secret_key_2026'
+AI_SERVICE_HMAC_SECRET = 'pos_ai_hmac_secret_2026'
+AI_SERVICE_TIMEOUT = 5
 ```
 
 Credential gateway juga bisa dikelola dari setting outlet/perusahaan sesuai flow aplikasi.

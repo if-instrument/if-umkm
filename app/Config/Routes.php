@@ -37,6 +37,13 @@ $routes->group('api', ['namespace' => 'App\Controllers\Api'], static function ($
 $routes->group('api/page', static function ($routes) {
     $routes->get('login/bootstrap', 'LoginController::bootstrap');
     $routes->post('login/submit', 'LoginController::submit');
+    $routes->post('login/face-verify', 'LoginController::faceVerify');
+    $routes->post('login/face-identify', 'LoginController::faceIdentify');
+    $routes->post('login/fingerprint-verify', 'LoginController::fingerprintVerify');
+    $routes->post('login/fingerprint-identify', 'LoginController::fingerprintIdentify');
+    $routes->post('login/fingerprint-open-device', 'LoginController::openFingerprintDevice');
+    $routes->post('login/fingerprint-capture-frame', 'LoginController::captureFingerprintFrame');
+    $routes->post('login/fingerprint-close-device', 'LoginController::closeFingerprintDevice');
     $routes->get('order/bootstrap', 'OnlineOrderController::bootstrap');
     $routes->get('order/member', 'OnlineOrderController::member');
     $routes->get('order/status', 'OnlineOrderController::status');
@@ -80,6 +87,22 @@ $routes->group('api', ['namespace' => 'App\Controllers\Api', 'filter' => 'jwt-au
     $routes->put('user/(:segment)', 'AccessController::updateUser/$1');
     $routes->post('user/(:segment)/invite', 'AccessController::resendUserInvitation/$1');
     $routes->delete('user/(:segment)', 'AccessController::deleteUser/$1');
+    $routes->get('profile', '\App\Controllers\Api\ProfileController::getProfile');
+    $routes->post('profile/update', '\App\Controllers\Api\ProfileController::updateProfile');
+    $routes->post('profile/face-register', '\App\Controllers\Api\ProfileController::registerFace');
+    $routes->post('profile/face-open-device', '\App\Controllers\Api\ProfileController::openCameraDevice');
+    $routes->post('profile/face-close-device', '\App\Controllers\Api\ProfileController::closeCameraDevice');
+    $routes->post('profile/face-test', '\App\Controllers\Api\ProfileController::testFace');
+    $routes->post('profile/face-delete', '\App\Controllers\Api\ProfileController::deleteFace');
+    $routes->delete('profile/face', '\App\Controllers\Api\ProfileController::deleteFace');
+    $routes->post('profile/fingerprint-register', '\App\Controllers\Api\ProfileController::registerFingerprint');
+    $routes->post('profile/fingerprint-verify-step', '\App\Controllers\Api\ProfileController::verifyFingerprintStep');
+    $routes->post('profile/fingerprint-open-device', '\App\Controllers\Api\ProfileController::openFingerprintDevice');
+    $routes->post('profile/fingerprint-close-device', '\App\Controllers\Api\ProfileController::closeFingerprintDevice');
+    $routes->post('profile/fingerprint-capture-frame', '\App\Controllers\Api\ProfileController::captureFingerprintFrame');
+    $routes->post('profile/fingerprint-test', '\App\Controllers\Api\ProfileController::testFingerprint');
+    $routes->post('profile/fingerprint-delete', '\App\Controllers\Api\ProfileController::deleteFingerprint');
+    $routes->delete('profile/fingerprint', '\App\Controllers\Api\ProfileController::deleteFingerprint');
     $routes->get('dashboard', 'DashboardController::show');
     $routes->get('onboarding', 'OnboardingController::show');
     $routes->get('page/pos/bootstrap', '\App\Controllers\PosController::bootstrap');
@@ -202,7 +225,9 @@ $routes->get('(:segment)/pages/crm-customers.html', 'AppPageController::tenantPa
 $routes->get('(:segment)/pages/crm-transactions.html', 'AppPageController::tenantPage/$1/crm-transactions.html');
 $routes->get('(:segment)/pages/onboarding.html', 'AppPageController::tenantPage/$1/onboarding.html');
 $routes->get('(:segment)/pages/order-history.html', 'AppPageController::tenantPage/$1/order-history.html');
+$routes->get('(:segment)/pages/profile.html', 'AppPageController::tenantPage/$1/profile.html');
 $routes->get('pages/pos.html', 'PosController::show');
+$routes->get('pages/profile.html', 'AppPageController::page/profile.html');
 $routes->get('pages/settings.html', 'SettingsPageController::show');
 $routes->get('pages/users.html', 'UserRoleController::show');
 $routes->get('pages/categories.html', 'ProductPageController::show/categories');

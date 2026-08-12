@@ -19,6 +19,14 @@ use CodeIgniter\Config\BaseService;
  */
 class Services extends BaseService
 {
+    public static function aiService(bool $getShared = true)
+    {
+        if ($getShared) {
+            return static::getSharedInstance('aiService');
+        }
+        return new \App\Libraries\AIService();
+    }
+
     public static function salesService(bool $getShared = true)
     {
         if ($getShared) {

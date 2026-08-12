@@ -11,7 +11,11 @@ param(
     [string]$DbUser = "root",
     [string]$DbPass = "",
     [int]$DbPort = 3306,
-    [string]$CiEnvironment = "production"
+    [string]$CiEnvironment = "production",
+    [string]$AiServiceUrl = "http://127.0.0.1:8000",
+    [string]$AiServiceApiKey = "pos_ai_secret_key_2026",
+    [string]$AiServiceHmacSecret = "pos_ai_hmac_secret_2026",
+    [int]$AiServiceTimeout = 5
 )
 
 $ErrorActionPreference = "Stop"
@@ -69,6 +73,11 @@ database.default.password = $DbPass
 database.default.DBDriver = MySQLi
 database.default.DBPrefix =
 database.default.port = $DbPort
+
+AI_SERVICE_URL = '$AiServiceUrl'
+AI_SERVICE_API_KEY = '$AiServiceApiKey'
+AI_SERVICE_HMAC_SECRET = '$AiServiceHmacSecret'
+AI_SERVICE_TIMEOUT = $AiServiceTimeout
 # END IF_INSTRUMENT_SERVER_SETUP
 "@
 
@@ -109,6 +118,12 @@ if (!$SkipMigrate) {
 if ($Fresh) {
     Write-Host "Fresh seed aktif: reset database pusat dan seed Super Admin SaaS..."
     & $PhpBin spark db:seed DemoSeeder
+}
+
+if (Test-Path "scripts\setup-ai-service.ps1") {
+    Write-Host ""
+    Write-Host "Membuat dan menyiapkan AI Microservice (Python)..."
+    & .\scripts\setup-ai-service.ps1
 }
 
 Write-Host ""

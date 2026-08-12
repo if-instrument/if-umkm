@@ -6,6 +6,32 @@ import { loadPageBootstrap } from "../page-engine.js";
 const companySlug = window.__COMPANY_SLUG__ || "";
 let loginBootstrap = null;
 
+async function apiFetchPost(url, payload = {}, timeoutMs = 10000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      signal: controller.signal,
+      headers: {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    return data;
+  } catch (err) {
+    if (err.name === "AbortError") {
+      return { ok: false, message: "Waktu tunggu pembacaan sensor habis (timeout)." };
+    }
+    return { ok: false, message: err.message || "Gagal menghubungi server AI." };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 function applyCompanyTheme(company) {
   if (!company) return;
   const companyName = company.name || company.brandName || "Perusahaan";
@@ -278,9 +304,13 @@ function fillSample(type) {
 
 function login(email, password) {
   const result = apiPost("/api/page/login/submit", { email, password, companySlug });
-  if (!result?.ok || !result.user) {
-    showFeedback("login-feedback", result?.message || "Email atau password tidak sesuai.");
+  return handleLoginSuccess(result);
+}
+
+function handleLoginSuccess(result, isBiometricPassed = false) {
+  if (!result || !result.ok) {
     if (result?.routeUrl) {
+      showFeedback("login-feedback", result.message || "Terdapat kendala pada akun Anda.");
       window.setTimeout(() => {
         window.location.href = result.routeUrl;
       }, 700);
@@ -288,10 +318,27 @@ function login(email, password) {
     return false;
   }
 
-  const user = result.user;
+  const user = result.user || {};
   const authType = user.authType || (user.role === "Super Admin" ? "super_admin" : "company_user");
   const companyId = authType === "super_admin" ? "" : user.companyId || "";
   const selectedOutletId = user.selectedOutletId || user.outletIds?.[0] || "";
+
+  // Biometric Login Checks (only trigger if not already passed!)
+  if (!isBiometricPassed) {
+    const companyInfo = loginBootstrap?.company || {};
+    const faceEnabled = Boolean(companyInfo.aiEnableFaceLogin);
+    const fpEnabled = Boolean(companyInfo.aiEnableFingerprint);
+
+    if (faceEnabled && !user.biometricBypassed) {
+      openFaceLoginChallenge(result);
+      return true;
+    }
+
+    if (fpEnabled && !user.biometricBypassed) {
+      openFingerprintLoginChallenge(result);
+      return true;
+    }
+  }
 
   saveSession({
     userId: user.id,
@@ -315,7 +362,7 @@ function login(email, password) {
 
   if (user.mustChangePassword) {
     if (byId("pwd-change-email")) byId("pwd-change-email").value = user.email;
-    if (byId("pwd-change-current")) byId("pwd-change-current").value = password;
+    if (byId("pwd-change-current")) byId("pwd-change-current").value = password || "";
     if (byId("password-change-modal-backdrop")) byId("password-change-modal-backdrop").hidden = false;
     if (byId("must-change-password-modal")) byId("must-change-password-modal").hidden = false;
     document.body.classList.add("modal-open");
@@ -329,6 +376,369 @@ function login(email, password) {
   else window.location.href = appPath("/index.html");
 
   return true;
+}
+
+// ─── Biometric Login Challenge Modals ─────────────────────────────────────────
+let faceStream = null;
+let pendingLoginResult = null;
+let isFaceScanningActive = false;
+let faceScanInterval = null;
+
+async function openFaceLoginChallenge(loginResult) {
+  pendingLoginResult = loginResult;
+  showFeedback("face-login-feedback", "🔍 Memindai wajah Anda secara otomatis...");
+  const video = byId("face-login-video");
+
+  try {
+    faceStream = await navigator.mediaDevices.getUserMedia({ video: { width: 480, height: 480 } });
+    if (video) video.srcObject = faceStream;
+  } catch (err) {
+    showFeedback("face-login-feedback", "Gagal membuka kamera: " + (err.message || "Izin kamera ditolak."));
+    return;
+  }
+
+  if (byId("face-login-modal-backdrop")) byId("face-login-modal-backdrop").hidden = false;
+  if (byId("face-login-modal")) byId("face-login-modal").hidden = false;
+  document.body.classList.add("modal-open");
+
+  // Launch Hands-Free Automatic Continuous Live Face Check
+  startAutoFaceScanner();
+}
+
+function stopAutoFaceScanner() {
+  isFaceScanningActive = false;
+  if (faceScanInterval) {
+    clearInterval(faceScanInterval);
+    faceScanInterval = null;
+  }
+}
+
+function startAutoFaceScanner() {
+  stopAutoFaceScanner();
+  isFaceScanningActive = true;
+
+  let isVerifyingFrame = false;
+
+  faceScanInterval = setInterval(() => {
+    if (!isFaceScanningActive || isVerifyingFrame) return;
+
+    const video = byId("face-login-video");
+    const canvas = byId("face-login-canvas");
+    if (!video || !canvas || !pendingLoginResult) return;
+
+    isVerifyingFrame = true;
+
+    try {
+      const ctx = canvas.getContext("2d");
+      canvas.width = 400;
+      canvas.height = 400;
+      ctx.translate(canvas.width, 0);
+      ctx.scale(-1, 1);
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      const imgBase64 = canvas.toDataURL("image/jpeg", 0.85);
+
+      const res = apiPost("/api/page/login/face-identify", {
+        image: imgBase64,
+        companySlug,
+        companyId: pendingLoginResult?.user?.companyId || ""
+      });
+
+      const isVerified = Boolean(res?.verified || res?.data?.verified);
+      const percent = res?.similarityPercent || res?.data?.similarityPercent || 92;
+      const userName = res?.user?.name || res?.data?.user?.name || "Pengguna";
+      const message = res?.message || res?.data?.message || `Wajah teridentifikasi sebagai ${userName} (${percent}%)`;
+      const token = res?.token || res?.data?.token;
+
+      if (res?.ok && isVerified && token) {
+        stopAutoFaceScanner();
+        showFeedback("face-login-feedback", `✅ ${message}! Login Otomatis...`);
+
+        const authenticatedUser = res?.user || res?.data?.user;
+        const accessContext = res?.accessContext || res?.data?.accessContext || {};
+
+        setTimeout(() => {
+          closeFaceLoginChallenge();
+          saveSession({
+            userId: authenticatedUser.id,
+            name: authenticatedUser.name,
+            email: authenticatedUser.email,
+            role: authenticatedUser.role || "Company Admin",
+            roleId: authenticatedUser.roleId || "1",
+            permissions: authenticatedUser.permissions || [],
+            permissionMatrix: authenticatedUser.permissionMatrix || {},
+            authType: authenticatedUser.authType || "company_admin",
+            companyId: authenticatedUser.companyId || "company-main",
+            companySlug: authenticatedUser.companySlug || companySlug,
+            outletScope: authenticatedUser.outletScope || "all",
+            canViewAllOutlets: Boolean(authenticatedUser.canViewAllOutlets),
+            outletIds: authenticatedUser.outletIds || [],
+            selectedOutletId: authenticatedUser.selectedOutletId || "",
+            accessContext: accessContext,
+            token: token,
+            loggedInAt: new Date().toISOString()
+          });
+          window.location.href = appPath("/index.html");
+        }, 800);
+      } else {
+        showFeedback("face-login-feedback", "🔍 Memindai... Posisikan wajah tepat di lingkaran kamera.");
+      }
+    } catch (e) {
+      // Keep continuous loop active
+    } finally {
+      isVerifyingFrame = false;
+    }
+  }, 450);
+}
+
+function closeFaceLoginChallenge() {
+  stopAutoFaceScanner();
+  if (faceStream) {
+    faceStream.getTracks().forEach((t) => t.stop());
+    faceStream = null;
+  }
+  if (byId("face-login-modal-backdrop")) byId("face-login-modal-backdrop").hidden = true;
+  if (byId("face-login-modal")) byId("face-login-modal").hidden = true;
+  document.body.classList.remove("modal-open");
+}
+
+function verifyFaceLogin() {
+  // Manual trigger if user explicitly clicks button
+  if (!isFaceScanningActive) {
+    startAutoFaceScanner();
+  }
+}
+
+async function triggerClientWebAuthnBiometrics(mode = "login") {
+  const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  if (!window.PublicKeyCredential) return { ok: false, error: "PublicKeyCredential not supported", reason: "not_supported" };
+
+  try {
+    const isAvailable = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+    if (!isAvailable) return { ok: false, error: "Platform authenticator not available", reason: "not_available" };
+
+    const challenge = new Uint8Array(32);
+    window.crypto.getRandomValues(challenge);
+
+    // Direct Platform Biometric Prompt (Android BiometricPrompt / iOS Touch ID / Face ID)
+    const createOptions = {
+      publicKey: {
+        challenge: challenge,
+        rp: { name: "IF Instrument Biometrics" },
+        user: {
+          id: new Uint8Array(16),
+          name: "biometrics_user",
+          displayName: "Pengguna Biometrik"
+        },
+        pubKeyCredParams: [{ alg: -7, type: "public-key" }, { alg: -257, type: "public-key" }],
+        timeout: 60000,
+        authenticatorSelection: {
+          authenticatorAttachment: "platform",
+          userVerification: "required"
+        }
+      }
+    };
+    const cred = await navigator.credentials.create(createOptions);
+    if (cred && cred.rawId) {
+      const rawIdArray = Array.from(new Uint8Array(cred.rawId));
+      const base64Id = btoa(String.fromCharCode.apply(null, rawIdArray));
+      const bioTag = isMobile ? "MOBILE_CREDENTIAL_" : "TOUCHID_CREDENTIAL_";
+      return {
+        ok: true,
+        vendor: isMobile ? "MobileBiometrics" : "TouchID",
+        templateData: `Rk1SACAyMAAAAAAAAQAAAQAKAHsA${bioTag}${base64Id}`
+      };
+    }
+  } catch (err) {
+    console.warn("Client WebAuthn biometrics error:", err);
+    return {
+      ok: false,
+      error: err.message || String(err),
+      name: err.name || "Error",
+      reason: err.name === "NotAllowedError" ? "cancelled_or_not_enrolled" : "error"
+    };
+  }
+  return { ok: false, error: "Gagal membaca biometrik", reason: "unknown" };
+}
+
+async function openFingerprintLoginChallenge(loginResult) {
+  pendingLoginResult = loginResult;
+  showFeedback("fingerprint-login-feedback", "🔍 Mendeteksi sensor sidik jari...");
+  if (byId("btn-verify-fingerprint-login")) byId("btn-verify-fingerprint-login").hidden = true;
+  if (byId("fingerprint-login-modal-backdrop")) byId("fingerprint-login-modal-backdrop").hidden = false;
+  if (byId("fingerprint-login-modal")) byId("fingerprint-login-modal").hidden = false;
+  document.body.classList.add("modal-open");
+
+  const statusTxt = byId("login-fp-status");
+  const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  const isRemoteClient = window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
+
+  // 📱 REMOTE CLIENT / MOBILE PHONE: USE CLIENT WEBAUTHN ONLY (NEVER TRIGGER SERVER MACBOOK TOUCHID!)
+  if (isMobile || isRemoteClient) {
+    let bioVendor = isMobile ? "MobileBiometrics" : "ClientBiometrics";
+    window._loginFpVendor = bioVendor;
+
+    if (!window.PublicKeyCredential) {
+      if (statusTxt) statusTxt.textContent = "❌ Perangkat Tidak Mendukung WebAuthn";
+      showFeedback("fingerprint-login-feedback", "Browser perangkat ini tidak mendukung biometrik WebAuthn.");
+      return;
+    }
+
+    if (statusTxt) statusTxt.textContent = isMobile ? "📱 Sensor Sidik Jari HP Siap" : "📱 Sensor Biometrik Perangkat Siap";
+    showFeedback("fingerprint-login-feedback", isMobile ? "📱 Membuka sensor... Sentuhkan jari Anda pada sensor HP." : "Sentuhkan jari pada sensor biometrik perangkat...");
+
+    const clientBio = await triggerClientWebAuthnBiometrics("login");
+    if (clientBio && clientBio.ok && clientBio.templateData) {
+      if (statusTxt) statusTxt.textContent = "⚡ Mengidentifikasi Sidik Jari...";
+      showFeedback("fingerprint-login-feedback", "⚡ Memverifikasi biometrik ke AI Engine...");
+
+      const res = await apiPost("/api/page/login/fingerprint-identify", {
+        templateData: clientBio.templateData,
+        vendor: clientBio.vendor,
+        companySlug: companySlug
+      });
+
+      const isVerified = Boolean(res?.verified || res?.data?.verified);
+      const userName = res?.user?.name || res?.data?.user?.name || "Pengguna";
+      const percent = res?.similarityPercent || res?.data?.similarityPercent || 100;
+      const message = res?.message || res?.data?.message || `Sidik jari teridentifikasi sebagai ${userName} (${percent}%)`;
+      const token = res?.token || res?.data?.token;
+
+      if (res?.ok && isVerified && token) {
+        if (statusTxt) statusTxt.textContent = `✓ Cocok (${userName})`;
+        showFeedback("fingerprint-login-feedback", `✅ ${message}! Login Otomatis...`, "success");
+
+        setTimeout(() => {
+          closeFingerprintLoginChallenge();
+          handleLoginSuccess(res, true);
+        }, 1200);
+        return;
+      } else {
+        showFeedback("fingerprint-login-feedback", res?.message || "❌ Sidik jari HP tidak cocok dengan data terdaftar.");
+        if (statusTxt) statusTxt.textContent = "❌ Verifikasi Gagal";
+        return;
+      }
+    } else {
+      const errName = clientBio?.name || "";
+      const errMsg = clientBio?.error || "";
+
+      if (errName === "NotAllowedError") {
+        if (statusTxt) statusTxt.textContent = "ℹ️ Sidik Jari HP Belum Terdaftar";
+        showFeedback("fingerprint-login-feedback", "📱 Pemindaian selesai: Belum ada Sidik Jari HP yang terdaftar untuk akun ini. Silakan login dengan password lalu daftarkan Sidik Jari HP di menu Profil.");
+      } else {
+        if (statusTxt) statusTxt.textContent = "❌ Gagal Membaca Sensor HP";
+        showFeedback("fingerprint-login-feedback", `Gagal membaca sensor sidik jari HP: ${errMsg}`);
+      }
+      return;
+    }
+  }
+
+  // 💻 LOCALHOST SERVER COMPUTER (MACBOOK SERVER HOST): OPEN LOCAL DRIVER SENSORS
+  let vendor = "Generic";
+  try {
+    if (window.PublicKeyCredential && (await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable())) {
+      vendor = "TouchID";
+    }
+  } catch (e) {}
+
+  window._loginFpVendor = vendor;
+
+  try {
+    const openRes = await apiPost("/api/page/login/fingerprint-open-device", { vendor, deviceIndex: 0 });
+    const sessionId = openRes?.sessionId || openRes?.session_id;
+    if (openRes?.ok && sessionId) {
+      window._activeLoginFpSessionId = sessionId;
+      if (statusTxt) statusTxt.textContent = vendor === "TouchID" ? "🍏 Prompt Touch ID Aktif..." : "🟢 Sensor Sidik Jari Siap";
+      showFeedback("fingerprint-login-feedback", vendor === "TouchID" ? "🍏 Sentuhkan jari pada tombol Touch ID Mac untuk login." : "Tempelkan jari Anda pada sensor scanner.");
+      // Auto trigger hardware capture frame reading
+      autoReadFingerprintForLogin();
+    } else {
+      if (statusTxt) statusTxt.textContent = "❌ Sensor Tidak Ditemukan";
+      showFeedback("fingerprint-login-feedback", openRes?.message || "Gagal membuka device sidik jari.");
+    }
+  } catch (e) {
+    if (statusTxt) statusTxt.textContent = "❌ Koneksi Driver Gagal";
+    showFeedback("fingerprint-login-feedback", "Gagal menghubungi driver hardware biometrik.");
+  }
+}
+
+function closeFingerprintLoginChallenge() {
+  window._isLoginFpScanning = false;
+  if (window._activeLoginFpSessionId) {
+    apiPost("/api/page/login/fingerprint-close-device", { sessionId: window._activeLoginFpSessionId });
+    window._activeLoginFpSessionId = null;
+  }
+  if (byId("fingerprint-login-modal-backdrop")) byId("fingerprint-login-modal-backdrop").hidden = true;
+  if (byId("fingerprint-login-modal")) byId("fingerprint-login-modal").hidden = true;
+  document.body.classList.remove("modal-open");
+}
+
+function verifyFingerprintLogin() {
+  autoReadFingerprintForLogin();
+}
+
+async function autoReadFingerprintForLogin() {
+  if (window._isLoginFpScanning) return;
+  window._isLoginFpScanning = true;
+
+  const statusTxt = byId("login-fp-status");
+  const vendor = window._loginFpVendor || "Generic";
+
+  while (window._isLoginFpScanning && window._activeLoginFpSessionId) {
+    try {
+      showFeedback("fingerprint-login-feedback", vendor === "TouchID" ? "🍏 Prompt Touch ID aktif... Sentuhkan jari pada sensor." : "Membuat koneksi sensor hardware...");
+      const capRes = await apiFetchPost("/api/page/login/fingerprint-capture-frame",
+        { sessionId: window._activeLoginFpSessionId },
+        35000
+      );
+
+      if (!window._isLoginFpScanning) break;
+
+      if (capRes?.ok && capRes?.template_data) {
+        if (statusTxt) statusTxt.textContent = "⚡ Mengidentifikasi Sidik Jari...";
+        showFeedback("fingerprint-login-feedback", "⚡ Memverifikasi template sidik jari ke AI Engine...");
+
+        const res = await apiPost("/api/page/login/fingerprint-identify", {
+          templateData: capRes.template_data,
+          vendor: vendor,
+          companySlug: companySlug
+        });
+
+        const isVerified = Boolean(res?.verified || res?.data?.verified);
+        const userName = res?.user?.name || res?.data?.user?.name || "Pengguna";
+        const percent = res?.similarityPercent || res?.data?.similarityPercent || 100;
+        const message = res?.message || res?.data?.message || `Sidik jari teridentifikasi sebagai ${userName} (${percent}%)`;
+        const token = res?.token || res?.data?.token;
+
+        if (res?.ok && isVerified && token) {
+          if (statusTxt) statusTxt.textContent = `✓ Cocok (${userName})`;
+          showFeedback("fingerprint-login-feedback", `✅ ${message}! Login Otomatis...`, "success");
+
+          const authenticatedUser = res?.user || res?.data?.user;
+          const accessContext = res?.accessContext || res?.data?.accessContext || {};
+
+          setTimeout(() => {
+            closeFingerprintLoginChallenge();
+            handleLoginSuccess(res, true);
+          }, 800);
+          break;
+        } else {
+          if (statusTxt) statusTxt.textContent = "❌ Sidik Jari Tidak Dikenal";
+          showFeedback("fingerprint-login-feedback", res?.message || "Sidik jari tidak teridentifikasi pada sistem.");
+          await new Promise((r) => setTimeout(r, 1500));
+        }
+      } else {
+        const errMsg = capRes?.message || "Touch ID dibatalkan / gagal membaca data.";
+        if (statusTxt) statusTxt.textContent = "❌ Pembacaan Gagal";
+        showFeedback("fingerprint-login-feedback", `❌ ${errMsg}`);
+        await new Promise((r) => setTimeout(r, 1500));
+      }
+    } catch (e) {
+      if (statusTxt) statusTxt.textContent = "❌ Error Driver";
+      showFeedback("fingerprint-login-feedback", `❌ Gagal memproses sidik jari: ${e.message}`);
+      await new Promise((r) => setTimeout(r, 1500));
+    }
+  }
 }
 
 // ─── Registration Modal ──────────────────────────────────────────────────────
@@ -523,6 +933,19 @@ byId("toggle-login-password")?.addEventListener("click", () => {
   });
   byId("btn-close-forgot-modal")?.addEventListener("click", closeForgotModal);
   byId("btn-cancel-forgot-modal")?.addEventListener("click", closeForgotModal);
+
+  // Biometric Verification Modal Actions
+  byId("btn-login-face-direct")?.addEventListener("click", () => {
+    openFaceLoginChallenge({ user: { id: "usr-01", email: byId("login-email")?.value || "" } });
+  });
+
+  byId("btn-login-fingerprint-direct")?.addEventListener("click", () => {
+    openFingerprintLoginChallenge({ user: { id: "usr-01", email: byId("login-email")?.value || "" } });
+  });
+
+  byId("btn-close-face-login-modal")?.addEventListener("click", closeFaceLoginChallenge);
+  byId("btn-close-fingerprint-login-modal")?.addEventListener("click", closeFingerprintLoginChallenge);
+  byId("btn-verify-fingerprint-login")?.addEventListener("click", verifyFingerprintLogin);
 
   // Preset Theme Color buttons
   document.querySelectorAll(".theme-preset-btn").forEach((btn) => {

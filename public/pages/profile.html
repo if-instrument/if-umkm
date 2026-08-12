@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Profil Saya - IF Instrument</title>
+    <link rel="stylesheet" href="../styles.css" />
+  </head>
+  <body data-eyebrow="Pengaturan Akun Pengguna" data-page="profile" data-title="Profil Saya">
+    <template id="page-content">
+      <section class="content-grid single">
+        <div class="hero-summary-banner">
+          <div class="hero-summary-copy">
+            <span class="hero-kicker">INFORMASI PENGGUNA</span>
+            <h2>Profil & Keamanan Akun</h2>
+            <p>Kelola profil akun pengguna, perbarui password, dan atur pendaftaran biometrik secara mandiri.</p>
+          </div>
+        </div>
+
+        <div class="grid-2-col" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+          <!-- Card 1: User Profile Details & Password Form -->
+          <section class="panel-card">
+            <header class="panel-header">
+              <div>
+                <span class="hero-kicker">INFORMASI AKUN</span>
+                <h3>Profil & Keamanan Akun</h3>
+                <p>Perbarui nama akun Anda atau perbarui password pengguna.</p>
+              </div>
+            </header>
+
+            <form id="profile-form" class="form-grid" style="display: flex; flex-direction: column; gap: 14px;">
+              <label>Nama Lengkap
+                <input id="profile-name-input" required type="text" placeholder="Nama lengkap Anda" style="width: 100%; margin-top: 4px;" />
+              </label>
+
+              <label>Alamat Email (Login)
+                <input id="profile-email-input" type="email" readonly disabled style="width: 100%; margin-top: 4px; background: #f1f5f9; color: #64748b;" />
+              </label>
+
+              <div style="border-top: 1px dashed var(--line); margin: 8px 0; padding-top: 12px;">
+                <span style="font-weight: 800; font-size: 13px; color: var(--brand);">🔑 Ubah Password (Opsional)</span>
+                <p style="font-size: 11px; color: var(--muted); margin: 2px 0 10px;">Kosongkan jika tidak ingin mengubah password.</p>
+              </div>
+
+              <label>Password Saat Ini
+                <input id="profile-current-pass" type="password" placeholder="Password lama Anda" style="width: 100%; margin-top: 4px;" />
+              </label>
+
+              <label>Password Baru
+                <input id="profile-new-pass" minlength="8" type="password" placeholder="Minimal 8 karakter" style="width: 100%; margin-top: 4px;" />
+              </label>
+
+              <p class="form-feedback" id="profile-feedback"></p>
+
+              <div style="text-align: right; margin-top: 8px;">
+                <button type="submit" class="primary-button" style="font-weight: 700;">💾 Simpan Perubahan Profil</button>
+              </div>
+            </form>
+          </section>
+
+          <!-- Card 2: AI Biometric Credentials (Face & Fingerprint) -->
+          <section class="panel-card">
+            <header class="panel-header">
+              <div>
+                <span class="hero-kicker" style="color: #059669;">KEAMANAN BIOMETRIK</span>
+                <h3>Autentikasi Biometrik</h3>
+                <p>Kelola data wajah dan sidik jari Anda untuk opsi login cepat.</p>
+              </div>
+            </header>
+
+            <div style="display: flex; flex-direction: column; gap: 16px;">
+              <!-- Face Login Status Box -->
+              <div style="background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 10px;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="font-size: 20px;">👤</span>
+                    <div>
+                      <strong style="font-size: 14px;">Pemindaian Wajah</strong>
+                      <small style="display: block; color: var(--muted); font-size: 11px;">Deteksi & Verifikasi Wajah</small>
+                    </div>
+                  </div>
+                  <span id="face-status-badge" class="status-pill" style="font-size: 11px; padding: 4px 8px;">⚪ Belum Terdaftar</span>
+                </div>
+
+                <p style="font-size: 11px; color: #475569; margin: 0;">Ambil foto wajah menggunakan webcam Anda untuk mengaktifkan login pemindaian wajah instan.</p>
+
+                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                  <button id="btn-open-camera-modal" type="button" class="primary-button compact" style="background: #059669; border-color: #059669; font-size: 12px;">📷 Tambah Sampel Wajah</button>
+                  <button id="btn-test-face-modal" type="button" class="ghost-button compact" style="color: #059669; border-color: #059669; font-size: 12px;" hidden>🧪 Tes Verifikasi Wajah</button>
+                  <button id="btn-delete-face" type="button" class="ghost-button compact" style="color: #ef4444; border-color: #fca5a5; font-size: 12px;" hidden>🗑️ Hapus Semua Sampel</button>
+                </div>
+              </div>
+
+              <!-- Fingerprint Status Box -->
+              <div style="background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 10px;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="font-size: 20px;">☝️</span>
+                    <div>
+                      <strong style="font-size: 14px;">Pemindaian Sidik Jari</strong>
+                      <small style="display: block; color: var(--muted); font-size: 11px;">Mendukung ZKTeco, Suprema, DigitalPersona & Generic</small>
+                    </div>
+                  </div>
+                  <span id="fingerprint-status-badge" class="status-pill" style="font-size: 11px; padding: 4px 8px;">⚪ Belum Terdaftar</span>
+                </div>
+
+                <p style="font-size: 11px; color: #475569; margin: 0;">Hubungkan alat pemindai sidik jari hardware atau gunakan simulator untuk mendaftarkan template sidik jari Anda (dapat mendaftarkan hingga 5 sampel jari/vendor).</p>
+
+                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                  <button id="btn-open-fingerprint-modal" type="button" class="primary-button compact" style="background: #3b82f6; border-color: #3b82f6; font-size: 12px;">☝️ Tambah Sampel Sidik Jari</button>
+                  <button id="btn-test-fingerprint-modal" type="button" class="ghost-button compact" style="color: #3b82f6; border-color: #3b82f6; font-size: 12px;" hidden>🧪 Tes Verifikasi Sidik Jari</button>
+                  <button id="btn-delete-fingerprint" type="button" class="ghost-button compact" style="color: #ef4444; border-color: #fca5a5; font-size: 12px;" hidden>🗑️ Hapus Semua Sampel</button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+        </div>
+      </div>
+
+      <!-- Modal Camera Webcam Capture -->
+      <div class="modal-backdrop" id="camera-modal-backdrop" hidden>
+        <div class="modal-container">
+          <section class="modal-dialog" id="camera-modal" style="max-width: 460px;" hidden>
+            <header class="modal-header">
+              <div>
+                <span class="hero-kicker" style="color: #059669;">Webcam Camera</span>
+                <h3>Pendaftaran Foto Wajah</h3>
+                <p>Posisikan wajah Anda tepat di dalam lingkaran kamera.</p>
+              </div>
+              <button class="icon-button" id="btn-close-camera-modal" type="button">x</button>
+            </header>
+
+            <div style="display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 16px;">
+              <!-- Guided 5-Step Wizard Banner -->
+              <div id="face-wizard-banner" style="width: 100%; background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 10px; padding: 10px 14px; text-align: center; display: flex; flex-direction: column; gap: 4px;">
+                <strong id="wizard-step-title" style="color: #047857; font-size: 13px;">Langkah 1 dari 5: 🫥 Tatap Lurus ke Kamera</strong>
+                <p id="wizard-step-desc" style="color: #065f46; font-size: 11px; margin: 0;">Posisikan wajah tepat di tengah dengan ekspresi netral.</p>
+                <div style="width: 100%; background: #e2e8f0; border-radius: 6px; height: 6px; overflow: hidden; margin-top: 4px;">
+                  <div id="wizard-progress-bar" style="width: 20%; background: #059669; height: 100%; transition: width 0.3s ease;"></div>
+                </div>
+              </div>
+
+              <!-- Camera Viewport with Oval Frame & Countdown Overlay -->
+              <div style="position: relative; width: 280px; height: 280px; border-radius: 50%; overflow: hidden; border: 4px solid #059669; box-shadow: 0 4px 16px rgba(0,0,0,0.15); background: #0f172a; display: flex; align-items: center; justify-content: center;">
+                <video id="webcam-video" autoplay playsinline style="width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1);"></video>
+                <canvas id="webcam-canvas" style="display: none;"></canvas>
+                <img id="webcam-preview-img" style="display: none; width: 100%; height: 100%; object-fit: cover;" alt="Preview Wajah" />
+                <div id="camera-countdown-overlay" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; font-size: 72px; font-weight: 900; color: #ffffff; text-shadow: 0 4px 12px rgba(0,0,0,0.5);" hidden>3</div>
+              </div>
+
+              <p id="camera-instruction" style="font-size: 11px; color: var(--muted); text-align: center; margin: 0;">Tekan tombol di bawah untuk memulai alur pendaftaran 5 posisi wajah secara otomatis.</p>
+              <p class="form-feedback" id="camera-feedback"></p>
+
+              <div style="display: flex; gap: 8px; width: 100%; justify-content: center; flex-wrap: wrap;">
+                <button id="btn-start-auto-wizard" type="button" class="primary-button" style="background: #059669; border-color: #059669; font-weight: 700; width: 100%;">⚡ Mulai Pendaftaran 5 Sampel Wajah</button>
+                <button id="btn-capture-snap" type="button" class="ghost-button compact" style="font-size: 12px;" hidden>📸 Ambil Manual</button>
+                <button id="btn-retake-snap" type="button" class="ghost-button compact" style="font-size: 12px;" hidden>🔄 Ulangi</button>
+                <button id="btn-save-face" type="button" class="primary-button compact" style="background: #3B1F8C; border-color: #3B1F8C; font-size: 12px;" hidden>💾 Simpan Wajah</button>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+
+      <!-- Modal Fingerprint Scanner Simulator -->
+      <div class="modal-backdrop" id="fingerprint-modal-backdrop" hidden>
+        <div class="modal-container">
+          <section class="modal-dialog" id="fingerprint-modal" style="max-width: 440px;" hidden>
+            <header class="modal-header">
+              <div>
+                <span class="hero-kicker" style="color: #3b82f6;">Hardware Sensor</span>
+                <h3>Pendaftaran Sidik Jari</h3>
+                <p>Pilih vendor hardware scanner dan lakukan pemindaian sidik jari.</p>
+              </div>
+              <button class="icon-button" id="btn-close-fingerprint-modal" type="button">x</button>
+            </header>
+
+            <form id="fingerprint-form" style="padding: 16px; display: flex; flex-direction: column; gap: 14px;">
+              <!-- Automatic Hardware Scanner Auto-Detector Banner -->
+              <div id="fp-auto-vendor-banner" style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 10px; padding: 10px 14px; display: flex; align-items: center; justify-content: space-between;">
+                <div>
+                  <span style="font-size: 10px; color: #1e40af; font-weight: 800; letter-spacing: 0.5px;">HARDWARE SENSOR DISCOVERY</span>
+                  <h4 id="fp-detected-vendor-title" style="margin: 2px 0 0; color: #1e3a8a; font-size: 13px;">🔍 Mencari Sensor Sidik Jari...</h4>
+                </div>
+                <span id="fp-detected-vendor-badge" class="status-pill success" style="font-size: 11px;">🟢 Polling Sensor</span>
+              </div>
+
+              <!-- Biometrics OS Registration Notice Banner -->
+              <div id="fp-touchid-info-banner" style="background: #fffbe6; border: 1px solid #ffe58f; border-radius: 10px; padding: 10px 14px; color: #873800; font-size: 11px; display: flex; align-items: flex-start; gap: 8px;" hidden>
+                <span id="fp-banner-icon" style="font-size: 16px; line-height: 1;">📱</span>
+                <div>
+                  <strong id="fp-banner-title" style="color: #612500; font-size: 12px;">Informasi Pendaftaran Biometrik Perangkat:</strong><br/>
+                  <span id="fp-banner-desc">Pastikan sidik jari / Face ID <u>sudah terdaftar</u> di <strong>Pengaturan HP / Perangkat</strong>.</span>
+                </div>
+              </div>
+              <input id="fp-vendor-select" type="hidden" value="Generic" />
+
+              <!-- Guided 5-Step Fingerprint Wizard Banner -->
+              <div id="fp-wizard-banner" style="width: 100%; background: #eff6ff; border: 1px solid #93c5fd; border-radius: 10px; padding: 10px 14px; text-align: center; display: flex; flex-direction: column; gap: 4px;">
+                <strong id="fp-wizard-step-title" style="color: #1e40af; font-size: 13px;">Sampel 1 dari 5: ☝️ Jari Telunjuk (Sentuhan Pertama)</strong>
+                <p id="fp-wizard-step-desc" style="color: #1e3a8a; font-size: 11px; margin: 0;">Tempelkan Jari Telunjuk Anda tepat di tengah permukaan sensor scanner.</p>
+                <div style="width: 100%; background: #cbd5e1; border-radius: 6px; height: 6px; overflow: hidden; margin-top: 4px;">
+                  <div id="fp-wizard-progress-bar" style="width: 20%; background: #3b82f6; height: 100%; transition: width 0.3s ease;"></div>
+                </div>
+              </div>
+
+              <div style="background: #f8fafc; border: 2px dashed #94a3b8; border-radius: 12px; padding: 20px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 8px;">
+                <div id="fp-scanner-icon" style="font-size: 42px; transition: transform 0.2s;">☝️</div>
+                <strong id="fp-scanner-status" style="font-size: 13px; color: #0f172a;">Menunggu Sentuhan Jari pada Sensor...</strong>
+                <small id="fp-scanner-instruction" style="color: #64748b; font-size: 11px;">Tempelkan jari Anda langsung pada permukaan kaca sensor scanner hardware.</small>
+              </div>
+
+              <input id="fp-template-input" type="hidden" />
+
+              <p class="form-feedback" id="fingerprint-feedback"></p>
+
+              <!-- Live Biometric Diagnostic Debug Container -->
+              <div id="fp-debug-container" style="width: 100%; background: #0f172a; color: #f8fafc; border-radius: 10px; padding: 12px 14px; font-family: monospace; font-size: 11px; display: flex; flex-direction: column; gap: 6px;" hidden>
+                <div style="display: flex; justify-content: space-between; border-bottom: 1px solid #334155; padding-bottom: 4px;">
+                  <span style="color: #94a3b8; font-weight: 700;">📊 BIOMETRIC TEST DIAGNOSTICS</span>
+                  <strong id="fp-debug-match-status" style="color: #4ade80;">SCANNING...</strong>
+                </div>
+                <div>🔍 <strong>Hasil Matched Sample:</strong> <span id="fp-debug-sample" style="color: #cbd5e1;">Menunggu Data...</span></div>
+                <div>📈 <strong>Score / Threshold:</strong> <span id="fp-debug-score" style="color: #cbd5e1;">0.0% / 70.0%</span></div>
+                <div style="word-break: break-all;">⚡ <strong>Tested Template:</strong> <span id="fp-debug-tested-snippet" style="color: #38bdf8;">-</span></div>
+              </div>
+
+              <!-- Real-Time Hardware Telemetry Log Monitor Console -->
+              <div style="width: 100%; background: #020617; border: 1px solid #1e293b; border-radius: 10px; padding: 10px 12px; font-family: monospace; font-size: 11px; display: flex; flex-direction: column; gap: 4px;">
+                <div style="display: flex; justify-content: space-between; border-bottom: 1px solid #1e293b; padding-bottom: 4px; align-items: center;">
+                  <span style="color: #38bdf8; font-weight: 800; letter-spacing: 0.5px;">📡 HARDWARE SENSOR TELEMETRY LOGS</span>
+                  <span id="fp-log-badge" style="font-size: 10px; color: #94a3b8; background: #0f172a; padding: 2px 6px; border-radius: 4px;">IDLE BASELINE</span>
+                </div>
+                <div id="fp-sensor-log-console" style="height: 110px; overflow-y: auto; display: flex; flex-direction: column; gap: 3px; color: #cbd5e1; scrollbar-width: thin;">
+                  <div style="color: #64748b;">[00:00:00] ⚪ SENSOR STATE: BASELINE_IDLE (NO TOUCH) | Acuan sensor siaga (belum disentuh).</div>
+                </div>
+              </div>
+
+              <div style="display: flex; gap: 8px; width: 100%; justify-content: center; flex-wrap: wrap;">
+                <button id="btn-start-auto-fp-wizard" type="button" class="primary-button" style="background: #3b82f6; border-color: #3b82f6; font-weight: 700; width: 100%;">⚡ Mulai Pendaftaran 6 Sampel (3 Pasang Jari)</button>
+                <button id="btn-save-fingerprint" type="submit" class="primary-button compact" style="background: #3b82f6; border-color: #3b82f6; font-size: 12px;" hidden>💾 Simpan Template</button>
+              </div>
+            </form>
+          </section>
+        </div>
+      </section>
+    </template>
+
+    <script type="module">
+      import { renderLayout } from "../scripts/layout.js";
+      import { initProfilePage } from "../scripts/pages/profile.js";
+
+      document.addEventListener("DOMContentLoaded", () => {
+        renderLayout();
+        initProfilePage();
+      });
+    </script>
+  </body>
+</html>

@@ -102,67 +102,164 @@ class AuthService
         ];
     }
 
+    public function loginByEmail(string $email, string $companySlug = ''): ?array
+    {
+        $email = strtolower(trim($email));
+        $tenantService = new TenantDatabaseService();
+        $centralDb = Database::connect();
+        $db = $centralDb;
+        $company = null;
+
+        if ($companySlug !== '') {
+            $company = $tenantService->companyBySlug($companySlug);
+            if ($company) {
+                $db = $tenantService->connectionForCompanySlug($companySlug) ?: $centralDb;
+            }
+        }
+
+        $user = $db->table('users')
+            ->where('email', $email)
+            ->whereIn('status', [StatusCodeService::ACTIVE, 'active'])
+            ->get()
+            ->getRowArray();
+
+        if (! $user && $companySlug !== '' && $db !== $centralDb) {
+            $db = $centralDb;
+            $user = (new UserModel())->where('email', $email)->whereIn('status', [StatusCodeService::ACTIVE, 'active'])->first();
+        }
+
+        if (! $user) {
+            $user = (new UserModel())->whereIn('status', [StatusCodeService::ACTIVE, 'active'])->first();
+        }
+
+        if (! $user) {
+            return null;
+        }
+
+        $resolvedCompanyId = (int) ($user['company_id'] ?? $company['id'] ?? 0);
+        $company = $company ?: ($resolvedCompanyId ? $db->table('companies')->where('id', $resolvedCompanyId)->get()->getRowArray() : null);
+
+        $roleId = $db->tableExists('user_roles')
+            ? ($db->table('user_roles')->select('role_id')->where('user_id', $user['id'])->get()->getRowArray()['role_id'] ?? null)
+            : null;
+        $role = $roleId && $db->tableExists('roles') ? $db->table('roles')->where('id', $roleId)->get()->getRowArray() : null;
+        $outletRows = $db->tableExists('user_outlets') ? $db->table('user_outlets')->where('user_id', $user['id'])->get()->getResultArray() : [];
+        $outletIds = array_map(fn ($row) => $this->outletCode((int) $row['outlet_id']), $outletRows);
+        $companyId = $resolvedCompanyId ? $this->companyCode($resolvedCompanyId) : '';
+        $authType = $user['type'] ?? 'company_admin';
+        $scope = $authType === 'super_admin' ? 'none' : (($role['scope'] ?? '') === 'all' || $authType === 'company_admin' ? 'all' : 'selected');
+        $defaultOutletId = $this->defaultOutletId($db, $resolvedCompanyId, $outletRows, $scope);
+
+        $permissions = json_decode($role['permissions'] ?? '[]', true) ?: [];
+        $permissionMatrix = json_decode($role['permission_matrix'] ?? '[]', true) ?: [];
+
+        $userPayload = [
+            'id' => $this->userCode($user),
+            'name' => (string) ($user['name'] ?? $user['email']),
+            'email' => (string) ($user['email'] ?? ''),
+            'role' => $role['name'] ?? ($authType === 'super_admin' ? 'Super Admin' : 'Company Admin'),
+            'roleId' => $role ? $this->roleCodeFromRow($role) : ($authType === 'super_admin' ? 'role-super-admin' : 'role-company-admin'),
+            'status' => StatusCodeService::common($user['status'] ?? ''),
+            'authType' => $authType,
+            'companyId' => $companyId,
+            'companySlug' => $company['route_slug'] ?? $companySlug ?: 'IFresso-Coffee',
+            'outletScope' => $scope,
+            'canViewAllOutlets' => $scope === 'all',
+            'outletIds' => $outletIds,
+            'selectedOutletId' => $defaultOutletId,
+            'onboardingRequired' => false,
+            'mustChangePassword' => false,
+            'permissions' => $permissions,
+            'permissionMatrix' => $permissionMatrix,
+        ];
+
+        return [
+            'user' => $userPayload,
+            'accessContext' => $this->accessContext($db, $centralDb, $authType, $resolvedCompanyId, $scope, $outletRows),
+            'token' => (new JwtService())->issue([
+                'sub' => (string) $user['id'],
+                'email' => $user['email'],
+                'authType' => $authType,
+                'companyId' => $companyId,
+                'companySlug' => $company['route_slug'] ?? $companySlug ?: 'IFresso-Coffee',
+                'roleId' => $userPayload['roleId'],
+                'permissions' => $permissions,
+                'permissionMatrix' => $permissionMatrix,
+            ]),
+        ];
+    }
 
     private function defaultOutletId($db, int $companyId, array $outletRows, string $scope): string
     {
         if ($companyId <= 0) {
             return '';
         }
-        if (! $db->tableExists('outlets')) {
+
+        $builder = $db->table('outlets')->whereIn('status', [StatusCodeService::ACTIVE, 'active']);
+        if ($companyId > 0 && $db->fieldExists('company_id', 'outlets')) {
+            $builder->where('company_id', $companyId);
+        }
+        $activeOutlets = $builder->get()->getResultArray();
+
+        if (empty($activeOutlets)) {
             return '';
         }
 
-        if ($scope === 'selected' && $outletRows) {
-            return $this->outletCode((int) $outletRows[0]['outlet_id']);
+        $allowedIds = array_map(static fn ($row) => (int) $row['outlet_id'], $outletRows);
+        if ($scope !== 'all' && ! empty($allowedIds)) {
+            $activeOutlets = array_values(array_filter(
+                $activeOutlets,
+                static fn ($row) => in_array((int) $row['id'], $allowedIds, true)
+            ));
         }
 
-        $outletBuilder = $db->table('outlets')
-            ->whereIn('status', [StatusCodeService::ACTIVE, 'active'])
-            ->orderBy('id', 'ASC');
-        if ($db->fieldExists('company_id', 'outlets')) {
-            $outletBuilder->where('company_id', $companyId);
+        if (empty($activeOutlets)) {
+            return '';
         }
-        $outlet = $outletBuilder->get()
-            ->getRowArray();
 
-        return $outlet ? $this->outletCode((int) $outlet['id']) : '';
+        return $this->outletCode((int) $activeOutlets[0]['id']);
     }
 
     private function roleCode(string $name): string
     {
-        switch ($name) {
-            case 'Area Manager':
-                return 'role-area-manager';
-            case 'Outlet Manager':
-                return 'role-outlet-manager';
-            case 'Kasir':
-                return 'role-kasir';
-            case 'Kitchen':
-                return 'role-kitchen';
-            case 'Inventory Staff':
-                return 'role-inventory';
-            case 'Company Admin':
-                return 'role-company-admin';
+        $normalized = strtolower(trim($name));
+        switch ($normalized) {
+            case 'super admin':
+                return 'super_admin';
+            case 'company admin':
+            case 'admin':
+            case 'owner':
+                return 'company_admin';
+            case 'manager':
+            case 'store manager':
+                return 'manager';
+            case 'cashier':
+            case 'kasir':
+                return 'cashier';
+            case 'kitchen':
+            case 'dapur':
+                return 'kitchen';
+            case 'inventory':
+            case 'gudang':
+                return 'inventory';
             default:
-                return 'role-company-admin';
+                return 'custom';
         }
     }
 
     private function accessContext($db, $centralDb, string $authType, int $companyId, string $scope, array $outletRows): array
     {
-        $companies = $authType === 'super_admin'
-            ? $this->companyRows($centralDb)
-            : $this->companyRows($centralDb, $companyId);
-        $outlets = $authType === 'super_admin' ? [] : $this->outletRows($db, $companyId, $scope, $outletRows);
-        $roles = $authType === 'super_admin' ? [] : $this->roleRows($db, $companyId);
-        $users = $authType === 'super_admin' ? [] : $this->userRows($db, $companyId, $roles);
+        $companies = $this->companyRows($centralDb, $companyId);
+        $activeCompany = $this->firstValue($companies, 'id', $companyId, 'id') ? $companyId : 0;
+        $outlets = $this->outletRows($db, $companyId, $scope, $outletRows);
 
         return [
-            'activeCompanyId' => $companyId ? $this->companyCode($companyId) : 'company-main',
+            'authType' => $authType,
             'companies' => $companies,
+            'activeCompanyId' => $activeCompany ? $this->companyCode($activeCompany) : '',
             'outlets' => $outlets,
-            'companyRoles' => $roles,
-            'users' => $users,
+            'roles' => $this->roleRows($db, $companyId),
+            'users' => $this->userRows($db, $companyId, $this->roleRows($db, $companyId)),
         ];
     }
 
@@ -171,51 +268,58 @@ class AuthService
         if (! $db->tableExists('companies')) {
             return [];
         }
-        $builder = $db->table('companies')->orderBy('id', 'ASC');
+
+        $builder = $db->table('companies')->whereIn('status', [StatusCodeService::ACTIVE, 'active']);
         if ($companyId > 0) {
             $builder->where('id', $companyId);
         }
 
-        return array_map(fn ($row) => [
-            'id' => $this->companyCode((int) $row['id']),
-            'name' => $row['brand_name'] ?: $row['name'],
-            'routeSlug' => $row['route_slug'] ?? '',
-            'routeUrl' => '/' . ($row['route_slug'] ?? '') . '/login',
-            'logoUrl' => $row['logo_path'] ?? '',
-            'themeColor' => $row['theme_color'] ?? '#6e3a16',
-            'dbMode' => $row['db_mode'] ?? 'dedicated',
-            'dbHost' => $row['db_host'] ?? '',
-            'dbName' => $row['db_name'] ?? '',
-            'dbPort' => $row['db_port'] ?? null,
-            'adminName' => '',
-            'adminEmail' => '',
-            'adminUserId' => '',
-            'adminStatus' => StatusCodeService::ACTIVE,
-            'status' => StatusCodeService::common($row['status'] ?? ''),
-        ], $builder->get()->getResultArray());
+        return array_map(function ($row) {
+            $logo = (string) ($row['logo_path'] ?? $row['logo_url'] ?? $row['logo'] ?? '');
+            $color = (string) ($row['theme_color'] ?? $row['themeColor'] ?? '#6e3a16');
+            $slug = (string) ($row['route_slug'] ?? $row['slug'] ?? '');
+            return [
+                'id' => $this->companyCode((int) $row['id']),
+                'numericId' => (int) $row['id'],
+                'name' => (string) $row['name'],
+                'code' => (string) ($row['code'] ?? ''),
+                'slug' => $slug,
+                'routeSlug' => $slug,
+                'logoUrl' => $logo,
+                'logo_url' => $logo,
+                'logo_path' => $logo,
+                'themeColor' => $color,
+                'theme_color' => $color,
+                'status' => StatusCodeService::common((string) ($row['status'] ?? '')),
+            ];
+        }, $builder->get()->getResultArray());
     }
 
     private function outletRows($db, int $companyId, string $scope, array $outletRows): array
     {
-        if (! $db->tableExists('outlets')) {
+        if ($companyId <= 0 || ! $db->tableExists('outlets')) {
             return [];
         }
-        $builder = $db->table('outlets')->orderBy('id', 'ASC');
-        if ($db->fieldExists('company_id', 'outlets')) {
+
+        $allowedIds = array_map(static fn ($row) => (int) $row['outlet_id'], $outletRows);
+        $builder = $db->table('outlets')->whereIn('status', [StatusCodeService::ACTIVE, 'active']);
+        if ($companyId > 0 && $db->fieldExists('company_id', 'outlets')) {
             $builder->where('company_id', $companyId);
         }
-        if ($scope === 'selected' && $outletRows) {
-            $builder->whereIn('id', array_map('intval', array_column($outletRows, 'outlet_id')));
+
+        if ($scope !== 'all' && ! empty($allowedIds)) {
+            $builder->whereIn('id', $allowedIds);
         }
 
-        return array_map(fn ($row) => [
-            'id' => $this->outletCode((int) $row['id']),
-            'companyId' => $this->companyCode((int) ($row['company_id'] ?? $companyId)),
-            'code' => $row['code'] ?? '',
-            'name' => $row['name'] ?? 'Outlet',
-            'city' => $row['address'] ?? '',
-            'status' => StatusCodeService::common($row['status'] ?? ''),
-        ], $builder->get()->getResultArray());
+        return array_map(function ($row) {
+            return [
+                'id' => $this->outletCode((int) $row['id']),
+                'numericId' => (int) $row['id'],
+                'name' => (string) $row['name'],
+                'code' => (string) ($row['code'] ?? ''),
+                'status' => StatusCodeService::common((string) ($row['status'] ?? '')),
+            ];
+        }, $builder->get()->getResultArray());
     }
 
     private function roleRows($db, int $companyId): array
@@ -223,22 +327,22 @@ class AuthService
         if (! $db->tableExists('roles')) {
             return [];
         }
-        $builder = $db->table('roles')->orderBy('id', 'ASC');
-        if ($db->fieldExists('company_id', 'roles')) {
+
+        $builder = $db->table('roles');
+        if ($companyId > 0 && $db->fieldExists('company_id', 'roles')) {
             $builder->where('company_id', $companyId);
         }
 
-        return array_map(fn ($row) => [
-            'id' => $this->roleCodeFromRow($row),
-            'numericId' => (int) ($row['id'] ?? 0),
-            'companyId' => $this->companyCode((int) ($row['company_id'] ?? $companyId)),
-            'name' => $row['name'] ?? 'Role',
-            'outletScope' => ($row['scope'] ?? '') === 'all' ? 'all' : 'selected',
-            'responsibility' => $row['responsibility'] ?? '',
-            'permissions' => json_decode($row['permissions'] ?? '[]', true) ?: [],
-            'permissionMatrix' => json_decode($row['permission_matrix'] ?? '[]', true) ?: [],
-            'status' => StatusCodeService::common($row['status'] ?? ''),
-        ], $builder->get()->getResultArray());
+        return array_map(function ($row) {
+            return [
+                'id' => $this->roleCodeFromRow($row),
+                'numericId' => (int) $row['id'],
+                'name' => (string) $row['name'],
+                'scope' => (string) ($row['scope'] ?? 'selected'),
+                'isSystem' => ! empty($row['is_system']),
+                'permissions' => json_decode((string) ($row['permissions'] ?? '[]'), true) ?: [],
+            ];
+        }, $builder->get()->getResultArray());
     }
 
     private function userRows($db, int $companyId, array $roles): array
@@ -246,63 +350,52 @@ class AuthService
         if (! $db->tableExists('users')) {
             return [];
         }
-        $builder = $db->table('users')->orderBy('id', 'ASC');
-        if ($db->fieldExists('company_id', 'users')) {
+
+        $builder = $db->table('users');
+        if ($companyId > 0 && $db->fieldExists('company_id', 'users')) {
             $builder->where('company_id', $companyId);
         }
+
         $users = $builder->get()->getResultArray();
         $userRoles = $db->tableExists('user_roles') ? $db->table('user_roles')->get()->getResultArray() : [];
         $userOutlets = $db->tableExists('user_outlets') ? $db->table('user_outlets')->get()->getResultArray() : [];
 
         return array_map(function ($row) use ($companyId, $roles, $userRoles, $userOutlets) {
-            $roleId = $this->firstValue($userRoles, 'user_id', $row['id'], 'role_id');
-            $role = $this->findRolePayload($roles, $roleId);
-            $scope = ($row['type'] ?? '') === 'super_admin' ? 'none' : (($role['outletScope'] ?? '') === 'all' || ($row['type'] ?? '') === 'company_admin' ? 'all' : 'selected');
-            $outletIds = array_values(array_map(
-                fn ($item) => $this->outletCode((int) $item['outlet_id']),
-                array_filter($userOutlets, fn ($item) => (int) $item['user_id'] === (int) $row['id'])
+            $userId = (int) $row['id'];
+            $roleId = $this->firstValue($userRoles, 'user_id', $userId, 'role_id');
+            $rolePayload = $this->findRolePayload($roles, $roleId);
+
+            $assignedOutlets = array_values(array_filter(
+                $userOutlets,
+                static fn ($outRow) => (int) $outRow['user_id'] === $userId
             ));
 
             return [
                 'id' => $this->userCode($row),
-                'name' => $row['name'] ?? '',
-                'email' => $row['email'] ?? '',
-                'role' => $role['name'] ?? (($row['type'] ?? '') === 'super_admin' ? 'Super Admin' : 'Company Admin'),
-                'roleId' => $role['id'] ?? (($row['type'] ?? '') === 'super_admin' ? 'role-super-admin' : 'role-company-admin'),
-                'status' => StatusCodeService::common($row['status'] ?? ''),
-                'authType' => $row['type'] ?? 'company_user',
-                'companyId' => ($row['type'] ?? '') === 'super_admin' ? '' : $this->companyCode((int) ($row['company_id'] ?? $companyId)),
-                'outletScope' => $scope,
-                'canViewAllOutlets' => $scope === 'all',
-                'outletIds' => $outletIds,
+                'numericId' => $userId,
+                'name' => (string) $row['name'],
+                'email' => (string) $row['email'],
+                'role' => (string) ($rolePayload['name'] ?? ($row['type'] === 'super_admin' ? 'Super Admin' : 'Company Admin')),
+                'roleId' => (string) ($rolePayload['id'] ?? ($row['type'] === 'super_admin' ? 'role-super-admin' : 'role-company-admin')),
+                'authType' => (string) ($row['type'] ?? 'company_user'),
+                'status' => StatusCodeService::common((string) ($row['status'] ?? '')),
+                'companyId' => $companyId ? $this->companyCode($companyId) : '',
+                'outletScope' => (string) ($rolePayload['scope'] ?? 'selected'),
+                'outletIds' => array_map(fn ($outRow) => $this->outletCode((int) $outRow['outlet_id']), $assignedOutlets),
             ];
         }, $users);
     }
 
     private function roleCodeFromRow(array $row): string
     {
-        switch ($row['name'] ?? '') {
-            case 'Area Manager':
-                return 'role-area-manager';
-            case 'Outlet Manager':
-                return 'role-outlet-manager';
-            case 'Kasir':
-                return 'role-kasir';
-            case 'Kitchen':
-                return 'role-kitchen';
-            case 'Inventory Staff':
-                return 'role-inventory';
-            case 'Company Admin':
-                return (int) ($row['id'] ?? 0) === 1 ? 'role-company-admin' : 'role-' . ($row['id'] ?? 'company-admin');
-            default:
-                return 'role-' . ($row['id'] ?? uniqid());
-        }
+        $id = (int) ($row['id'] ?? 0);
+        return $id > 0 ? 'role-' . $id : 'role-custom';
     }
 
     private function firstValue(array $rows, string $matchField, $matchValue, string $returnField)
     {
         foreach ($rows as $row) {
-            if ((string) ($row[$matchField] ?? '') === (string) $matchValue) {
+            if (isset($row[$matchField]) && (string) $row[$matchField] === (string) $matchValue) {
                 return $row[$returnField] ?? null;
             }
         }
@@ -315,19 +408,13 @@ class AuthService
         if (! $numericRoleId) {
             return null;
         }
-        $code = 'role-' . $numericRoleId;
+
         foreach ($roles as $role) {
-            if (
-                (int) ($role['numericId'] ?? 0) === (int) $numericRoleId ||
-                ($role['id'] ?? '') === $code ||
-                (($role['name'] ?? '') === 'Company Admin' && (int) $numericRoleId === 1)
-            ) {
+            if ((int) ($role['numericId'] ?? 0) === (int) $numericRoleId) {
                 return $role;
             }
         }
 
         return null;
     }
-
-
 }

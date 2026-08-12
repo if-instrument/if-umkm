@@ -79,7 +79,11 @@ function canAccessItem(item, state, session) {
 function applyAccessState(state, session) {
   if (!session?.token) return state;
   const context = session.accessContext || {};
-  state.companies = context.companies || state.companies || [];
+  if (context.company && (!context.companies || !context.companies.length)) {
+    state.companies = [context.company];
+  } else {
+    state.companies = context.companies || state.companies || [];
+  }
   state.outlets = context.outlets || state.outlets || [];
   state.companyRoles = context.companyRoles || state.companyRoles || [];
   state.users = context.users || state.users || [];
@@ -90,8 +94,20 @@ function applyAccessState(state, session) {
 }
 
 function activeCompany(state, session) {
+  const contextCompany = session?.accessContext?.company;
+  const slug = session?.companySlug || window.__COMPANY_SLUG__ || "";
   const companyId = session?.companyId || state.activeCompanyId;
-  return (state.companies || []).find((company) => company.id === companyId) || (state.companies || [])[0] || {};
+
+  if (contextCompany && (contextCompany.slug === slug || contextCompany.routeSlug === slug || contextCompany.id === companyId || !slug)) {
+    return contextCompany;
+  }
+
+  const foundInState = (state.companies || []).find((c) => c.routeSlug === slug || c.slug === slug || c.id === companyId);
+  if (foundInState) return foundInState;
+
+  if (contextCompany) return contextCompany;
+
+  return (state.companies || [])[0] || {};
 }
 
 function navMarkup(currentPage, session, state) {
@@ -167,7 +183,7 @@ export function renderLayout() {
     window.location.href = appPath(currentPath);
     return;
   }
-  const allowedSuperAdminPages = ["users", "central-payment-gateway"];
+  const allowedSuperAdminPages = ["users", "central-payment-gateway", "profile"];
   if (session?.authType === "super_admin" && !allowedSuperAdminPages.includes(document.body.dataset.page)) {
     window.location.href = "/pages/users.html";
     return;
@@ -189,7 +205,7 @@ export function renderLayout() {
   }
   if (session?.authType !== "super_admin") {
     const allowedItems = allNavItems().filter((item) => canAccessItem(item, state, session));
-    const canOpenPage = (currentPage === "onboarding" && session?.authType === "company_admin") || allowedItems.some((item) => (item.activePages || [item.page]).includes(currentPage));
+    const canOpenPage = currentPage === "profile" || (currentPage === "onboarding" && session?.authType === "company_admin") || allowedItems.some((item) => (item.activePages || [item.page]).includes(currentPage));
     if (!canOpenPage && allowedItems[0]) {
       window.location.href = appPath(allowedItems[0].href);
       return;
@@ -199,9 +215,9 @@ export function renderLayout() {
   const companySlug = company.routeSlug || session?.companySlug || window.__COMPANY_SLUG__ || "";
   const derivedCompanyName = company.name || state.settings.companyName || (companySlug ? formatSlugToTitle(companySlug) : APP_NAME);
   const companyName = derivedCompanyName;
-  const companyLogoUrl = company.logoUrl || state.settings.companyLogoUrl || "";
+  const companyLogoUrl = company.logoUrl || company.logo_url || company.logo_path || state.settings.companyLogoUrl || "";
   const isSuperAdmin = session?.authType === "super_admin";
-  const companyThemeColor = isSuperAdmin ? "#3B1F8C" : (company.themeColor || state.settings.themeColor || "#3B1F8C");
+  const companyThemeColor = isSuperAdmin ? "#3B1F8C" : (company.themeColor || company.theme_color || state.settings.themeColor || "#3B1F8C");
   applyBrandTheme(companyThemeColor);
 
   const activeFavicon = isSuperAdmin ? APP_LOGO : (companyLogoUrl || APP_LOGO);
@@ -300,7 +316,7 @@ export function renderLayout() {
         <nav class="nav-tabs" aria-label="Navigasi utama">${navMarkup(page, session, state)}</nav>
         <div class="sidebar-footer">
           ${outletMarkup}
-          <div class="user-card">
+          <div class="user-card" id="user-card-profile" style="cursor: pointer;" title="Buka Profil Saya">
             <span class="user-avatar">${(session?.name || "A").slice(0, 1).toUpperCase()}</span>
             <div><strong>${session?.name || "Admin"}</strong><small>${session?.email || "admin@ifresso.id"}</small></div>
           </div>
@@ -325,6 +341,10 @@ export function renderLayout() {
     </div>
   `;
   applyPermissionControls(document, state, session);
+
+  document.querySelector("#user-card-profile")?.addEventListener("click", () => {
+    window.location.href = appPath("/pages/profile.html");
+  });
 
   document.querySelector("#sidebar-toggle")?.addEventListener("click", () => {
     const shell = document.querySelector(".app-shell");

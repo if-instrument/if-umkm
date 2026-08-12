@@ -419,6 +419,8 @@ function handleSessionExpired(url = "") {
 function isPublicAuthUrl(url = "") {
   return [
     "/api/auth/login",
+    "/api/page/login",
+    "/api/public",
     "/api/tenant",
     "/api/tenants",
     "/api/invitation"

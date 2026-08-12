@@ -13,25 +13,29 @@ class AuthApiService
     public function login(string $email, string $password, string $companySlug = ''): array
     {
         $result = (new AuthService())->login($email, $password, $companySlug);
-        if ($result) {
-            return ['ok' => true] + $result;
+        if (! $result) {
+            return ['ok' => false, 'message' => 'Email atau password tidak sesuai.'];
         }
 
         $route = $this->companyRouteForEmail($email);
-        if ($route !== '' && $companySlug === '') {
+        if ($route !== '' && strtolower($route) !== strtolower($companySlug)) {
             return [
                 'ok' => false,
-                'status' => 403,
-                'message' => 'User perusahaan harus login melalui halaman perusahaan.',
+                'message' => 'Silakan akses login dari portal khusus bisnis Anda.',
                 'routeUrl' => '/' . $route . '/login',
             ];
         }
 
-        return [
-            'ok' => false,
-            'status' => 401,
-            'message' => 'Email atau password tidak sesuai.',
-        ];
+        return ['ok' => true] + $result;
+    }
+
+    public function loginByEmail(string $email, string $companySlug = ''): array
+    {
+        $result = (new AuthService())->loginByEmail($email, $companySlug);
+        if (! $result) {
+            return ['ok' => false, 'message' => 'Pengguna tidak ditemukan.'];
+        }
+        return ['ok' => true] + $result;
     }
 
     public function bootstrap(string $companySlug = ''): array

@@ -170,6 +170,294 @@ class LoginController extends BaseController
         return $this->response->setJSON($result);
     }
 
+    public function faceVerify()
+    {
+        try {
+            $payload = $this->request->getJSON(true) ?: [];
+            $imageBase64 = (string) ($payload['image'] ?? '');
+            $email = strtolower(trim((string) ($payload['email'] ?? '')));
+            $companySlug = (string) ($payload['companySlug'] ?? '');
+            $userId = (string) ($payload['userId'] ?? '');
+            $tenantId = (string) ($payload['companyId'] ?? $companySlug ?: 'company-main');
+
+            if ($email !== '') {
+                $userModel = new \App\Models\UserModel();
+                $foundUser = $userModel->where('email', $email)->first();
+                if ($foundUser) {
+                    $userId = (string) ($foundUser['id'] ?? $userId);
+                }
+            }
+
+            if (! $userId || $userId === 'usr-01' || $userId === '01') {
+                $userModel = new \App\Models\UserModel();
+                $foundUser = $userModel->whereIn('status', ['ACTIVE', 'active', '1', 1])->first();
+                if ($foundUser) {
+                    $userId = (string) ($foundUser['id'] ?? '1');
+                }
+            }
+
+            $formattedUserId = (str_starts_with($userId, 'usr-') || $userId === '') ? $userId : ('usr-' . $userId);
+
+            $ai = service('aiService');
+            $verifyRes = $ai->verifyFace($tenantId, $formattedUserId, $imageBase64);
+
+            $verified = (bool) ($verifyRes['verified'] ?? false);
+            $similarity = (float) ($verifyRes['similarity'] ?? 0);
+            $percent = round($similarity * 100, 1);
+            $sampleName = $verifyRes['matched_sample'] ?? 'Sampel #1';
+
+            if (! $verified) {
+                return $this->response->setStatusCode(422)->setJSON([
+                    'ok' => false,
+                    'verified' => false,
+                    'similarity' => $similarity,
+                    'similarityPercent' => $percent,
+                    'message' => $verifyRes['message'] ?? 'Verifikasi wajah belum memenuhi batas minimal.',
+                ]);
+            }
+
+            return $this->response->setJSON([
+                'ok' => true,
+                'verified' => true,
+                'similarity' => $similarity,
+                'similarityPercent' => $percent,
+                'matchedSample' => $sampleName,
+                'sampleCount' => $verifyRes['sample_count'] ?? 1,
+                'message' => $verifyRes['message'] ?? "Wajah terverifikasi cocok dengan {$sampleName} ({$percent}%)",
+            ]);
+        } catch (\Throwable $e) {
+            return $this->response->setStatusCode(500)->setJSON([
+                'ok' => false,
+                'verified' => false,
+                'message' => 'Gagal memverifikasi wajah: ' . $e->getMessage(),
+            ]);
+        }
+    }
+
+    public function faceIdentify()
+    {
+        try {
+            $payload = $this->request->getJSON(true) ?: [];
+            $imageBase64 = (string) ($payload['image'] ?? '');
+            $companySlug = (string) ($payload['companySlug'] ?? '');
+
+            $ai = service('aiService');
+            $identifyRes = $ai->identifyFace($imageBase64, $companySlug);
+
+            $verified = (bool) ($identifyRes['verified'] ?? false);
+            $userKey = (string) ($identifyRes['user_key'] ?? '');
+            $similarity = (float) ($identifyRes['similarity'] ?? 0);
+            $percent = round($similarity * 100, 1);
+
+            if (! $verified || $userKey === '') {
+                return $this->response->setStatusCode(422)->setJSON([
+                    'ok' => false,
+                    'verified' => false,
+                    'message' => 'Wajah tidak teridentifikasi pada sistem.',
+                ]);
+            }
+
+            $userModel = new \App\Models\UserModel();
+            $user = $userModel->where('user_key', $userKey)->first();
+
+            if (! $user) {
+                return $this->response->setStatusCode(404)->setJSON([
+                    'ok' => false,
+                    'verified' => false,
+                    'message' => 'Pengguna biometrik tidak ditemukan di database.',
+                ]);
+            }
+
+            $authResult = $this->authApi->loginByEmail((string) $user['email'], $companySlug);
+
+            if (! ($authResult['ok'] ?? false)) {
+                return $this->response->setStatusCode(422)->setJSON([
+                    'ok' => false,
+                    'verified' => false,
+                    'message' => 'Gagal membuat sesi login biometrik.',
+                ]);
+            }
+
+            return $this->response->setJSON([
+                'ok' => true,
+                'verified' => true,
+                'user' => $authResult['user'],
+                'accessContext' => $authResult['accessContext'],
+                'token' => $authResult['token'],
+                'similarity' => $similarity,
+                'similarityPercent' => $percent,
+                'matchedSample' => $identifyRes['matched_sample'] ?? 'Sampel #1',
+                'message' => "Wajah teridentifikasi sebagai {$user['name']} ({$percent}%)",
+            ]);
+        } catch (\Throwable $e) {
+            return $this->response->setStatusCode(500)->setJSON([
+                'ok' => false,
+                'verified' => false,
+                'message' => 'Gagal mengidentifikasi wajah: ' . $e->getMessage(),
+            ]);
+        }
+    }
+
+    public function fingerprintVerify()
+    {
+        return $this->jsonAction(function () {
+            $payload = $this->request->getJSON(true) ?: [];
+            $templateData = (string) ($payload['templateData'] ?? '');
+            $vendor = (string) ($payload['vendor'] ?? 'Generic');
+            $companySlug = (string) ($payload['companySlug'] ?? '');
+            $userId = (string) ($payload['userId'] ?? '');
+            $tenantId = (string) ($payload['companyId'] ?? $companySlug ?: 'company-main');
+
+            $formattedUserId = (str_starts_with($userId, 'usr-') || $userId === '') ? $userId : ('usr-' . $userId);
+
+            $ai = service('aiService');
+            $verifyRes = $ai->verifyFingerprint($tenantId, $formattedUserId, $templateData, $vendor);
+
+            if (! ($verifyRes['verified'] ?? false)) {
+                return $this->response->setStatusCode(422)->setJSON([
+                    'ok' => false,
+                    'message' => $verifyRes['message'] ?? 'Verifikasi sidik jari gagal.',
+                ]);
+            }
+
+            return ['ok' => true, 'verified' => true, 'message' => 'Verifikasi sidik jari berhasil!'];
+        });
+    }
+
+    public function fingerprintIdentify()
+    {
+        try {
+            $payload = $this->request->getJSON(true) ?: [];
+            $templateData = (string) ($payload['templateData'] ?? $payload['template_data'] ?? '');
+            $vendor = (string) ($payload['vendor'] ?? 'Generic');
+            $companySlug = (string) ($payload['companySlug'] ?? '');
+
+            if ($templateData === '') {
+                return $this->response->setStatusCode(422)->setJSON([
+                    'ok' => false,
+                    'verified' => false,
+                    'message' => 'Data template sidik jari wajib disertakan.',
+                ]);
+            }
+
+            $ai = service('aiService');
+            $identifyRes = $ai->identifyFingerprint($templateData, $vendor, $companySlug);
+
+            $verified = (bool) ($identifyRes['verified'] ?? false);
+            $userKey = (string) ($identifyRes['user_key'] ?? '');
+            $similarity = (float) ($identifyRes['similarity'] ?? 0);
+            $percent = round($similarity * 100, 1);
+
+            if (! $verified || $userKey === '') {
+                return $this->response->setStatusCode(422)->setJSON([
+                    'ok' => false,
+                    'verified' => false,
+                    'message' => 'Sidik jari tidak teridentifikasi pada sistem.',
+                ]);
+            }
+
+            $userModel = new \App\Models\UserModel();
+            $user = $userModel->where('user_key', $userKey)->first();
+
+            if (! $user) {
+                return $this->response->setStatusCode(404)->setJSON([
+                    'ok' => false,
+                    'verified' => false,
+                    'message' => 'Pengguna biometrik sidik jari tidak ditemukan di database.',
+                ]);
+            }
+
+            $authResult = $this->authApi->loginByEmail((string) $user['email'], $companySlug);
+
+            if (! ($authResult['ok'] ?? false)) {
+                return $this->response->setStatusCode(422)->setJSON([
+                    'ok' => false,
+                    'verified' => false,
+                    'message' => 'Gagal membuat sesi login biometrik.',
+                ]);
+            }
+
+            return $this->response->setJSON([
+                'ok' => true,
+                'verified' => true,
+                'user' => $authResult['user'],
+                'accessContext' => $authResult['accessContext'],
+                'token' => $authResult['token'],
+                'similarity' => $similarity,
+                'similarityPercent' => $percent,
+                'matchedSample' => $identifyRes['matched_sample'] ?? 'Sampel #1',
+                'message' => "Sidik jari teridentifikasi sebagai {$user['name']} ({$percent}%)",
+            ]);
+        } catch (\Throwable $e) {
+            return $this->response->setStatusCode(500)->setJSON([
+                'ok' => false,
+                'verified' => false,
+                'message' => 'Gagal mengidentifikasi sidik jari: ' . $e->getMessage(),
+            ]);
+        }
+    }
+
+    public function openFingerprintDevice()
+    {
+        try {
+            $json = $this->request->getJSON(true) ?? [];
+            $vendor = (string) ($json['vendor'] ?? 'Generic');
+            $deviceIndex = (int) ($json['deviceIndex'] ?? 0);
+
+            $ai = service('aiService');
+            $res = $ai->openFingerprintDevice($vendor, $deviceIndex);
+            if (isset($res['session_id']) && ! isset($res['sessionId'])) {
+                $res['sessionId'] = $res['session_id'];
+            }
+            return $this->response->setJSON($res);
+        } catch (\Throwable $e) {
+            return $this->response->setStatusCode(500)->setJSON([
+                'ok' => false,
+                'message' => 'Gagal membuka device sidik jari di Python: ' . $e->getMessage(),
+            ]);
+        }
+    }
+
+    public function captureFingerprintFrame()
+    {
+        try {
+            $json = $this->request->getJSON(true) ?? [];
+            $sessionId = (string) ($json['sessionId'] ?? $json['session_id'] ?? '');
+
+            $ai = service('aiService');
+            $res = $ai->captureFingerprintFrame($sessionId);
+            if (isset($res['session_id']) && ! isset($res['sessionId'])) {
+                $res['sessionId'] = $res['session_id'];
+            }
+            return $this->response->setJSON($res);
+        } catch (\Throwable $e) {
+            return $this->response->setStatusCode(500)->setJSON([
+                'ok' => false,
+                'message' => 'Gagal membaca data frame sidik jari di Python: ' . $e->getMessage(),
+            ]);
+        }
+    }
+
+    public function closeFingerprintDevice()
+    {
+        try {
+            $json = $this->request->getJSON(true) ?? [];
+            $sessionId = (string) ($json['sessionId'] ?? $json['session_id'] ?? '');
+
+            $ai = service('aiService');
+            $res = $ai->closeFingerprintDevice($sessionId);
+            if (isset($res['session_id']) && ! isset($res['sessionId'])) {
+                $res['sessionId'] = $res['session_id'];
+            }
+            return $this->response->setJSON($res);
+        } catch (\Throwable $e) {
+            return $this->response->setStatusCode(500)->setJSON([
+                'ok' => false,
+                'message' => 'Gagal menutup device sidik jari di Python: ' . $e->getMessage(),
+            ]);
+        }
+    }
+
     private function renderLoginPage(string $companySlug = ''): \CodeIgniter\HTTP\ResponseInterface
     {
         $target = realpath(FCPATH . 'login.html');

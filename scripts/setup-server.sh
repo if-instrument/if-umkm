@@ -96,6 +96,10 @@ DB_USER="${DB_USER:-root}"
 DB_PASS="${DB_PASS:-}"
 DB_PORT="${DB_PORT:-3306}"
 CI_ENVIRONMENT="${CI_ENVIRONMENT:-production}"
+AI_SERVICE_URL="${AI_SERVICE_URL:-http://127.0.0.1:8000}"
+AI_SERVICE_API_KEY="${AI_SERVICE_API_KEY:-pos_ai_secret_key_2026}"
+AI_SERVICE_HMAC_SECRET="${AI_SERVICE_HMAC_SECRET:-pos_ai_hmac_secret_2026}"
+AI_SERVICE_TIMEOUT="${AI_SERVICE_TIMEOUT:-5}"
 
 echo "== IF Instrument UMKM Solution setup =="
 echo "Project     : $ROOT_DIR"
@@ -135,6 +139,11 @@ database.default.password = ${DB_PASS}
 database.default.DBDriver = MySQLi
 database.default.DBPrefix =
 database.default.port = ${DB_PORT}
+
+AI_SERVICE_URL = '${AI_SERVICE_URL}'
+AI_SERVICE_API_KEY = '${AI_SERVICE_API_KEY}'
+AI_SERVICE_HMAC_SECRET = '${AI_SERVICE_HMAC_SECRET}'
+AI_SERVICE_TIMEOUT = ${AI_SERVICE_TIMEOUT}
 # END IF_INSTRUMENT_SERVER_SETUP
 EOF
 mv "$TMP_ENV" .env
@@ -174,6 +183,12 @@ fi
 if [[ "$FRESH" -eq 1 ]]; then
   echo "Fresh seed aktif: reset database pusat dan seed Super Admin SaaS..."
   "$PHP_BIN" spark db:seed DemoSeeder
+fi
+
+if [[ -f scripts/setup-ai-service.sh ]]; then
+  echo
+  echo "Membuat dan menyiapkan AI Microservice (Python)..."
+  bash scripts/setup-ai-service.sh || echo "Peringatan: Setup AI Service dilewati atau gagal."
 fi
 
 echo
