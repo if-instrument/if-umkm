@@ -66,7 +66,7 @@ class UserRoleController extends BaseController
         return $this->renderHtmlResponse($html, $inject);
     }
 
-    private function numericCompanyId(string $companyId): int
+    protected function numericCompanyId(string $companyId): int
     {
         if ($companyId === '' || $companyId === 'company-main') {
             return 1;

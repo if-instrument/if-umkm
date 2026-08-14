@@ -30,7 +30,7 @@ class Settings:
     HMAC_SECRET: str = os.getenv("AI_SERVICE_HMAC_SECRET", "pos_ai_hmac_secret_2026")
     
     # Database Configuration (Dedicated MySQL DB for AI Microservice)
-    DATABASE_URL: str = os.getenv("AI_DATABASE_URL", "mysql+pymysql://root:1m4mf4154l@127.0.0.1:3306/if_umkm_ai_db")
+    DATABASE_URL: str = os.getenv("AI_DATABASE_URL", "mysql+pymysql://root:1m4mf4154l@127.0.0.1:3306/if_instrument_aiservice")
     
     # Threshold Configurations
     FACE_SIMILARITY_THRESHOLD: float = float(os.getenv("FACE_THRESHOLD", "0.72"))

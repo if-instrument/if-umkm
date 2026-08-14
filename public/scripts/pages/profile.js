@@ -1,5 +1,5 @@
 import { byId, showFeedback } from "../dom.js";
-import { apiGet, apiPost, loadSession } from "../store.js";
+import { apiGet, apiPost, apiUpload, loadSession } from "../store.js";
 
 /**
  * Async fetch helper with configurable timeout.
@@ -72,7 +72,9 @@ const FINGERPRINT_WIZARD_STEPS = [
 
 export function initProfilePage() {
   loadProfileData();
+  loadSubscriptionSection();
   bindProfileEvents();
+  bindTenantRenewalEvents();
 }
 
 function logSensorEvent(message, type = "idle") {
@@ -145,6 +147,22 @@ async function loadProfileData() {
 }
 
 function updateBiometricsUI(bio) {
+  const biometricsSection = byId("ai-biometrics-profile-section");
+
+  // Check if Company SaaS Plan includes AI Biometrics feature
+  if (bio.aiEnabledForCompany === false) {
+    if (biometricsSection) {
+      biometricsSection.hidden = true;
+      biometricsSection.style.display = "none";
+    }
+    return;
+  }
+
+  if (biometricsSection) {
+    biometricsSection.hidden = false;
+    biometricsSection.style.display = "";
+  }
+
   const faceBadge = byId("face-status-badge");
   const faceRegisterBtn = byId("btn-open-camera-modal") || byId("btn-register-face-modal");
   const faceTestBtn = byId("btn-test-face-modal");
@@ -1293,4 +1311,183 @@ async function handleDeleteFingerprint() {
   } catch (err) {
     showFeedback("profile-form-feedback", "Terjadi kesalahan koneksi.");
   }
+}
+
+// ============================================================
+// FITUR: Informasi & Perpanjangan Subscription Mandiri Tenant
+// ============================================================
+
+async function loadSubscriptionSection() {
+  try {
+    const res = await apiGet("/api/profile");
+    const sub = res?.data?.subscription;
+    if (!sub || !sub.companySlug) return; // Super Admin tidak punya company subscription
+
+    const section = byId("subscription-renewal-section");
+    if (section) section.style.display = "";
+
+    // Isi info card
+    const planNameEl  = byId("sub-plan-name");
+    const expiresAtEl = byId("sub-expires-at");
+    const maxOutletsEl = byId("sub-max-outlets");
+    const statusBadge = byId("sub-status-badge");
+
+    if (planNameEl)   planNameEl.textContent   = sub.plan || "-";
+    if (expiresAtEl)  expiresAtEl.textContent  = sub.expiresAt || "Selamanya";
+    if (maxOutletsEl) maxOutletsEl.textContent = (sub.maxOutlets >= 999) ? "Unlimited" : `${sub.maxOutlets || "-"} Outlet`;
+    if (statusBadge) {
+      const isActive = String(sub.status) === "10";
+      statusBadge.textContent = isActive ? "🟢 Aktif" : "🔴 Tidak Aktif";
+      statusBadge.className   = `status-pill ${isActive ? "success" : "error"}`;
+    }
+
+    // Simpan company slug ke form hidden (digunakan sebagai {id} di URL renewal)
+    const companyIdInput = byId("tenant-renewal-company-id");
+    if (companyIdInput) companyIdInput.value = sub.companySlug;
+
+    // Load daftar paket SaaS untuk dropdown
+    const planRes = await apiGet("/api/public/saas-plans");
+    const plans   = planRes?.data || planRes?.plans || [];
+    const select  = byId("tenant-renewal-plan");
+    if (select && plans.length) {
+      select.innerHTML = plans.map((p) => {
+        const priceText = p.price ? `Rp ${Number(p.price).toLocaleString("id-ID")}` : "Gratis";
+        const sel = String(p.code).toLowerCase() === String(sub.plan || "").toLowerCase() ? "selected" : "";
+        return `<option value="${p.code}" data-price="${p.price || 0}" data-duration="${p.durationDays || 365}" data-outlets="${p.maxOutlets || 5}" data-ai="${p.hasAiBiometrics ? '1' : '0'}" data-name="${p.name || p.code}" ${sel}>${p.name || p.code} — ${priceText} (${p.maxOutlets || 5} Outlet, ${p.durationDays || 365} Hari)</option>`;
+      }).join("");
+      updateTenantRenewalPlanDetails();
+    }
+
+    // Load rekening pembayaran pusat
+    try {
+      const accRes   = await apiGet("/api/public/central-payment-accounts");
+      const accounts = accRes?.data || [];
+      const payInfo  = byId("tenant-renewal-payment-info");
+      const payList  = byId("tenant-renewal-payment-accounts");
+      if (payList && accounts.length) {
+        payList.innerHTML = accounts.map((a) =>
+          `<div style="margin-top: 4px;">• <strong>${a.bankName || a.bank_name || "Bank"}</strong> — No. Rek: <strong>${a.accountNumber || a.account_number || "-"}</strong> a.n. ${a.accountHolder || a.account_holder || "-"}</div>`
+        ).join("");
+        if (payInfo) payInfo.style.display = "block";
+      }
+    } catch (_) { /* rekening opsional, tidak blocking */ }
+
+  } catch (err) {
+    // Tidak tampilkan error jika bukan company admin (Super Admin tidak punya subscription)
+  }
+}
+
+function updateTenantRenewalPlanDetails() {
+  const select  = byId("tenant-renewal-plan");
+  const details = byId("tenant-renewal-plan-details");
+  if (!select || !details) return;
+  const opt = select.options[select.selectedIndex];
+  if (!opt) { details.innerHTML = ""; return; }
+
+  const price    = Number(opt.dataset.price || 0);
+  const duration = Number(opt.dataset.duration || 365);
+  const outlets  = Number(opt.dataset.outlets || 5);
+  const hasAi    = opt.dataset.ai === "1";
+  const priceStr = price > 0 ? `Rp ${price.toLocaleString("id-ID")}` : "Gratis";
+  const durStr   = duration > 0 ? `${duration} Hari (~${Math.round(duration / 30)} Bulan)` : "Selamanya (Unlimited)";
+
+  details.innerHTML =
+    `• Biaya Perpanjangan: <strong>${priceStr}</strong><br>` +
+    `• Durasi Masa Aktif: <strong>${durStr}</strong><br>` +
+    `• Kuota Outlet: <strong>${outlets >= 999 ? "Unlimited" : outlets + " Outlet"}</strong><br>` +
+    `• AI Biometrik Login: <strong>${hasAi ? "✅ Termasuk" : "❌ Tidak Termasuk"}</strong>`;
+}
+
+function bindTenantRenewalEvents() {
+  byId("tenant-renewal-plan")?.addEventListener("change", updateTenantRenewalPlanDetails);
+
+  // Upload bukti transfer saat file dipilih
+  byId("tenant-renewal-proof-file")?.addEventListener("change", async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const statusEl  = byId("tenant-renewal-proof-status");
+    const previewEl = byId("tenant-renewal-proof-preview");
+    const imgEl     = byId("tenant-renewal-proof-img");
+    const urlInput  = byId("tenant-renewal-proof-url");
+
+    if (statusEl) { statusEl.textContent = "⏳ Sedang mengunggah bukti transfer..."; statusEl.style.color = "#b45309"; }
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+      const result      = apiUpload("/api/public/upload-payment-proof", formData);
+      const uploadedUrl = result?.url || result?.paymentProofUrl || "";
+
+      if (result?.ok && uploadedUrl) {
+        if (urlInput)  urlInput.value = uploadedUrl;
+        if (imgEl)     imgEl.src = uploadedUrl;
+        if (previewEl) previewEl.style.display = "flex";
+        if (statusEl)  { statusEl.textContent = `✅ Bukti transfer berhasil diunggah: ${file.name}`; statusEl.style.color = "#047857"; }
+      } else {
+        event.target.value = "";
+        if (statusEl) { statusEl.textContent = `❌ Gagal mengunggah: ${result?.message || "Error tidak diketahui."}`; statusEl.style.color = "#dc2626"; }
+      }
+    } catch (e) {
+      event.target.value = "";
+      if (statusEl) { statusEl.textContent = "❌ Gagal mengunggah bukti transfer."; statusEl.style.color = "#dc2626"; }
+    }
+  });
+
+  // Submit form perpanjangan
+  byId("tenant-renewal-form")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+
+    const companyId      = byId("tenant-renewal-company-id")?.value?.trim() || "";
+    const planCode       = byId("tenant-renewal-plan")?.value?.trim() || "";
+    const paymentProofUrl = byId("tenant-renewal-proof-url")?.value?.trim() || "";
+
+    if (!companyId || !planCode) return;
+
+    if (!paymentProofUrl) {
+      showFeedback("tenant-renewal-feedback", "❌ Bukti transfer pembayaran wajib diunggah terlebih dahulu.");
+      byId("tenant-renewal-proof-file")?.focus();
+      return;
+    }
+
+    const btn = byId("btn-submit-tenant-renewal");
+    if (btn) { btn.disabled = true; btn.innerHTML = `<span class="button-spinner"></span> Memproses...`; }
+
+    try {
+      const res = await fetch(`/api/company/${companyId}/renew-subscription`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+          ...(loadSession()?.token ? { "Authorization": `Bearer ${loadSession().token}` } : {}),
+        },
+        body: JSON.stringify({ subscriptionPlan: planCode, paymentProofUrl }),
+      }).then((r) => r.json());
+
+      if (btn) { btn.disabled = false; btn.innerHTML = "⏳ Ajukan Perpanjangan Subscription"; }
+
+      if (res?.ok || res?.data?.ok) {
+        showFeedback("tenant-renewal-feedback",
+          res?.data?.message || res?.message || "✅ Perpanjangan subscription berhasil diajukan! Terima kasih.",
+          "success");
+        // Reset form
+        const fileInput = byId("tenant-renewal-proof-file");
+        const urlInput  = byId("tenant-renewal-proof-url");
+        const previewEl = byId("tenant-renewal-proof-preview");
+        const statusEl  = byId("tenant-renewal-proof-status");
+        if (fileInput) fileInput.value = "";
+        if (urlInput)  urlInput.value  = "";
+        if (previewEl) previewEl.style.display = "none";
+        if (statusEl)  { statusEl.textContent = "Unggah bukti transfer untuk mengajukan perpanjangan subscription Anda."; statusEl.style.color = "#64748b"; }
+        // Refresh info subscription
+        loadSubscriptionSection();
+      } else {
+        showFeedback("tenant-renewal-feedback", res?.message || res?.data?.message || "❌ Gagal mengajukan perpanjangan.");
+      }
+    } catch (err) {
+      if (btn) { btn.disabled = false; btn.innerHTML = "⏳ Ajukan Perpanjangan Subscription"; }
+      showFeedback("tenant-renewal-feedback", "❌ Terjadi kesalahan koneksi. Silakan coba lagi.");
+    }
+  });
 }

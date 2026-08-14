@@ -33,6 +33,8 @@ $routes->group('api', ['namespace' => 'App\Controllers\Api'], static function ($
     $routes->post('public/change-password', '\App\Controllers\LoginController::changePassword');
     $routes->post('public/forgot-password', '\App\Controllers\LoginController::publicForgotPassword');
     $routes->get('public/central-payment-accounts', '\App\Controllers\LoginController::publicCentralPaymentAccounts');
+    $routes->get('public/registration-resubmit-data', '\App\Controllers\LoginController::publicRegistrationResubmitData');
+    $routes->post('public/registration-resubmit-submit', '\App\Controllers\LoginController::publicRegistrationResubmitSubmit');
 });
 $routes->group('api/page', static function ($routes) {
     $routes->get('login/bootstrap', 'LoginController::bootstrap');
@@ -61,8 +63,12 @@ $routes->group('api', ['namespace' => 'App\Controllers\Api', 'filter' => 'jwt-au
     $routes->delete('company/(:segment)', 'AccessController::deleteCompany/$1');
     $routes->post('company/(:segment)/approve', 'AccessController::approveCompany/$1');
     $routes->post('company/(:segment)/reject', 'AccessController::rejectCompany/$1');
+    $routes->post('company/(:segment)/resend-rejection', 'AccessController::resendRejectionEmail/$1');
+    $routes->post('company/(:segment)/renew-subscription', 'AccessController::renewSubscription/$1');
     $routes->post('company/(:segment)/invite-admin', 'AccessController::resendCompanyAdminInvitation/$1');
     $routes->post('company-logo', 'AccessController::uploadLogo');
+    $routes->get('saas-subscription-logs', 'AccessController::subscriptionLogs');
+    $routes->get('company/(:segment)/subscription-logs', 'AccessController::subscriptionLogs/$1');
     $routes->get('saas-plan', 'AccessController::listSaasPlans');
     $routes->post('saas-plan', 'AccessController::saveSaasPlan');
     $routes->put('saas-plan/(:segment)', 'AccessController::updateSaasPlan/$1');

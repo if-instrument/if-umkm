@@ -22,6 +22,17 @@
 
         <p class="form-feedback full-row" id="saas-plan-feedback"></p>
 
+        <!-- Showcase Benefit Cards Section -->
+        <section style="margin-top: 8px; margin-bottom: 24px;">
+          <div style="margin-bottom: 14px;">
+            <h3 style="font-size: 16px; font-weight: 700; color: #0f172a; display: flex; align-items: center; gap: 8px;">
+              <span>🎁 Pratinjau Detail Benefit & Fitur Paket SaaS</span>
+            </h3>
+            <p style="font-size: 13px; color: #64748b;">Rincian fitur dan keuntungan berlangganan yang didapatkan perusahaan untuk setiap tingkatan paket.</p>
+          </div>
+          <div id="saas-plans-cards-container" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;"></div>
+        </section>
+
         <section class="workspace-panel wide">
           <div class="panel-heading">
             <div>
@@ -38,6 +49,7 @@
                   <th>Harga Paket (Rp)</th>
                   <th>Kuota Max Outlet</th>
                   <th>Default Masa Aktif</th>
+                  <th>Fitur AI Login</th>
                   <th>Status</th>
                   <th>Featured Badge</th>
                   <th>Aksi</th>
@@ -71,6 +83,10 @@
                   <input id="saas-plan-duration-days" min="0" max="3650" placeholder="365 (Isi 0 jika Unlimited)" type="number" value="365" required />
                 </label>
                 <label>Status <select id="saas-plan-status"><option value="10">Aktif</option><option value="90">Nonaktif</option></select></label>
+                <label class="checkbox-field full-row">
+                  <input id="saas-plan-ai-login" type="checkbox" checked style="width: 16px; height: 16px; accent-color: var(--brand, #3B1F8C); cursor: pointer;" />
+                  <span><strong>🤖 Fitur AI Login (Wajah & Sidik Jari)</strong><small>Aktifkan otentikasi biometrik AI Login (Pemindaian Wajah & Sidik Jari) untuk meningkatkan nilai & harga jual paket SaaS ini.</small></span>
+                </label>
                 <label class="checkbox-field full-row">
                   <input id="saas-plan-featured" type="checkbox" />
                   <span><strong>Tandai sebagai Paket Unggulan (Featured)</strong><small>Paket unggulan akan disorot pada landing page autentikasi portal Super Admin.</small></span>

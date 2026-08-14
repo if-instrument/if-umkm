@@ -64,7 +64,7 @@ class AccessController extends BaseController
     public function uploadPaymentProof()
     {
         try {
-            $file = $this->request->getFile('file');
+            $file = $this->request->getFile('file') ?? $this->request->getFile('paymentProof') ?? $this->request->getFile('proof') ?? $this->request->getFile('payment_proof');
             if (! $file || ! $file->isValid()) {
                 throw new \InvalidArgumentException('Berkas bukti pembayaran tidak valid.');
             }
@@ -96,6 +96,38 @@ class AccessController extends BaseController
         try {
             $notes = (string) ($this->payload()['notes'] ?? '');
             return $this->response->setJSON(['ok' => true, 'data' => $this->access->rejectCompany($id, $notes)]);
+        } catch (\Throwable $exception) {
+            return $this->response->setStatusCode(422)->setJSON(['ok' => false, 'message' => $exception->getMessage()]);
+        }
+    }
+
+    public function resendRejectionEmail(string $id)
+    {
+        try {
+            return $this->response->setJSON($this->access->resendRejectionEmail($id));
+        } catch (\Throwable $exception) {
+            return $this->response->setStatusCode(422)->setJSON(['ok' => false, 'message' => $exception->getMessage()]);
+        }
+    }
+
+    public function renewSubscription(string $id)
+    {
+        try {
+            $payload = $this->payload();
+            // Sisipkan authType dari JWT agar service tahu siapa pelakunya
+            $claims = (array) (service('request')->jwt ?? []);
+            $payload['_authType'] = $claims['authType'] ?? 'company_admin';
+            $payload['_actorName'] = $claims['name'] ?? null;
+            return $this->response->setJSON(['ok' => true, 'data' => $this->access->renewSubscription($id, $payload)]);
+        } catch (\Throwable $exception) {
+            return $this->response->setStatusCode(422)->setJSON(['ok' => false, 'message' => $exception->getMessage()]);
+        }
+    }
+
+    public function subscriptionLogs(string $companyId = '')
+    {
+        try {
+            return $this->response->setJSON(['ok' => true, 'data' => $this->access->subscriptionLogs($companyId)]);
         } catch (\Throwable $exception) {
             return $this->response->setStatusCode(422)->setJSON(['ok' => false, 'message' => $exception->getMessage()]);
         }
@@ -366,7 +398,7 @@ class AccessController extends BaseController
 
     public function uploadLogo()
     {
-        $file = $this->request->getFile('logo');
+        $file = $this->request->getFile('logo') ?? $this->request->getFile('file');
         if (! $file || ! $file->isValid()) {
             return $this->response->setStatusCode(422)->setJSON([
                 'ok' => false,

@@ -11,7 +11,38 @@ export function showFeedback(id, message) {
   const element = byId(id);
   if (!element) return;
   element.textContent = message;
+  if (!message) {
+    element.classList.remove("show", "is-error", "is-success");
+    element.style.display = "none";
+    return;
+  }
+  element.style.display = "block";
   element.classList.add("show");
+
+  const msgLower = String(message).toLowerCase();
+  const isErr = message.includes("❌") || msgLower.includes("ditolak") || msgLower.includes("gagal") || msgLower.includes("tidak sesuai") || msgLower.includes("wajib") || msgLower.includes("salah") || msgLower.includes("error");
+
+  if (isErr) {
+    element.style.color = "#991b1b";
+    element.style.backgroundColor = "#fef2f2";
+    element.style.border = "1px solid #fecaca";
+    element.style.padding = "10px 14px";
+    element.style.borderRadius = "8px";
+    element.style.fontWeight = "600";
+    element.style.fontSize = "12.5px";
+    element.style.marginTop = "8px";
+    element.style.lineHeight = "1.45";
+  } else {
+    element.style.color = "#065f46";
+    element.style.backgroundColor = "#ecfdf5";
+    element.style.border = "1px solid #a7f3d0";
+    element.style.padding = "10px 14px";
+    element.style.borderRadius = "8px";
+    element.style.fontWeight = "600";
+    element.style.fontSize = "12.5px";
+    element.style.marginTop = "8px";
+    element.style.lineHeight = "1.45";
+  }
 }
 
 export function showAlert(message, type = "success") {

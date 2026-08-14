@@ -66,7 +66,7 @@ class TenantDatabaseService
         return DatabaseConfig::connect($this->tenantConfigFromCompany($company), false);
     }
 
-    public function companyBySlug(string $slug): ?array
+    public function rawCompanyBySlug(string $slug): ?array
     {
         $slug = trim($slug);
         if ($slug === '') {
@@ -76,7 +76,6 @@ class TenantDatabaseService
         $company = $this->centralConnection()
             ->table('companies')
             ->where('route_slug', $slug)
-            ->whereIn('status', [StatusCodeService::ACTIVE, 'active'])
             ->get()
             ->getRowArray();
         if ($company) {
@@ -86,7 +85,6 @@ class TenantDatabaseService
         $normalized = $this->normalizedSlug($slug);
         foreach ($this->centralConnection()
             ->table('companies')
-            ->whereIn('status', [StatusCodeService::ACTIVE, 'active'])
             ->get()
             ->getResultArray() as $row) {
             if ($this->normalizedSlug((string) ($row['route_slug'] ?? '')) === $normalized) {
@@ -95,6 +93,31 @@ class TenantDatabaseService
         }
 
         return null;
+    }
+
+    public function companyBySlug(string $slug): ?array
+    {
+        $company = $this->rawCompanyBySlug($slug);
+        if (! $company) {
+            return null;
+        }
+
+        // Enforce active status (10 or 'active')
+        $status = (string) ($company['status'] ?? '');
+        if ($status !== '10' && strtolower($status) !== 'active') {
+            return null;
+        }
+
+        // Enforce license expiration date
+        if (! empty($company['expires_at'])) {
+            $expiryTime = strtotime(substr((string) $company['expires_at'], 0, 10));
+            $todayTime = strtotime(date('Y-m-d'));
+            if ($expiryTime < $todayTime) {
+                return null;
+            }
+        }
+
+        return $company;
     }
 
     public function companyFromClaims(array $claims): ?array

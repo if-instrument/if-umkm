@@ -17,6 +17,19 @@ class AuthApiService
             return ['ok' => false, 'message' => 'Email atau password tidak sesuai.'];
         }
 
+        if (isset($result['rejected']) || isset($result['pending']) || isset($result['expired'])) {
+            return [
+                'ok' => false,
+                'rejected' => $result['rejected'] ?? false,
+                'pending' => $result['pending'] ?? false,
+                'expired' => $result['expired'] ?? false,
+                'hashKey' => $result['hashKey'] ?? '',
+                'renewUrl' => $result['renewUrl'] ?? '',
+                'resubmitUrl' => $result['resubmitUrl'] ?? '',
+                'message' => $result['message'],
+            ];
+        }
+
         $route = $this->companyRouteForEmail($email);
         if ($route !== '' && strtolower($route) !== strtolower($companySlug)) {
             return [
@@ -82,6 +95,24 @@ class AuthApiService
             return null;
         }
 
+        $planCode = strtolower(trim((string) ($company['subscription_plan'] ?? 'Professional')));
+        $saasPlans = (new \App\Services\AccessManagementService())->saasPlans();
+        $hasAiFromPlan = true;
+        foreach ($saasPlans as $p) {
+            if (strtolower((string) ($p['code'] ?? '')) === $planCode) {
+                $hasAiFromPlan = ! empty($p['hasAiBiometrics']);
+                break;
+            }
+        }
+
+        $faceEnabled = isset($company['ai_enable_face_login'])
+            ? (bool) $company['ai_enable_face_login']
+            : $hasAiFromPlan;
+
+        $fpEnabled = isset($company['ai_enable_fingerprint'])
+            ? (bool) $company['ai_enable_fingerprint']
+            : $hasAiFromPlan;
+
         return [
             'id' => (int) $company['id'],
             'companyId' => (int) $company['id'] === 1 ? 'company-main' : 'company-' . $company['id'],
@@ -91,6 +122,10 @@ class AuthApiService
             'logoUrl' => $company['logo_path'] ?? '',
             'themeColor' => $company['theme_color'] ?? '#6e3a16',
             'tagline' => $company['tagline'] ?: 'UMKM Solution',
+            'subscriptionPlan' => $company['subscription_plan'] ?? 'Professional',
+            'aiEnableFaceLogin' => $faceEnabled,
+            'aiEnableFingerprint' => $fpEnabled,
+            'hasAiBiometrics' => $faceEnabled || $fpEnabled,
         ];
     }
 

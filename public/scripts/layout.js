@@ -113,9 +113,10 @@ function activeCompany(state, session) {
 function navMarkup(currentPage, session, state) {
   const groups = session?.authType === "super_admin"
     ? [{
-        title: "SaaS",
+        title: "SaaS Central",
         items: [
           { page: "users", icon: "🏢", label: "Perusahaan", href: "/pages/users.html" },
+          { page: "saas-plans", icon: "📦", label: "Paket Subscription", href: "/pages/saas-plans.html" },
           { page: "central-payment-gateway", icon: "💳", label: "Payment Gateway", href: "/pages/central-payment-gateway.html" }
         ]
       }]
@@ -183,7 +184,7 @@ export function renderLayout() {
     window.location.href = appPath(currentPath);
     return;
   }
-  const allowedSuperAdminPages = ["users", "central-payment-gateway", "profile"];
+  const allowedSuperAdminPages = ["users", "saas-plans", "central-payment-gateway", "profile"];
   if (session?.authType === "super_admin" && !allowedSuperAdminPages.includes(document.body.dataset.page)) {
     window.location.href = "/pages/users.html";
     return;

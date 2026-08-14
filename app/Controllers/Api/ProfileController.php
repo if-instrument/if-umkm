@@ -137,26 +137,67 @@ class ProfileController extends BaseController
                 $aiOnline = false;
             }
 
+            // Resolve company AI feature plan enablement
+            $company = null;
+            if ($companySlug !== '') {
+                $company = (new \App\Services\TenantDatabaseService())->companyBySlug($companySlug);
+            }
+            $companyPlan = $company['subscription_plan'] ?? 'Professional';
+            $planCode = strtolower(trim((string) $companyPlan));
+            $saasPlans = (new \App\Services\AccessManagementService())->saasPlans();
+            $hasAiFromPlan = true;
+            foreach ($saasPlans as $p) {
+                if (strtolower((string) ($p['code'] ?? '')) === $planCode) {
+                    $hasAiFromPlan = ! empty($p['hasAiBiometrics']);
+                    break;
+                }
+            }
+
+            $faceEnabled = isset($company['ai_enable_face_login'])
+                ? (bool) $company['ai_enable_face_login']
+                : $hasAiFromPlan;
+
+            $fpEnabled = isset($company['ai_enable_fingerprint'])
+                ? (bool) $company['ai_enable_fingerprint']
+                : $hasAiFromPlan;
+
+            $aiEnabledForCompany = $faceEnabled || $fpEnabled;
+
             return $this->response->setJSON([
                 'ok' => true,
                 'data' => [
                     'user' => [
-                        'id' => $userCode,
-                        'userKey' => $userKey,
-                        'numericId' => $numericId,
-                        'name' => $userName,
-                        'email' => $userEmail,
-                        'type' => $userType,
-                        'companyId' => $tenantId,
-                        'companySlug' => $companySlug,
+                        'id'               => $userCode,
+                        'userKey'          => $userKey,
+                        'numericId'        => $numericId,
+                        'name'             => $userName,
+                        'email'            => $userEmail,
+                        'type'             => $userType,
+                        'companyId'        => $tenantId,
+                        'companySlug'      => $companySlug,
+                        'subscriptionPlan' => $companyPlan,
                     ],
                     'biometrics' => [
-                        'aiServiceOnline' => $aiOnline,
-                        'faceRegistered' => $faceRegistered,
-                        'faceCount' => $faceCount,
+                        'aiEnabledForCompany'  => $aiEnabledForCompany,
+                        'aiEnableFaceLogin'    => $faceEnabled,
+                        'aiEnableFingerprint'  => $fpEnabled,
+                        'companyPlan'          => $companyPlan,
+                        'aiServiceOnline'      => $aiOnline,
+                        'faceRegistered'       => $faceRegistered,
+                        'faceCount'            => $faceCount,
                         'fingerprintRegistered' => $fingerprintRegistered,
-                        'fingerprintCount' => $fingerprintCount,
+                        'fingerprintCount'     => $fingerprintCount,
                     ],
+                    // Subscription info for tenant self-renewal on profile page
+                    'subscription' => $company ? [
+                        'companyId'        => $tenantId,
+                        'companySlug'      => $companySlug ?: $tenantId,
+                        'plan'             => $company['subscription_plan'] ?? '-',
+                        'expiresAt'        => ! empty($company['expires_at']) ? date('d M Y', strtotime($company['expires_at'])) : 'Selamanya',
+                        'maxOutlets'       => (int) ($company['max_outlets'] ?? 5),
+                        'status'           => (string) ($company['status'] ?? '10'),
+                        'paymentStatus'    => (string) ($company['payment_status'] ?? '10'),
+                    ] : null,
                 ],
             ]);
         } catch (\Throwable $e) {

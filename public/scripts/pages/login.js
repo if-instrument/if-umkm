@@ -136,21 +136,25 @@ function renderSaasPlans(plans = []) {
   }
 
   container.innerHTML = plans.map((p) => {
-    const isFeatured = Boolean(p.isFeatured || p.is_featured || String(p.code).toLowerCase() === "professional");
+    const isFeatured = Boolean(p.isFeatured || p.is_featured || String(p.is_featured) === "1" || String(p.isFeatured) === "1");
     const recommendedBadge = isFeatured
       ? `<span class="plan-recommended-badge">⭐ Recommended</span>`
       : "";
 
+    const priceVal = Number(p.price || 0);
+    const priceText = priceVal <= 0 ? "Gratis" : "Rp " + priceVal.toLocaleString("id-ID");
+    const descText = p.description || p.details || p.desc || (p.maxOutlets ? `${p.maxOutlets} Outlet · ${p.durationDays ? p.durationDays + " Hari" : "Masa Aktif Selamanya"}` : "Paket langganan UMKM.");
+
     return `
       <div class="saas-plan-card ${isFeatured ? "featured-plan" : ""}" data-plan-code="${escapeHtml(p.code || "")}" style="cursor: pointer;" title="Klik untuk mendaftar paket ${escapeHtml(p.name || p.code || "")}">
         <div class="saas-plan-header">
-          <div style="display: flex; align-items: center; gap: 6px;">
-            <strong>${escapeHtml(p.name || p.code || "")}</strong>
+          <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+            <strong style="font-size: 13.5px; color: #0f172a;">${escapeHtml(p.name || p.code || "")}</strong>
             ${recommendedBadge}
           </div>
-          <span class="saas-plan-price">${Number(p.price || 0) <= 0 ? "Gratis" : "Rp " + Number(p.price).toLocaleString("id-ID") + " / th"}</span>
+          <span class="saas-plan-price">${priceText}</span>
         </div>
-        <small class="saas-plan-meta">${Number(p.maxOutlets || 0) >= 999 ? "Unlimited Outlet" : "Max " + (p.maxOutlets || 0) + " Outlet"} · ${p.durationDays ? p.durationDays + " Hari" : "Masa Aktif Selamanya"}</small>
+        <p class="saas-plan-desc" style="font-size: 11.5px; color: #334155; margin: 6px 0 0; line-height: 1.45; font-weight: 500;">${escapeHtml(descText)}</p>
       </div>
     `;
   }).join("");
@@ -161,13 +165,35 @@ function renderSaasPlans(plans = []) {
       openRegisterModal(code);
     });
   });
+
+  startSaasPlansAutoScroll();
+}
+
+let saasPlanAutoScrollTimer = null;
+function startSaasPlansAutoScroll() {
+  const container = byId("saas-plan-cards");
+  if (!container || saasPlanAutoScrollTimer) return;
+
+  saasPlanAutoScrollTimer = setInterval(() => {
+    if (!container || container.matches(":hover")) return;
+    const maxScroll = container.scrollHeight - container.clientHeight;
+    if (maxScroll <= 0) return;
+
+    if (container.scrollTop >= maxScroll - 10) {
+      container.scrollTo({ top: 0, behavior: "smooth" });
+    } else {
+      container.scrollBy({ top: 95, behavior: "smooth" });
+    }
+  }, 3200);
 }
 
 function renderRegisterPlanDropdown(plans = []) {
   const select = byId("reg-subscription-plan");
+  const picker = byId("reg-visual-plan-picker");
   if (!select) return;
   if (!plans || !plans.length) {
     select.innerHTML = `<option value="">Tidak ada paket tersedia</option>`;
+    if (picker) picker.innerHTML = `<p style="font-size:12px; color:var(--muted);">Tidak ada paket tersedia.</p>`;
     return;
   }
 
@@ -183,6 +209,37 @@ function renderRegisterPlanDropdown(plans = []) {
       </option>
     `;
   }).join("");
+
+  if (picker) {
+    picker.innerHTML = plans.map((p) => {
+      const isFeatured = Boolean(p.isFeatured || p.is_featured || String(p.code).toLowerCase() === "professional");
+      const isSelected = p.code === recommendedPlan.code;
+      const outletsText = Number(p.maxOutlets || 0) >= 999 ? "Unlimited Outlet" : `${p.maxOutlets || 5} Outlet`;
+      const priceText = Number(p.price || 0) <= 0 ? "Gratis" : "Rp " + Number(p.price).toLocaleString("id-ID");
+      const hasAi = Boolean(p.hasAiBiometrics);
+
+      return `
+        <div class="visual-plan-picker-card ${isSelected ? 'active' : ''}" data-picker-code="${escapeHtml(p.code || '')}">
+          <div class="radio-indicator"></div>
+          <strong style="font-size: 13px; color: #0f172a;">${escapeHtml(p.name || p.code || '')} ${isFeatured ? '⭐' : ''}</strong>
+          <span style="font-size: 13px; font-weight: 800; color: var(--brand, #3B1F8C);">${priceText}</span>
+          <small style="color: #64748b; font-size: 11px;">✓ ${outletsText} · ${p.durationDays ? p.durationDays + ' Hari' : 'Selamanya'}</small>
+          <small style="color: ${hasAi ? '#059669' : '#94a3b8'}; font-size: 10.5px; font-weight: 600;">${hasAi ? '✓ 🤖 AI Biometrik Login' : '✗ 🤖 Non-AI'}</small>
+        </div>
+      `;
+    }).join("");
+
+    picker.querySelectorAll(".visual-plan-picker-card").forEach((card) => {
+      card.addEventListener("click", () => {
+        const code = card.dataset.pickerCode;
+        if (!code) return;
+        select.value = code;
+        picker.querySelectorAll(".visual-plan-picker-card").forEach((c) => c.classList.remove("active"));
+        card.classList.add("active");
+        updateRegisterPlanSummary();
+      });
+    });
+  }
 }
 
 function renderCentralPaymentAccounts(accounts = []) {
@@ -303,17 +360,51 @@ function fillSample(type) {
 }
 
 function login(email, password) {
-  const result = apiPost("/api/page/login/submit", { email, password, companySlug });
-  return handleLoginSuccess(result);
+  const submitBtn = document.querySelector("#login-form button[type='submit']") || byId("btn-submit-login");
+  const originalHtml = submitBtn ? submitBtn.innerHTML : "Masuk ke Sistem";
+
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.classList.add("button-loading");
+    submitBtn.innerHTML = `<span class="button-spinner"></span> Memproses Login...`;
+  }
+
+  showFeedback("login-feedback", "⚡ Memverifikasi kredensial...");
+
+  setTimeout(() => {
+    try {
+      const result = apiPost("/api/page/login/submit", { email, password, companySlug });
+      const ok = handleLoginSuccess(result);
+      if (!ok && submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.classList.remove("button-loading");
+        submitBtn.innerHTML = originalHtml;
+      }
+    } catch (e) {
+      showFeedback("login-feedback", "Terjadi kesalahan saat memproses login.");
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.classList.remove("button-loading");
+        submitBtn.innerHTML = originalHtml;
+      }
+    }
+  }, 50);
 }
 
 function handleLoginSuccess(result, isBiometricPassed = false) {
   if (!result || !result.ok) {
-    if (result?.routeUrl) {
-      showFeedback("login-feedback", result.message || "Terdapat kendala pada akun Anda.");
+    const errorMsg = result?.message || "Email atau password tidak sesuai.";
+    showFeedback("login-feedback", errorMsg);
+    showAlert(errorMsg, "error");
+
+    if ((result?.expired || result?.rejected) && result?.hashKey) {
+      setTimeout(() => {
+        handleResubmitTokenFromUrl(result.hashKey);
+      }, 1000);
+    } else if (result?.routeUrl) {
       window.setTimeout(() => {
         window.location.href = result.routeUrl;
-      }, 700);
+      }, 1200);
     }
     return false;
   }
@@ -370,10 +461,13 @@ function handleLoginSuccess(result, isBiometricPassed = false) {
     return true;
   }
 
-  if (authType === "super_admin") window.location.href = "/pages/users.html";
-  else if (authType === "company_admin" && user.onboardingRequired) window.location.href = appPath("/pages/onboarding.html");
-  else if (user.permissions?.includes("kitchen") && !user.permissions.includes("pos")) window.location.href = appPath("/pages/orders.html");
-  else window.location.href = appPath("/index.html");
+  showGlobalLoading("🎉 Login Berhasil! Memuat dashboard...");
+  setTimeout(() => {
+    if (authType === "super_admin") window.location.href = "/pages/users.html";
+    else if (authType === "company_admin" && user.onboardingRequired) window.location.href = appPath("/pages/onboarding.html");
+    else if (user.permissions?.includes("kitchen") && !user.permissions.includes("pos")) window.location.href = appPath("/pages/orders.html");
+    else window.location.href = appPath("/index.html");
+  }, 200);
 
   return true;
 }
@@ -759,7 +853,29 @@ function updateRegisterPlanSummary() {
 
   if (summaryName) summaryName.textContent = plan?.name || selectedCode || "Starter Plan";
   if (summaryPrice) {
-    summaryPrice.textContent = !isPaid ? "Gratis (Bebas Biaya)" : "Rp " + priceVal.toLocaleString("id-ID") + " / th";
+    summaryPrice.textContent = !isPaid ? "Gratis (Bebas Biaya)" : "Rp " + priceVal.toLocaleString("id-ID");
+  }
+
+  const outletsEl = byId("reg-benefit-outlets");
+  if (outletsEl) {
+    outletsEl.textContent = Number(plan?.maxOutlets || 0) >= 999 ? "Unlimited Outlet" : `${plan?.maxOutlets || 5} Outlet`;
+  }
+
+  const durationEl = byId("reg-benefit-duration");
+  if (durationEl) {
+    durationEl.textContent = !plan?.durationDays ? "Selamanya (Unlimited)" : `${plan.durationDays} Hari (${Math.round(plan.durationDays / 30)} Bulan)`;
+  }
+
+  const aiEl = byId("reg-benefit-ai");
+  if (aiEl) {
+    const hasAi = Boolean(plan?.hasAiBiometrics);
+    if (hasAi) {
+      aiEl.style.color = "#047857";
+      aiEl.innerHTML = `<span style="color: #059669; font-weight: 700;">✓</span> 🤖 <strong>Fitur AI Biometrik Login:</strong> Wajah & Sidik Jari (Aktif)`;
+    } else {
+      aiEl.style.color = "#94a3b8";
+      aiEl.innerHTML = `<span style="color: #cbd5e1; font-weight: 700;">✗</span> 🤖 <strong>Fitur AI Biometrik Login:</strong> Tidak Tersedia pada Paket Ini`;
+    }
   }
 
   if (paymentSection) {
@@ -780,6 +896,7 @@ function openRegisterModal(selectedPlanCode = "") {
   renderCentralPaymentAccounts(loginBootstrap?.centralPaymentAccounts);
 
   const select = byId("reg-subscription-plan");
+  const picker = byId("reg-visual-plan-picker");
   if (select) {
     if (selectedPlanCode) {
       select.value = selectedPlanCode;
@@ -789,6 +906,16 @@ function openRegisterModal(selectedPlanCode = "") {
         select.value = recommendedPlan.code;
       }
     }
+  }
+
+  if (picker && select?.value) {
+    picker.querySelectorAll(".visual-plan-picker-card").forEach((card) => {
+      if (card.dataset.pickerCode === select.value) {
+        card.classList.add("active");
+      } else {
+        card.classList.remove("active");
+      }
+    });
   }
 
   updateRegisterPlanSummary();
@@ -836,6 +963,142 @@ byId("toggle-login-password")?.addEventListener("click", () => {
   openIcon.style.display = isPassword ? "none" : "";
   closedIcon.style.display = isPassword ? "" : "none";
 });
+
+function applyBiometricLoginOptionsVisibility(company) {
+  const optionsContainer = byId("ai-biometric-login-options");
+  const faceBtn = byId("btn-login-face-direct");
+  const fpBtn = byId("btn-login-fingerprint-direct");
+
+  if (!optionsContainer) return;
+
+  if (!company) {
+    optionsContainer.hidden = true;
+    optionsContainer.style.display = "none";
+    if (faceBtn) faceBtn.hidden = true;
+    if (fpBtn) fpBtn.hidden = true;
+    return;
+  }
+
+  const faceEnabled = Boolean(company.aiEnableFaceLogin ?? company.hasAiBiometrics ?? true);
+  const fpEnabled = Boolean(company.aiEnableFingerprint ?? company.hasAiBiometrics ?? true);
+
+  if (faceBtn) faceBtn.hidden = !faceEnabled;
+  if (fpBtn) fpBtn.hidden = !fpEnabled;
+
+  if (faceEnabled || fpEnabled) {
+    optionsContainer.hidden = false;
+    if (faceEnabled && fpEnabled) {
+      optionsContainer.style.display = "grid";
+      optionsContainer.style.gridTemplateColumns = "1fr 1fr";
+    } else {
+      optionsContainer.style.display = "block";
+    }
+  } else {
+    optionsContainer.hidden = true;
+    optionsContainer.style.display = "none";
+  }
+}
+
+async function handleResubmitTokenFromUrl(token) {
+  openRegisterModal();
+
+  showFeedback("register-feedback", "⚡ Memuat data pengajuan sebelumnya dari Hash Key...");
+
+  try {
+    const res = await apiGet(`/api/public/registration-resubmit-data?token=${encodeURIComponent(token)}`);
+    if (res?.ok && res.data) {
+      const data = res.data;
+      window._activeResubmitToken = token;
+
+      // Update Modal Header Text
+      const titleEl = document.querySelector("#public-register-modal .modal-header h3");
+      const descEl = document.querySelector("#public-register-modal .modal-header p");
+      if (titleEl) titleEl.innerHTML = `✏️ Perbaiki Pengajuan: <strong>${escapeHtml(data.companyName)}</strong>`;
+      if (descEl) descEl.textContent = "Lakukan perbaikan data atau unggah ulang bukti pembayaran sesuai catatan Super Admin.";
+
+      // Display Rejection & Audit Log History Box
+      let rejectionBox = byId("resubmit-rejection-alert-box");
+      if (!rejectionBox) {
+        rejectionBox = document.createElement("div");
+        rejectionBox.id = "resubmit-rejection-alert-box";
+        rejectionBox.style.cssText = "background:#fef2f2; border:1.5px solid #fecaca; border-radius:12px; padding:16px; margin:10px 0 16px; color:#991b1b; font-size:12.5px; line-height:1.45; grid-column: span 2;";
+        const form = byId("public-register-form");
+        if (form && form.firstChild) form.insertBefore(rejectionBox, form.firstChild);
+      }
+
+      const historyItemsHtml = (data.historyLogs || []).map((l) => `
+        <li style="display:flex; justify-content:space-between; align-items:center; background:#ffffff; border:1px solid #fca5a5; border-radius:6px; padding:8px 12px; font-size:11.5px;">
+          <div>
+            <strong style="color:#991b1b;">${escapeHtml(l.actionLabel || l.action)}</strong>
+            ${l.details ? `<br><small style="color:#7f1d1d; font-weight:500;">${escapeHtml(l.details)}</small>` : ""}
+          </div>
+          <span style="font-size:10.5px; font-weight:700; color:#b91c1c; white-space:nowrap; margin-left:10px;">${escapeHtml(l.formattedTime)}</span>
+        </li>
+      `).join("");
+
+      rejectionBox.innerHTML = `
+        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px dashed #fca5a5; padding-bottom:8px; margin-bottom:10px;">
+          <span style="font-weight:800; font-size:13.5px; color:#991b1b;">📌 Histori Penolakan & Pengajuan</span>
+          <span style="font-size:11px; font-weight:800; background:#fee2e2; color:#991b1b; padding:3px 8px; border-radius:6px; border:1px solid #fca5a5;">Ditolak: ${escapeHtml(data.rejectedAt || "Baru Saja")}</span>
+        </div>
+
+        <div style="background:#ffffff; border:1.5px solid #ef4444; border-radius:8px; padding:12px; margin-bottom:12px; box-shadow:0 2px 6px rgba(239,68,68,0.1);">
+          <div style="font-size:11px; font-weight:800; color:#dc2626; text-transform:uppercase; margin-bottom:4px; letter-spacing:0.03em;">❌ Alasan Penolakan Super Admin:</div>
+          <div style="font-size:13px; font-weight:700; color:#7f1d1d; line-height:1.5;">"${escapeHtml(data.rejectionNotes || "Bukti pembayaran belum memenuhi verifikasi.")}"</div>
+        </div>
+
+        <div style="font-size:11.5px; font-weight:800; color:#991b1b; margin-bottom:8px; display:flex; justify-content:space-between;">
+          <span>📜 Riwayat Aktivitas Pengajuan:</span>
+          <span style="font-size:10.5px; color:#7f1d1d;">Pendaftaran Awal: <strong>${escapeHtml(data.submittedAt || "-")}</strong></span>
+        </div>
+        <ul style="list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:6px;">
+          ${historyItemsHtml}
+        </ul>
+      `;
+
+      // Pre-fill Editable Form Fields
+      if (byId("reg-company-name")) byId("reg-company-name").value = data.companyName || "";
+      if (byId("reg-admin-name")) byId("reg-admin-name").value = data.adminName || "";
+      if (byId("reg-admin-email")) {
+        byId("reg-admin-email").value = data.adminEmail || "";
+        byId("reg-admin-email").readOnly = false;
+        byId("reg-admin-email").style.background = "#ffffff";
+      }
+      if (byId("reg-theme-color")) byId("reg-theme-color").value = data.themeColor || "#3B1F8C";
+      if (byId("reg-company-logo-url")) byId("reg-company-logo-url").value = data.logoUrl || "";
+      if (data.logoUrl && byId("reg-company-logo-preview")) {
+        byId("reg-company-logo-preview").style.backgroundImage = `url('${data.logoUrl}')`;
+        byId("reg-company-logo-preview").style.backgroundSize = "cover";
+        byId("reg-company-logo-preview").textContent = "";
+      }
+      if (data.paymentProofUrl && byId("reg-payment-proof-url")) {
+        byId("reg-payment-proof-url").value = data.paymentProofUrl;
+      }
+      if (data.paymentProofUrl && byId("reg-payment-proof-preview")) {
+        byId("reg-payment-proof-preview").style.backgroundImage = `url('${data.paymentProofUrl}')`;
+        byId("reg-payment-proof-preview").style.backgroundSize = "cover";
+        byId("reg-payment-proof-preview").textContent = "";
+      }
+
+      // Pre-select Subscription Plan
+      if (byId("reg-subscription-plan")) {
+        byId("reg-subscription-plan").value = data.subscriptionPlan || "Starter";
+        updateRegisterPlanSummary();
+      }
+
+      // Change Submit Button Label
+      const submitBtn = byId("public-register-form")?.querySelector("button[type='submit']");
+      if (submitBtn) submitBtn.innerHTML = `✏️ Kirim Perbaikan Pengajuan →`;
+
+      showFeedback("register-feedback", "✅ Data pengajuan sebelumnya & histori penolakan berhasil dimuat.");
+    } else {
+      showFeedback("register-feedback", res?.message || "Token perbaikan tidak valid atau sudah kedaluwarsa.");
+      showAlert(res?.message || "Token perbaikan tidak valid.", "error");
+    }
+  } catch (err) {
+    showFeedback("register-feedback", "Gagal memuat data token perbaikan.");
+  }
+}
 
 // ─── Page Initializer ────────────────────────────────────────────────────────
 (function initLoginPage() {
@@ -909,7 +1172,11 @@ byId("toggle-login-password")?.addEventListener("click", () => {
       const companyName = response.data.company.name || response.data.company.brandName || "Perusahaan";
       if (formKicker) formKicker.textContent = companyName.toUpperCase();
       if (formTitle) formTitle.textContent = `Masuk ke Portal ${companyName}`;
+
+      // Apply AI Biometrics Feature Visibility based on Company's SaaS Plan
+      applyBiometricLoginOptionsVisibility(response.data.company);
     } else {
+      applyBiometricLoginOptionsVisibility(null);
       renderSaasPlans(response.data.saasPlans);
       renderTenantList(response.data.companies);
     }
@@ -961,6 +1228,7 @@ byId("toggle-login-password")?.addEventListener("click", () => {
     const file = event.target.files?.[0];
     if (!file) return;
     const formData = new FormData();
+    formData.append("logo", file);
     formData.append("file", file);
     const result = apiUpload("/api/public/upload-company-logo", formData);
     if (result?.ok && result.url) {
@@ -996,9 +1264,19 @@ byId("toggle-login-password")?.addEventListener("click", () => {
     }
   });
 
+  // Auto check URL parameters for Hash Key Resubmission link (?action=resubmit&token=XXXX or ?token=XXXX)
+  const urlParams = new URLSearchParams(window.location.search);
+  const resubmitToken = urlParams.get("token") || urlParams.get("resubmitToken");
+  if (resubmitToken) {
+    setTimeout(() => handleResubmitTokenFromUrl(resubmitToken), 200);
+  }
+
   // Submit Register Form
   byId("public-register-form")?.addEventListener("submit", (event) => {
     event.preventDefault();
+    const submitBtn = byId("public-register-form")?.querySelector("button[type='submit']");
+    const originalHtml = submitBtn ? submitBtn.innerHTML : "Kirim Pendaftaran Perusahaan →";
+
     const payload = {
       name: byId("reg-company-name")?.value?.trim() || "",
       logoUrl: byId("reg-company-logo-url")?.value?.trim() || "",
@@ -1014,21 +1292,86 @@ byId("toggle-login-password")?.addEventListener("click", () => {
       return;
     }
 
-    const result = apiPost("/api/public/register-company", payload);
-    if (result?.ok) {
-      showFeedback("register-feedback", result.message || "Pendaftaran berhasil!");
-      window.setTimeout(() => {
-        closeRegisterModal();
-        showFeedback("login-feedback", "Pendaftaran berhasil dikirim! Silakan tunggu verifikasi Super Admin.");
-      }, 2000);
-    } else {
-      showFeedback("register-feedback", result?.message || "Pendaftaran gagal.");
+    if (window._activeResubmitToken) {
+      payload.token = window._activeResubmitToken;
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.classList.add("button-loading");
+        submitBtn.innerHTML = `<span class="button-spinner"></span> Mengirim Perbaikan...`;
+      }
+
+      setTimeout(() => {
+        try {
+          const result = apiPost("/api/public/registration-resubmit-submit", payload);
+          if (result?.ok) {
+            showFeedback("register-feedback", result.message || "Perbaikan pengajuan berhasil dikirim!");
+            showAlert(result.message || "Perbaikan pengajuan berhasil dikirim!", "success");
+            window.setTimeout(() => {
+              window._activeResubmitToken = null;
+              closeRegisterModal();
+              showFeedback("login-feedback", "Perbaikan pendaftaran berhasil dikirim! Silakan tunggu verifikasi ulang Super Admin.");
+            }, 2200);
+          } else {
+            showFeedback("register-feedback", result?.message || "Gagal memproses perbaikan.");
+            showAlert(result?.message || "Gagal mengirim perbaikan.", "error");
+            if (submitBtn) {
+              submitBtn.disabled = false;
+              submitBtn.classList.remove("button-loading");
+              submitBtn.innerHTML = `✏️ Kirim Perbaikan Pengajuan →`;
+            }
+          }
+        } catch (e) {
+          showFeedback("register-feedback", "Gagal mengirim perbaikan pengajuan.");
+          if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.classList.remove("button-loading");
+            submitBtn.innerHTML = `✏️ Kirim Perbaikan Pengajuan →`;
+          }
+        }
+      }, 50);
+      return;
     }
+
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.classList.add("button-loading");
+      submitBtn.innerHTML = `<span class="button-spinner"></span> Mendaftarkan Perusahaan...`;
+    }
+
+    setTimeout(() => {
+      try {
+        const result = apiPost("/api/public/register-company", payload);
+        if (result?.ok) {
+          showFeedback("register-feedback", result.message || "Pendaftaran berhasil!");
+          window.setTimeout(() => {
+            closeRegisterModal();
+            showFeedback("login-feedback", "Pendaftaran berhasil dikirim! Silakan tunggu verifikasi Super Admin.");
+          }, 2000);
+        } else {
+          showFeedback("register-feedback", result?.message || "Pendaftaran gagal.");
+          if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.classList.remove("button-loading");
+            submitBtn.innerHTML = originalHtml;
+          }
+        }
+      } catch (e) {
+        showFeedback("register-feedback", "Gagal memproses pendaftaran.");
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.classList.remove("button-loading");
+          submitBtn.innerHTML = originalHtml;
+        }
+      }
+    }, 50);
   });
 
   // Submit Must Change Password Form
   byId("must-change-password-form")?.addEventListener("submit", (event) => {
     event.preventDefault();
+    const submitBtn = byId("must-change-password-form")?.querySelector("button[type='submit']");
+    const originalHtml = submitBtn ? submitBtn.innerHTML : "Simpan Password Baru";
+
     const email = byId("pwd-change-email")?.value;
     const currentPassword = byId("pwd-change-current")?.value;
     const newPassword = byId("pwd-change-new")?.value;
@@ -1043,24 +1386,46 @@ byId("toggle-login-password")?.addEventListener("click", () => {
       return;
     }
 
-    const result = apiPost("/api/public/change-password", {
-      email,
-      currentPassword,
-      newPassword,
-      companySlug
-    });
-
-    if (result?.ok) {
-      showFeedback("pwd-change-feedback", result.message || "Password berhasil diperbarui!");
-      window.setTimeout(() => {
-        if (byId("password-change-modal-backdrop")) byId("password-change-modal-backdrop").hidden = true;
-        if (byId("must-change-password-modal")) byId("must-change-password-modal").hidden = true;
-        document.body.classList.remove("modal-open");
-        login(email, newPassword);
-      }, 1500);
-    } else {
-      showFeedback("pwd-change-feedback", result?.message || "Gagal memperbarui password.");
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.classList.add("button-loading");
+      submitBtn.innerHTML = `<span class="button-spinner"></span> Memperbarui Password...`;
     }
+
+    setTimeout(() => {
+      try {
+        const result = apiPost("/api/public/change-password", {
+          email,
+          currentPassword,
+          newPassword,
+          companySlug
+        });
+
+        if (result?.ok) {
+          showFeedback("pwd-change-feedback", result.message || "Password berhasil diperbarui!");
+          window.setTimeout(() => {
+            if (byId("password-change-modal-backdrop")) byId("password-change-modal-backdrop").hidden = true;
+            if (byId("must-change-password-modal")) byId("must-change-password-modal").hidden = true;
+            document.body.classList.remove("modal-open");
+            login(email, newPassword);
+          }, 1500);
+        } else {
+          showFeedback("pwd-change-feedback", result?.message || "Gagal memperbarui password.");
+          if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.classList.remove("button-loading");
+            submitBtn.innerHTML = originalHtml;
+          }
+        }
+      } catch (e) {
+        showFeedback("pwd-change-feedback", "Gagal memperbarui password.");
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.classList.remove("button-loading");
+          submitBtn.innerHTML = originalHtml;
+        }
+      }
+    }, 50);
   });
 
   // Submit Forgot Password Form
@@ -1073,28 +1438,40 @@ byId("toggle-login-password")?.addEventListener("click", () => {
     }
 
     const submitBtn = document.querySelector("#forgot-password-form button[type='submit']");
-    const originalText = submitBtn ? submitBtn.textContent : "Kirim Password Sementara";
+    const originalHtml = submitBtn ? submitBtn.innerHTML : "Kirim Password Sementara";
     if (submitBtn) {
       submitBtn.disabled = true;
-      submitBtn.textContent = "⏳ Memproses...";
+      submitBtn.classList.add("button-loading");
+      submitBtn.innerHTML = `<span class="button-spinner"></span> Memproses Reset Password...`;
     }
 
-    const result = apiPost("/api/public/forgot-password", { email, companySlug });
-    if (result?.ok) {
-      showFeedback("forgot-feedback", result.message || "Password sementara telah dikirim ke email Anda.");
-      if (byId("login-email")) byId("login-email").value = email;
-      window.setTimeout(() => {
-        closeForgotModal();
-        showFeedback("login-feedback", "Password sementara dikirim ke email Anda. Gunakan password sementara tersebut untuk masuk.");
-      }, 2000);
-    } else {
-      showFeedback("forgot-feedback", result?.message || "Gagal memproses reset password.");
-    }
-
-    if (submitBtn) {
-      submitBtn.disabled = false;
-      submitBtn.textContent = originalText;
-    }
+    setTimeout(() => {
+      try {
+        const result = apiPost("/api/public/forgot-password", { email, companySlug });
+        if (result?.ok) {
+          showFeedback("forgot-feedback", result.message || "Password sementara telah dikirim ke email Anda.");
+          if (byId("login-email")) byId("login-email").value = email;
+          window.setTimeout(() => {
+            closeForgotModal();
+            showFeedback("login-feedback", "Password sementara dikirim ke email Anda. Gunakan password sementara tersebut untuk masuk.");
+          }, 2000);
+        } else {
+          showFeedback("forgot-feedback", result?.message || "Gagal memproses reset password.");
+          if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.classList.remove("button-loading");
+            submitBtn.innerHTML = originalHtml;
+          }
+        }
+      } catch (e) {
+        showFeedback("forgot-feedback", "Gagal memproses reset password.");
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.classList.remove("button-loading");
+          submitBtn.innerHTML = originalHtml;
+        }
+      }
+    }, 50);
   });
 })();
 

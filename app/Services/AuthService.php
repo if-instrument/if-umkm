@@ -21,19 +21,123 @@ class AuthService
             if (! $company) {
                 return null;
             }
+            $companyId = (int) $company['id'];
             $db = $tenantService->connectionForCompanySlug($companySlug) ?: $centralDb;
+
+            // Strict Filter by Company ID when accessing tenant portal /{companySlug}/login
+            $user = $db->table('users')
+                ->where('email', $email)
+                ->where('company_id', $companyId)
+                ->whereIn('status', [StatusCodeService::ACTIVE, 'active'])
+                ->get()
+                ->getRowArray();
+
+            if (! $user && $db !== $centralDb) {
+                $user = $centralDb->table('users')
+                    ->where('email', $email)
+                    ->where('company_id', $companyId)
+                    ->whereIn('status', [StatusCodeService::ACTIVE, 'active'])
+                    ->get()
+                    ->getRowArray();
+            }
+
+            if (! $user) {
+                // Check if user/company for this specific company ID was rejected or pending
+                $rawUser = $centralDb->table('users')
+                    ->where('email', $email)
+                    ->where('company_id', $companyId)
+                    ->get()
+                    ->getRowArray();
+
+                if ($rawUser) {
+                    $cStatus = (string) ($company['status'] ?? '');
+                    $pStatus = (string) ($company['payment_status'] ?? '');
+                    $notes = (string) ($company['payment_notes'] ?? '');
+                    $expiresAt = ! empty($company['expires_at']) ? strtotime($company['expires_at']) : 0;
+                    $isExpired = $expiresAt > 0 && $expiresAt < strtotime('today');
+
+                    if ($isExpired) {
+                        $accessService = new AccessManagementService();
+                        $hashKey = $accessService->generateResubmitHashKey((int) $company['id'], $email);
+                        return [
+                            'expired' => true,
+                            'hashKey' => $hashKey,
+                            'renewUrl' => '/login?action=renew&token=' . $hashKey,
+                            'message' => '🚨 Masa Aktif Perusahaan Telah Kedaluwarsa. Silakan lakukan perpanjang subscription untuk membuka kembali akses.'
+                        ];
+                    }
+
+                    if (in_array($cStatus, ['90', 'rejected', '20'], true) || $pStatus === '20') {
+                        $accessService = new AccessManagementService();
+                        $hashKey = $accessService->generateResubmitHashKey((int) $company['id'], $email);
+                        return [
+                            'rejected' => true,
+                            'hashKey' => $hashKey,
+                            'resubmitUrl' => '/login?action=resubmit&token=' . $hashKey,
+                            'message' => '❌ Akses Ditolak: Pendaftaran perusahaan (' . ($company['name'] ?? $email) . ') telah DITOLAK oleh Super Admin.' . ($notes ? ' Catatan: ' . $notes : '')
+                        ];
+                    }
+                    if (in_array($cStatus, ['00', '0', 'pending'], true) || $pStatus === '00') {
+                        return [
+                            'pending' => true,
+                            'message' => '⏳ Menunggu Verifikasi: Pendaftaran perusahaan (' . ($company['name'] ?? $email) . ') sedang dalam proses peninjauan Super Admin.'
+                        ];
+                    }
+                    if (in_array((string) ($rawUser['status'] ?? ''), ['90', 'rejected', '20'], true)) {
+                        return [
+                            'rejected' => true,
+                            'message' => '❌ Akses Ditolak: Akun (' . $email . ') telah dinonaktifkan atau ditolak oleh Super Admin.'
+                        ];
+                    }
+                }
+                return null;
+            }
+        } else {
+            // Central Login Portal (/login): companySlug is empty
+            // 1. Try Super Admin first
+            $user = $centralDb->table('users')
+                ->where('email', $email)
+                ->where('type', 'super_admin')
+                ->whereIn('status', [StatusCodeService::ACTIVE, 'active'])
+                ->get()
+                ->getRowArray();
+
+            if (! $user) {
+                // Check if user is a regular tenant user trying to log in at central portal
+                $rawUser = $centralDb->table('users')
+                    ->where('email', $email)
+                    ->get()
+                    ->getRowArray();
+
+                if ($rawUser) {
+                    $compId = (int) ($rawUser['company_id'] ?? 0);
+                    if ($compId) {
+                        $comp = $centralDb->table('companies')->where('id', $compId)->get()->getRowArray();
+                        if ($comp) {
+                            $cStatus = (string) ($comp['status'] ?? '');
+                            $pStatus = (string) ($comp['payment_status'] ?? '');
+                            $notes = (string) ($comp['payment_notes'] ?? '');
+
+                            if (in_array($cStatus, ['90', 'rejected', '20'], true) || $pStatus === '20') {
+                                return [
+                                    'rejected' => true,
+                                    'message' => '❌ Akses Ditolak: Pendaftaran perusahaan (' . ($comp['name'] ?? $email) . ') telah DITOLAK oleh Super Admin.' . ($notes ? ' Catatan: ' . $notes : '')
+                                ];
+                            }
+                            if (in_array($cStatus, ['00', '0', 'pending'], true) || $pStatus === '00') {
+                                return [
+                                    'pending' => true,
+                                    'message' => '⏳ Menunggu Verifikasi: Pendaftaran perusahaan (' . ($comp['name'] ?? $email) . ') sedang dalam proses peninjauan Super Admin.'
+                                ];
+                            }
+                        }
+                    }
+                }
+                return null;
+            }
         }
 
-        $user = $db->table('users')
-            ->where('email', $email)
-            ->whereIn('status', [StatusCodeService::ACTIVE, 'active'])
-            ->get()
-            ->getRowArray();
-        if (! $user && $companySlug !== '' && $db !== $centralDb) {
-            $db = $centralDb;
-            $user = (new UserModel())->where('email', $email)->whereIn('status', [StatusCodeService::ACTIVE, 'active'])->first();
-        }
-        if (!$user || !password_verify($password, $user['password_hash'])) {
+        if (! password_verify($password, $user['password_hash'])) {
             return null;
         }
 

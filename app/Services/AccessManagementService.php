@@ -48,11 +48,15 @@ class AccessManagementService
                 'subscriptionPlan' => $row['subscription_plan'] ?? 'Professional',
                 'expiresAt' => $this->resolveCompanyExpiresAt($row, $saasPlansMap),
                 'maxOutlets' => (int) ($row['max_outlets'] ?? ($saasPlansMap[strtolower($row['subscription_plan'] ?? 'professional')]['maxOutlets'] ?? 5)),
+                'aiEnableFaceLogin' => isset($row['ai_enable_face_login']) ? (bool) $row['ai_enable_face_login'] : ($saasPlansMap[strtolower($row['subscription_plan'] ?? 'professional')]['hasAiBiometrics'] ?? true),
+                'aiEnableFingerprint' => isset($row['ai_enable_fingerprint']) ? (bool) $row['ai_enable_fingerprint'] : ($saasPlansMap[strtolower($row['subscription_plan'] ?? 'professional')]['hasAiBiometrics'] ?? true),
+                'hasAiBiometrics' => (isset($row['ai_enable_face_login']) ? (bool) $row['ai_enable_face_login'] : ($saasPlansMap[strtolower($row['subscription_plan'] ?? 'professional')]['hasAiBiometrics'] ?? true)) || (isset($row['ai_enable_fingerprint']) ? (bool) $row['ai_enable_fingerprint'] : ($saasPlansMap[strtolower($row['subscription_plan'] ?? 'professional')]['hasAiBiometrics'] ?? true)),
                 'createdAt' => $row['created_at'] ?? '',
                 'paymentProofUrl' => $row['payment_proof_path'] ?? '',
                 'paymentStatus' => $row['payment_status'] ?? '10',
                 'paymentNotes' => $row['payment_notes'] ?? '',
                 'tenantStatus' => $row['tenant_status'] ?? ($row['db_name'] ? 'CREATED' : 'NOT_CREATED'),
+                'registrationType' => $row['registration_type'] ?? ($row['db_name'] ? 'SUPER_ADMIN' : 'PUBLIC_REGISTRATION'),
                 'status' => (function($s) {
                     // Normalize legacy string statuses to numeric codes
                     $map = ['ACTIVE' => '10', 'REJECTED' => '90', 'PENDING_APPROVAL' => '00', 'INACTIVE' => '90'];
@@ -102,6 +106,10 @@ class AccessManagementService
         try {
             $db = Database::connect();
             if ($db->tableExists('saas_plans')) {
+                if (! in_array('has_ai_biometrics', $db->getFieldNames('saas_plans'), true)) {
+                    $db->query("ALTER TABLE saas_plans ADD COLUMN has_ai_biometrics TINYINT(1) DEFAULT 1");
+                }
+
                 $rows = $db->table('saas_plans')->orderBy('id')->get()->getResultArray();
                 if (! empty($rows)) {
                     return array_map(fn ($row) => [
@@ -113,6 +121,7 @@ class AccessManagementService
                         'durationDays' => (int) ($row['duration_days'] ?? 365),
                         'description' => (string) ($row['description'] ?? ''),
                         'isFeatured' => (bool) ($row['is_featured'] ?? false),
+                        'hasAiBiometrics' => isset($row['has_ai_biometrics']) ? (bool) $row['has_ai_biometrics'] : (strtolower((string)$row['code']) !== 'starter'),
                         'status' => (string) ($row['status'] ?? '10'),
                     ], $rows);
                 }
@@ -122,18 +131,19 @@ class AccessManagementService
         }
 
         return [
-            ['id' => '1', 'code' => 'Starter', 'name' => 'Starter Plan', 'price' => 150000, 'maxOutlets' => 3, 'durationDays' => 90, 'description' => 'Masa aktif langganan standar 90 hari dengan batas kuota 3 outlet.', 'isFeatured' => false, 'status' => '10'],
-            ['id' => '2', 'code' => 'Professional', 'name' => 'Professional Plan', 'price' => 350000, 'maxOutlets' => 10, 'durationDays' => 365, 'description' => 'Lisensi penuh 1 tahun, multi-outlet, CRM, inventory sync, & payment gateway.', 'isFeatured' => true, 'status' => '10'],
-            ['id' => '3', 'code' => 'Enterprise', 'name' => 'Enterprise Plan', 'price' => 750000, 'maxOutlets' => 999, 'durationDays' => 0, 'description' => 'Akses unlimited outlet, dedicated tenant DB, & prioritas support 24/7.', 'isFeatured' => false, 'status' => '10'],
+            ['id' => '1', 'code' => 'Starter', 'name' => 'Starter Plan', 'price' => 150000, 'maxOutlets' => 3, 'durationDays' => 90, 'description' => 'Masa aktif langganan standar 90 hari dengan batas kuota 3 outlet.', 'isFeatured' => false, 'hasAiBiometrics' => false, 'status' => '10'],
+            ['id' => '2', 'code' => 'Professional', 'name' => 'Professional Plan', 'price' => 350000, 'maxOutlets' => 10, 'durationDays' => 365, 'description' => 'Lisensi penuh 1 tahun, multi-outlet, CRM, inventory sync, & payment gateway.', 'isFeatured' => true, 'hasAiBiometrics' => true, 'status' => '10'],
+            ['id' => '3', 'code' => 'Enterprise', 'name' => 'Enterprise Plan', 'price' => 750000, 'maxOutlets' => 999, 'durationDays' => 0, 'description' => 'Akses unlimited outlet, dedicated tenant DB, & prioritas support 24/7.', 'isFeatured' => false, 'hasAiBiometrics' => true, 'status' => '10'],
         ];
     }
 
     public function saveSaasPlan(array $payload): array
     {
         $db = Database::connect();
-        if (! $db->tableExists('saas_plans')) {
-            $migrator = new \App\Database\Migrations\CreateSaasPlansSchema();
-            $migrator->up();
+        if ($db->tableExists('saas_plans')) {
+            if (! in_array('has_ai_biometrics', $db->getFieldNames('saas_plans'), true)) {
+                $db->query("ALTER TABLE saas_plans ADD COLUMN has_ai_biometrics TINYINT(1) DEFAULT 1");
+            }
         }
 
         $code = trim((string) ($payload['code'] ?? $payload['name'] ?? 'Plan'));
@@ -144,6 +154,7 @@ class AccessManagementService
         $durationDays = max(0, (int) ($payload['durationDays'] ?? 365));
         $description = trim((string) ($payload['description'] ?? ''));
         $isFeatured = ! empty($payload['isFeatured']) ? 1 : 0;
+        $hasAiBiometrics = ! empty($payload['hasAiBiometrics']) ? 1 : 0;
         $status = StatusCodeService::common($payload['status'] ?? 'active');
 
         $row = [
@@ -154,6 +165,7 @@ class AccessManagementService
             'duration_days' => $durationDays,
             'description' => $description,
             'is_featured' => $isFeatured,
+            'has_ai_biometrics' => $hasAiBiometrics,
             'status' => $status,
             'updated_at' => date('Y-m-d H:i:s'),
         ];
@@ -194,16 +206,29 @@ class AccessManagementService
         }
         $slug = $this->slugify((string) ($payload['routeSlug'] ?? $payload['name'] ?? 'company'));
         $this->assertUniqueCompanySlug($slug, $id);
+        $existingCompany = $id ? $model->find($id) : null;
+        $logoUrl = trim((string) ($payload['logoUrl'] ?? ''));
+        if ($id && $logoUrl === '' && ! empty($existingCompany['logo_path'])) {
+            $logoUrl = $existingCompany['logo_path'];
+        }
+
+        $registrationType = ! empty($existingCompany['registration_type'])
+            ? $existingCompany['registration_type']
+            : trim((string) ($payload['registrationType'] ?? 'SUPER_ADMIN'));
+
         $row = [
             'name' => trim((string) ($payload['name'] ?? '')),
             'brand_name' => trim((string) ($payload['name'] ?? '')),
             'route_slug' => $slug,
             'tagline' => 'UMKM Solution',
-            'logo_path' => trim((string) ($payload['logoUrl'] ?? '')),
+            'logo_path' => $logoUrl,
             'theme_color' => $payload['themeColor'] ?? '#6e3a16',
             'subscription_plan' => trim((string) ($payload['subscriptionPlan'] ?? 'Professional')),
             'expires_at' => trim((string) ($payload['expiresAt'] ?? '')) ?: null,
             'max_outlets' => (int) ($payload['maxOutlets'] ?? 5),
+            'ai_enable_face_login' => isset($payload['aiEnableFaceLogin']) ? ($payload['aiEnableFaceLogin'] ? 1 : 0) : null,
+            'ai_enable_fingerprint' => isset($payload['aiEnableFingerprint']) ? ($payload['aiEnableFingerprint'] ? 1 : 0) : null,
+            'registration_type' => $registrationType,
             'status' => StatusCodeService::common($payload['status'] ?? 'active'),
         ];
         if ($id) {
@@ -237,6 +262,175 @@ class AccessManagementService
         return $this->companyDetail($this->companyCode($id));
     }
 
+    public function renewSubscription(string $companyId, array $payload = []): array
+    {
+        $id = $this->numericId($companyId);
+        if (! $id) throw new \InvalidArgumentException('ID Perusahaan tidak valid.');
+
+        $companyModel = new CompanyModel();
+        $company = $companyModel->find($id);
+        if (! $company) throw new \InvalidArgumentException('Data Perusahaan tidak ditemukan.');
+
+        $planCode = trim((string) ($payload['subscriptionPlan'] ?? $company['subscription_plan'] ?? 'Professional'));
+        $saasPlans = $this->saasPlans();
+        $selectedPlan = null;
+        foreach ($saasPlans as $plan) {
+            if (strtolower($plan['code']) === strtolower($planCode)) {
+                $selectedPlan = $plan;
+                break;
+            }
+        }
+
+        $durationDays = (int) ($selectedPlan['durationDays'] ?? 365);
+        $currentExpiry = ! empty($company['expires_at']) ? strtotime($company['expires_at']) : time();
+        $baseTime = ($currentExpiry > time()) ? $currentExpiry : time();
+
+        $newExpiresAt = ($durationDays > 0)
+            ? date('Y-m-d H:i:s', strtotime("+{$durationDays} days", $baseTime))
+            : null;
+
+        $paymentProofUrl = trim((string) ($payload['paymentProofUrl'] ?? ''));
+
+        $fromPlanCode = $company['subscription_plan'] ?? 'Starter';
+        $toPlanCode = $selectedPlan['code'] ?? $planCode;
+
+        $actionType = 'RENEWAL';
+        $fromPrice = 0;
+        foreach ($saasPlans as $sp) {
+            if (strtolower($sp['code']) === strtolower($fromPlanCode)) {
+                $fromPrice = (float) ($sp['price'] ?? 0);
+                break;
+            }
+        }
+        $toPrice = (float) ($selectedPlan['price'] ?? 0);
+        if (strtolower($fromPlanCode) !== strtolower($toPlanCode)) {
+            $actionType = ($toPrice >= $fromPrice) ? 'UPGRADE' : 'DOWNGRADE';
+        }
+
+        $companyModel->update($id, [
+            'subscription_plan' => $selectedPlan['code'] ?? $planCode,
+            'max_outlets' => (int) ($selectedPlan['maxOutlets'] ?? $company['max_outlets'] ?? 5),
+            'expires_at' => $newExpiresAt ? date('Y-m-d', strtotime($newExpiresAt)) : null,
+            'payment_status' => '10',
+            'payment_proof_path' => $paymentProofUrl ?: ($company['payment_proof_path'] ?? ''),
+            'payment_notes' => 'Perpanjangan subscription berhasil disetujui & diperbarui.',
+            'status' => '10',
+            'updated_at' => date('Y-m-d H:i:s'),
+        ]);
+
+        $authType  = trim((string) ($payload['_authType']  ?? 'company_admin'));
+        $actorName = trim((string) ($payload['_actorName'] ?? ''));
+        $isSuperAdmin = $authType === 'super_admin';
+        $actorLabel = $isSuperAdmin
+            ? 'Super Admin' . ($actorName ? " ({$actorName})" : '')
+            : 'Tenant Mandiri' . ($actorName ? " ({$actorName})" : '');
+
+        $this->recordSubscriptionAuditLog([
+            'company_id'        => $id,
+            'company_name'      => $company['name'],
+            'action_type'       => $actionType,
+            'from_plan_code'    => $fromPlanCode,
+            'from_plan_name'    => $fromPlanCode,
+            'to_plan_code'      => $toPlanCode,
+            'to_plan_name'      => $selectedPlan['name'] ?? $toPlanCode,
+            'price_paid'        => (float) ($selectedPlan['price'] ?? 0),
+            'duration_days'     => $durationDays,
+            'max_outlets'       => (int) ($selectedPlan['maxOutlets'] ?? 5),
+            'has_ai_biometrics' => ! empty($selectedPlan['hasAiBiometrics']),
+            'prev_expires_at'   => $company['expires_at'],
+            'new_expires_at'    => $newExpiresAt ? date('Y-m-d', strtotime($newExpiresAt)) : null,
+            'payment_proof_path'=> $paymentProofUrl ?: ($company['payment_proof_path'] ?? ''),
+            'notes'             => "Transaksi {$actionType} paket dari {$fromPlanCode} ke {$toPlanCode} oleh {$actorLabel}.",
+        ]);
+
+        $this->recordAuditLog($id, null, 'RENEW_SUBSCRIPTION', "Perpanjangan paket {$planCode} selama {$durationDays} hari berhasil diproses.");
+
+        return [
+            'ok' => true,
+            'message' => "Masa aktif perusahaan {$company['name']} berhasil diperpanjang hingga " . ($newExpiresAt ? date('d M Y', strtotime($newExpiresAt)) : 'Selamanya (Unlimited)') . '.',
+            'company' => $this->companyDetail($this->companyCode($id)),
+        ];
+    }
+
+    public function recordSubscriptionAuditLog(array $data): void
+    {
+        try {
+            $db = Database::connect();
+            if (! $db->tableExists('saas_subscription_logs')) {
+                return;
+            }
+
+            $claims = (array) (service('request')->jwt ?? []);
+
+            $db->table('saas_subscription_logs')->insert([
+                'company_id' => (int) ($data['company_id'] ?? 0),
+                'company_name' => (string) ($data['company_name'] ?? '-'),
+                'action_type' => (string) ($data['action_type'] ?? 'RENEWAL'),
+                'from_plan_code' => (string) ($data['from_plan_code'] ?? ''),
+                'from_plan_name' => (string) ($data['from_plan_name'] ?? ''),
+                'to_plan_code' => (string) ($data['to_plan_code'] ?? ''),
+                'to_plan_name' => (string) ($data['to_plan_name'] ?? ''),
+                'price_paid' => (float) ($data['price_paid'] ?? 0),
+                'duration_days' => (int) ($data['duration_days'] ?? 365),
+                'max_outlets' => (int) ($data['max_outlets'] ?? 5),
+                'has_ai_biometrics' => ! empty($data['has_ai_biometrics']) ? 1 : 0,
+                'prev_expires_at' => ! empty($data['prev_expires_at']) ? date('Y-m-d', strtotime($data['prev_expires_at'])) : null,
+                'new_expires_at' => ! empty($data['new_expires_at']) ? date('Y-m-d', strtotime($data['new_expires_at'])) : null,
+                'payment_method' => (string) ($data['payment_method'] ?? 'BANK_TRANSFER'),
+                'payment_proof_path' => (string) ($data['payment_proof_path'] ?? ''),
+                'notes' => (string) ($data['notes'] ?? ''),
+                'created_by_user_id' => (int) ($claims['userId'] ?? $claims['sub'] ?? 0) ?: null,
+                'created_by_name' => (string) ($claims['name'] ?? 'Super Admin'),
+                'created_at' => date('Y-m-d H:i:s'),
+            ]);
+        } catch (\Throwable $ex) {
+            // Ignore optional audit errors
+        }
+    }
+
+    public function subscriptionLogs(string $companyCode = ''): array
+    {
+        try {
+            $db = Database::connect();
+            if (! $db->tableExists('saas_subscription_logs')) {
+                return [];
+            }
+
+            $builder = $db->table('saas_subscription_logs')->orderBy('id', 'DESC');
+            if ($companyCode !== '') {
+                $companyId = $this->numericId($companyCode);
+                if ($companyId > 0) {
+                    $builder->where('company_id', $companyId);
+                }
+            }
+
+            $rows = $builder->get()->getResultArray();
+            return array_map(fn ($row) => [
+                'id' => (int) $row['id'],
+                'companyId' => $this->companyCode((int) $row['company_id']),
+                'companyName' => $row['company_name'],
+                'actionType' => $row['action_type'],
+                'fromPlanCode' => $row['from_plan_code'] ?: '-',
+                'fromPlanName' => $row['from_plan_name'] ?: '-',
+                'toPlanCode' => $row['to_plan_code'],
+                'toPlanName' => $row['to_plan_name'],
+                'pricePaid' => (float) $row['price_paid'],
+                'durationDays' => (int) $row['duration_days'],
+                'maxOutlets' => (int) $row['max_outlets'],
+                'hasAiBiometrics' => (bool) $row['has_ai_biometrics'],
+                'prevExpiresAt' => $row['prev_expires_at'] ?: '-',
+                'newExpiresAt' => $row['new_expires_at'] ?: 'Selamanya',
+                'paymentMethod' => $row['payment_method'],
+                'paymentProofUrl' => $row['payment_proof_path'],
+                'notes' => $row['notes'],
+                'createdByName' => $row['created_by_name'] ?: 'System',
+                'createdAt' => date('d M Y H:i', strtotime($row['created_at'])),
+            ], $rows);
+        } catch (\Throwable $ex) {
+            return [];
+        }
+    }
+
     public function publicRegisterCompany(array $payload): array
     {
         $adminName = trim((string) ($payload['adminName'] ?? ''));
@@ -249,7 +443,108 @@ class AccessManagementService
 
         if (! $companyName) throw new \InvalidArgumentException('Nama perusahaan wajib diisi.');
         if (! filter_var($adminEmail, FILTER_VALIDATE_EMAIL)) throw new \InvalidArgumentException('Email admin perusahaan tidak valid.');
-        if ((new UserModel())->where('email', $adminEmail)->first()) throw new \InvalidArgumentException('Email admin sudah terdaftar.');
+
+        $existingUser = (new UserModel())->where('email', $adminEmail)->first();
+        if ($existingUser) {
+            $companyModel = new CompanyModel();
+            $existingCompany = ! empty($existingUser['company_id']) ? $companyModel->find($existingUser['company_id']) : null;
+
+            $cStatus = (string) ($existingCompany['status'] ?? '');
+            $pStatus = (string) ($existingCompany['payment_status'] ?? '');
+            $uStatus = (string) ($existingUser['status'] ?? '');
+
+            $isRejected = in_array($cStatus, ['90', 'rejected', '20'], true) || $pStatus === '20' || in_array($uStatus, ['90', 'rejected', '20'], true);
+            $isPending = in_array($cStatus, ['00', '0', 'pending'], true) || $pStatus === '00';
+
+            if (! $isRejected) {
+                if ($isPending) {
+                    throw new \InvalidArgumentException('Pendaftaran dengan email ini sedang dalam proses verifikasi Super Admin.');
+                }
+                throw new \InvalidArgumentException('Email admin sudah terdaftar dan aktif.');
+            }
+
+            // Existing application was REJECTED: Update existing record for Re-registration / Resubmission (Daftar Ulang)
+            $db = Database::connect();
+            $db->transStart();
+
+            $saasPlans = $this->saasPlans();
+            $selectedPlan = null;
+            foreach ($saasPlans as $p) {
+                if (strtolower($p['code']) === strtolower($planCode)) {
+                    $selectedPlan = $p;
+                    break;
+                }
+            }
+            $durationDays = $selectedPlan['durationDays'] ?? 365;
+            $maxOutlets = $selectedPlan['maxOutlets'] ?? 5;
+            $expiresAt = $durationDays > 0 ? date('Y-m-d', strtotime("+{$durationDays} days")) : null;
+
+            $companyId = (int) $existingCompany['id'];
+            $companyModel->update($companyId, [
+                'name' => $companyName,
+                'brand_name' => $companyName,
+                'logo_path' => $logoUrl ?: ($existingCompany['logo_path'] ?? ''),
+                'theme_color' => $themeColor ?: ($existingCompany['theme_color'] ?? '#3B1F8C'),
+                'subscription_plan' => $planCode,
+                'expires_at' => $expiresAt,
+                'max_outlets' => $maxOutlets,
+                'status' => '00', // Reset status back to Pending Approval
+                'tenant_status' => 'NOT_CREATED',
+                'registration_type' => 'PUBLIC_REGISTRATION',
+                'payment_proof_path' => $paymentProofUrl ?: ($existingCompany['payment_proof_path'] ?? ''),
+                'payment_status' => '00', // Reset payment status to Pending Verification
+                'payment_notes' => 'Pendaftaran ulang mandiri (Daftar Ulang). Menunggu persetujuan Super Admin.',
+                'updated_at' => date('Y-m-d H:i:s'),
+            ]);
+
+            (new UserModel())->update($existingUser['id'], [
+                'name' => $adminName ?: $existingUser['name'],
+                'status' => '00', // Reset user status back to Pending
+                'updated_at' => date('Y-m-d H:i:s'),
+            ]);
+
+            $this->recordAuditLog($companyId, (int) $existingUser['id'], 'PUBLIC_REGISTRATION_RESUBMITTED', "Pendaftaran ulang perusahaan {$companyName} berhasil dikirim kembali (PENDING_APPROVAL).");
+
+            // Audit SaaS: Catat riwayat pengajuan ulang pendaftaran
+            $this->recordSubscriptionAuditLog([
+                'company_id'        => $companyId,
+                'company_name'      => $companyName,
+                'action_type'       => 'RESUBMIT_REGISTER',
+                'from_plan_code'    => $existingCompany['subscription_plan'] ?? '-',
+                'from_plan_name'    => $existingCompany['subscription_plan'] ?? '-',
+                'to_plan_code'      => $planCode,
+                'to_plan_name'      => $selectedPlan['name'] ?? $planCode,
+                'price_paid'        => (float) ($selectedPlan['price'] ?? 0),
+                'duration_days'     => (int) ($selectedPlan['durationDays'] ?? 365),
+                'max_outlets'       => (int) ($maxOutlets ?? 5),
+                'has_ai_biometrics' => ! empty($selectedPlan['hasAiBiometrics']),
+                'prev_expires_at'   => null,
+                'new_expires_at'    => $expiresAt,
+                'payment_proof_path'=> $paymentProofUrl ?: ($existingCompany['payment_proof_path'] ?? ''),
+                'notes'             => "Pendaftaran ulang mandiri (RESUBMIT) oleh calon tenant {$companyName}. Menunggu verifikasi Super Admin.",
+            ]);
+
+            $db->transComplete();
+
+            $companyRow = $companyModel->find($companyId);
+            $userRow = (new UserModel())->find($existingUser['id']);
+
+            $this->sendEmail('user_registration_pending', [
+                'company' => $companyRow,
+                'user' => $userRow,
+            ]);
+
+            $this->sendEmail('admin_registration_notification', [
+                'company' => $companyRow,
+                'user' => $userRow,
+            ]);
+
+            return [
+                'ok' => true,
+                'message' => 'Pendaftaran ulang perusahaan Anda berhasil dikirim! Tim Super Admin akan memverifikasi ulang pengajuan Anda.',
+                'companyId' => $this->companyCode($companyId),
+            ];
+        }
 
         $saasPlans = $this->saasPlans();
         $selectedPlan = null;
@@ -280,6 +575,7 @@ class AccessManagementService
                 'max_outlets' => $maxOutlets,
                 'status' => '00',
                 'tenant_status' => 'NOT_CREATED',
+                'registration_type' => 'PUBLIC_REGISTRATION',
                 'payment_proof_path' => $paymentProofUrl,
                 'payment_status' => '00', // Pending verification
                 'payment_notes' => 'Pendaftaran online mandiri. Menunggu persetujuan Super Admin.',
@@ -303,6 +599,25 @@ class AccessManagementService
             ]);
 
             $this->recordAuditLog($companyId, $userId, 'PUBLIC_REGISTRATION_SUBMITTED', "Pendaftaran perusahaan {$companyName} berhasil disimpan dengan status PENDING_APPROVAL.");
+
+            // Audit SaaS: Catat riwayat pendaftaran baru mandiri
+            $this->recordSubscriptionAuditLog([
+                'company_id'        => $companyId,
+                'company_name'      => $companyName,
+                'action_type'       => 'INITIAL_REGISTER',
+                'from_plan_code'    => null,
+                'from_plan_name'    => null,
+                'to_plan_code'      => $planCode,
+                'to_plan_name'      => $selectedPlan['name'] ?? $planCode,
+                'price_paid'        => (float) ($selectedPlan['price'] ?? 0),
+                'duration_days'     => (int) ($durationDays ?? 365),
+                'max_outlets'       => (int) ($maxOutlets ?? 5),
+                'has_ai_biometrics' => ! empty($selectedPlan['hasAiBiometrics']),
+                'prev_expires_at'   => null,
+                'new_expires_at'    => $expiresAt,
+                'payment_proof_path'=> $paymentProofUrl,
+                'notes'             => "Pendaftaran mandiri baru oleh calon tenant {$companyName} dengan paket {$planCode}. Menunggu verifikasi Super Admin.",
+            ]);
 
             $db->transComplete();
 
@@ -492,6 +807,34 @@ class AccessManagementService
             // 7. Record Audit Log
             $this->recordAuditLog($companyId, $adminUser['id'] ?? null, 'APPROVE_COMPANY_PROVISIONING', "Tenant DB {$tenantDbName} berhasil diprovisi dengan slug {$slug}.");
 
+            // Audit SaaS: Catat persetujuan pendaftaran beserta snapshot harga final saat ini
+            $saasPlans = $this->saasPlans();
+            $approvedPlanCode = $companyRow['subscription_plan'] ?? 'Starter';
+            $approvedPlan = null;
+            foreach ($saasPlans as $sp) {
+                if (strtolower($sp['code']) === strtolower($approvedPlanCode)) {
+                    $approvedPlan = $sp;
+                    break;
+                }
+            }
+            $this->recordSubscriptionAuditLog([
+                'company_id'        => $companyId,
+                'company_name'      => $companyRow['name'],
+                'action_type'       => 'REGISTRATION_APPROVED',
+                'from_plan_code'    => null,
+                'from_plan_name'    => null,
+                'to_plan_code'      => $approvedPlanCode,
+                'to_plan_name'      => $approvedPlan['name'] ?? $approvedPlanCode,
+                'price_paid'        => (float) ($approvedPlan['price'] ?? 0),
+                'duration_days'     => (int) ($approvedPlan['durationDays'] ?? 365),
+                'max_outlets'       => (int) ($approvedPlan['maxOutlets'] ?? $companyRow['max_outlets'] ?? 5),
+                'has_ai_biometrics' => ! empty($approvedPlan['hasAiBiometrics']),
+                'prev_expires_at'   => null,
+                'new_expires_at'    => $companyRow['expires_at'] ?? null,
+                'payment_proof_path'=> $companyRow['payment_proof_path'] ?? '',
+                'notes'             => "Pendaftaran perusahaan {$companyRow['name']} disetujui Super Admin. Tenant {$tenantDbName} berhasil diprovisi.",
+            ]);
+
             $db->transComplete();
 
             if ($db->transStatus() === false) {
@@ -544,14 +887,247 @@ class AccessManagementService
         $db->transComplete();
 
         if ($adminUser) {
+            $hashKey = $this->generateResubmitHashKey($id, $adminUser['email']);
             $this->sendEmail('user_registration_rejected', [
                 'company' => $company,
                 'user' => $adminUser,
                 'notes' => $notes ?: 'Pendaftaran tidak memenuhi verifikasi bukti pembayaran.',
+                'hashKey' => $hashKey,
             ]);
         }
 
         return $this->data();
+    }
+
+    public function resendRejectionEmail(string $companyId): array
+    {
+        $id = $this->numericId($companyId);
+        if (! $id) throw new \InvalidArgumentException('ID Perusahaan tidak valid.');
+
+        $companyModel = new CompanyModel();
+        $company = $companyModel->find($id);
+        if (! $company) throw new \InvalidArgumentException('Data Perusahaan tidak ditemukan.');
+
+        $userModel = new UserModel();
+        $adminUser = $userModel->where('company_id', $id)->first();
+        if (! $adminUser) throw new \InvalidArgumentException('User admin perusahaan tidak ditemukan.');
+
+        $notes = $company['payment_notes'] ?: 'Pendaftaran tidak memenuhi verifikasi bukti pembayaran.';
+        $hashKey = $this->generateResubmitHashKey($id, $adminUser['email']);
+
+        $this->sendEmail('user_registration_rejected', [
+            'company' => $company,
+            'user' => $adminUser,
+            'notes' => $notes,
+            'hashKey' => $hashKey,
+        ]);
+
+        $this->recordAuditLog($id, null, 'RESEND_REJECTION_EMAIL', "Email penolakan & link perbaikan dikirim ulang ke {$adminUser['email']}.");
+
+        return [
+            'ok' => true,
+            'message' => "Email penolakan & link perbaikan berhasil dikirim ulang ke {$adminUser['email']}.",
+            'hashKey' => $hashKey,
+            'resubmitUrl' => rtrim((string) (function_exists('config') ? config('App')->baseURL : 'http://localhost:8081/'), '/') . '/login?action=resubmit&token=' . $hashKey,
+        ];
+    }
+
+    public function generateResubmitHashKey(int $companyId, string $email): string
+    {
+        $key = (string) (function_exists('env') ? env('encryption.key') : (getenv('encryption.key') ?: 'IF_SaaS_Secret_Key_2026_Resubmit!'));
+        $payload = json_encode([
+            'company_id' => $companyId,
+            'email' => strtolower(trim($email)),
+            'ts' => time(),
+        ]);
+        $iv = random_bytes(16);
+        $ciphertext = openssl_encrypt($payload, 'aes-256-cbc', hash('sha256', $key, true), OPENSSL_RAW_DATA, $iv);
+        $hmac = hash_hmac('sha256', $iv . $ciphertext, $key, true);
+        return rtrim(strtr(base64_encode($iv . $hmac . $ciphertext), '+/', '-_'), '=');
+    }
+
+    public function decryptResubmitHashKey(string $hashKey): ?array
+    {
+        try {
+            $key = (string) (function_exists('env') ? env('encryption.key') : (getenv('encryption.key') ?: 'IF_SaaS_Secret_Key_2026_Resubmit!'));
+            $data = base64_decode(strtr($hashKey, '-_', '+/'));
+            if (! $data || strlen($data) < 48) return null;
+
+            $iv = substr($data, 0, 16);
+            $hmac = substr($data, 16, 32);
+            $ciphertext = substr($data, 48);
+
+            $calcHmac = hash_hmac('sha256', $iv . $ciphertext, $key, true);
+            if (! hash_equals($hmac, $calcHmac)) {
+                return null;
+            }
+
+            $decrypted = openssl_decrypt($ciphertext, 'aes-256-cbc', hash('sha256', $key, true), OPENSSL_RAW_DATA, $iv);
+            if (! $decrypted) return null;
+
+            return json_decode($decrypted, true);
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    public function getRegistrationResubmitData(string $hashKey): array
+    {
+        $payload = $this->decryptResubmitHashKey($hashKey);
+        if (! $payload || empty($payload['company_id'])) {
+            throw new \InvalidArgumentException('Token hash key perbaikan tidak valid atau telah mengalami manipulasi.');
+        }
+
+        $companyId = (int) $payload['company_id'];
+        $db = Database::connect();
+        $company = $db->table('companies')->where('id', $companyId)->get()->getRowArray();
+        if (! $company) {
+            throw new \InvalidArgumentException('Data pengajuan perusahaan tidak ditemukan.');
+        }
+
+        $cStatus = (string) ($company['status'] ?? '');
+        $pStatus = (string) ($company['payment_status'] ?? '');
+        if (! in_array($cStatus, ['90', 'rejected', '20'], true) && $pStatus !== '20') {
+            throw new \InvalidArgumentException('Pengajuan perusahaan ini tidak dalam status ditolak.');
+        }
+
+        $adminUser = $db->table('users')->where('company_id', $companyId)->get()->getRowArray();
+
+        // Fetch Rejection & Application Audit History Logs
+        $logs = [];
+        if ($db->tableExists('audit_logs')) {
+            $logRows = $db->table('audit_logs')
+                ->where('company_id', $companyId)
+                ->orderBy('id', 'DESC')
+                ->get()
+                ->getResultArray();
+
+            foreach ($logRows as $l) {
+                $actionLabel = $l['action'];
+                if ($l['action'] === 'REJECT_COMPANY_REGISTRATION') $actionLabel = '❌ Pendaftaran Ditolak';
+                elseif ($l['action'] === 'PUBLIC_REGISTRATION_SUBMITTED') $actionLabel = '📝 Pengajuan Pendaftaran Mandiri';
+                elseif (str_contains($l['action'], 'RESUBMITTED')) $actionLabel = '✏️ Perbaikan Pengajuan Dikirim';
+
+                $logs[] = [
+                    'id' => (int) $l['id'],
+                    'action' => (string) $l['action'],
+                    'actionLabel' => $actionLabel,
+                    'details' => (string) ($l['details'] ?? ''),
+                    'timestamp' => (string) ($l['created_at'] ?? ''),
+                    'formattedTime' => ! empty($l['created_at']) ? date('d M Y, H:i', strtotime($l['created_at'])) . ' WIB' : '-',
+                ];
+            }
+        }
+
+        $rejectedAt = ! empty($company['updated_at']) ? date('d M Y, H:i', strtotime($company['updated_at'])) . ' WIB' : 'Baru Saja';
+        $submittedAt = ! empty($company['created_at']) ? date('d M Y, H:i', strtotime($company['created_at'])) . ' WIB' : '-';
+
+        return [
+            'token' => $hashKey,
+            'companyId' => $this->companyCode($companyId),
+            'companyName' => $company['name'] ?? '',
+            'adminName' => $adminUser['name'] ?? '',
+            'adminEmail' => $adminUser['email'] ?? '',
+            'subscriptionPlan' => $company['subscription_plan'] ?? 'Professional',
+            'logoUrl' => $company['logo_path'] ?? '',
+            'themeColor' => $company['theme_color'] ?? '#3B1F8C',
+            'paymentProofUrl' => $company['payment_proof_path'] ?? '',
+            'rejectionNotes' => $company['payment_notes'] ?? 'Persyaratan belum terpenuhi.',
+            'rejectedAt' => $rejectedAt,
+            'submittedAt' => $submittedAt,
+            'historyLogs' => $logs,
+        ];
+    }
+
+    public function submitRegistrationResubmit(array $payload): array
+    {
+        $hashKey = trim((string) ($payload['token'] ?? ''));
+        $data = $this->decryptResubmitHashKey($hashKey);
+        if (! $data || empty($data['company_id'])) {
+            throw new \InvalidArgumentException('Token hash key perbaikan tidak valid.');
+        }
+
+        $companyId = (int) $data['company_id'];
+        $companyModel = new CompanyModel();
+        $company = $companyModel->find($companyId);
+        if (! $company) {
+            throw new \InvalidArgumentException('Data perusahaan tidak ditemukan.');
+        }
+
+        $userModel = new UserModel();
+        $adminUser = $userModel->where('company_id', $companyId)->first();
+
+        $companyName = trim((string) ($payload['name'] ?? $company['name']));
+        $adminName = trim((string) ($payload['adminName'] ?? ($adminUser['name'] ?? '')));
+        $planCode = trim((string) ($payload['subscriptionPlan'] ?? $company['subscription_plan']));
+        $paymentProofUrl = trim((string) ($payload['paymentProofUrl'] ?? $company['payment_proof_path']));
+        $logoUrl = trim((string) ($payload['logoUrl'] ?? $company['logo_path']));
+        $themeColor = trim((string) ($payload['themeColor'] ?? $company['theme_color'])) ?: '#3B1F8C';
+
+        if (! $companyName) throw new \InvalidArgumentException('Nama perusahaan wajib diisi.');
+        if (! $paymentProofUrl) throw new \InvalidArgumentException('Bukti pembayaran wajib diunggah.');
+
+        $saasPlans = $this->saasPlans();
+        $selectedPlan = null;
+        foreach ($saasPlans as $p) {
+            if (strtolower($p['code']) === strtolower($planCode)) {
+                $selectedPlan = $p;
+                break;
+            }
+        }
+        $durationDays = $selectedPlan['durationDays'] ?? 365;
+        $maxOutlets = $selectedPlan['maxOutlets'] ?? 5;
+        $expiresAt = $durationDays > 0 ? date('Y-m-d', strtotime("+{$durationDays} days")) : null;
+
+        $db = Database::connect();
+        $db->transStart();
+
+        $companyModel->update($companyId, [
+            'name' => $companyName,
+            'brand_name' => $companyName,
+            'logo_path' => $logoUrl,
+            'theme_color' => $themeColor,
+            'subscription_plan' => $planCode,
+            'expires_at' => $expiresAt,
+            'max_outlets' => $maxOutlets,
+            'status' => '00', // Reset to Pending Approval
+            'tenant_status' => 'NOT_CREATED',
+            'payment_proof_path' => $paymentProofUrl,
+            'payment_status' => '00', // Reset to Pending Verification
+            'payment_notes' => 'Pendaftaran telah diperbaiki via link khusus token perbaikan. Menunggu persetujuan Super Admin.',
+            'updated_at' => date('Y-m-d H:i:s'),
+        ]);
+
+        if ($adminUser) {
+            $userModel->update($adminUser['id'], [
+                'name' => $adminName ?: $adminUser['name'],
+                'status' => '00', // Reset user status to Pending
+                'updated_at' => date('Y-m-d H:i:s'),
+            ]);
+        }
+
+        $this->recordAuditLog($companyId, $adminUser ? (int)$adminUser['id'] : null, 'PUBLIC_REGISTRATION_RESUBMITTED_HASHKEY', "Perbaikan pendaftaran perusahaan {$companyName} berhasil dikirim via hash key (PENDING_APPROVAL).");
+
+        $db->transComplete();
+
+        $updatedCompany = $companyModel->find($companyId);
+        $updatedUser = $adminUser ? $userModel->find($adminUser['id']) : null;
+
+        $this->sendEmail('user_registration_pending', [
+            'company' => $updatedCompany,
+            'user' => $updatedUser,
+        ]);
+
+        $this->sendEmail('admin_registration_notification', [
+            'company' => $updatedCompany,
+            'user' => $updatedUser,
+        ]);
+
+        return [
+            'ok' => true,
+            'message' => 'Perbaikan pendaftaran perusahaan Anda berhasil dikirim! Tim Super Admin akan memverifikasi ulang pengajuan Anda.',
+            'companyId' => $this->companyCode($companyId),
+        ];
     }
 
     public function recordAuditLog(?int $companyId, ?int $userId, string $action, ?string $details = null): void
@@ -641,6 +1217,9 @@ HTML);
 
             if ($template === 'user_registration_rejected' && $userEmail) {
                 $notes = htmlspecialchars($data['notes'] ?? 'Persyaratan belum terpenuhi.', ENT_QUOTES, 'UTF-8');
+                $hashKey = htmlspecialchars($data['hashKey'] ?? '', ENT_QUOTES, 'UTF-8');
+                $resubmitUrl = $baseUrl . '/login?action=resubmit&token=' . $hashKey;
+
                 $email->setFrom($fromEmail, $fromName);
                 $email->setTo($userEmail);
                 $email->setSubject("Pendaftaran Perusahaan {$companyName} Ditolak");
@@ -650,11 +1229,17 @@ HTML);
   <div style="max-width:600px;margin:0 auto;border:1px solid #e2e8f0;border-radius:8px;padding:24px;background:#ffffff">
     <h2 style="color:#ef4444;margin-top:0">Pendaftaran Ditolak</h2>
     <p>Halo <strong>{$userName}</strong>,</p>
-    <p>Mohon maaf, pendaftaran perusahaan <strong>{$companyName}</strong> belum dapat kami setujui.</p>
+    <p>Mohon maaf, pendaftaran perusahaan <strong>{$companyName}</strong> belum dapat kami setujui saat ini.</p>
     <div style="background:#fef2f2;padding:16px;border-radius:6px;border-left:4px solid #ef4444;margin:16px 0">
       <p style="margin:0"><strong>Alasan Penolakan:</strong> {$notes}</p>
     </div>
-    <p>Silakan melakukan pendaftaran ulang atau perbaiki data/bukti pembayaran melalui portal pendaftaran.</p>
+    <p>Anda dapat melakukan perbaikan data atau mengunggah ulang bukti pembayaran melalui link khusus perbaikan di bawah ini:</p>
+    <p style="text-align:center;margin:24px 0;">
+      <a href="{$resubmitUrl}" style="display:inline-block;padding:12px 24px;background:#ef4444;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:bold;font-size:14px;">
+        ✏️ Perbaiki Pengajuan Perusahaan
+      </a>
+    </p>
+    <p style="color:#64748b;font-size:12px">Atau salin link berikut ke browser Anda:<br><a href="{$resubmitUrl}" style="color:#ef4444">{$resubmitUrl}</a></p>
   </div>
 </body></html>
 HTML);

@@ -5,7 +5,7 @@ from sqlalchemy.orm import sessionmaker
 from app.config import settings
 
 def ensure_mysql_db_exists(url: str):
-    """Automatically create MySQL database if_umkm_ai_db if connecting to MySQL."""
+    """Automatically create MySQL database if_instrument_aiservice if connecting to MySQL."""
     if "mysql" in url:
         try:
             clean_url = url.split("?")[0]

@@ -59,7 +59,7 @@
           </section>
 
           <!-- Card 2: AI Biometric Credentials (Face & Fingerprint) -->
-          <section class="panel-card">
+          <section class="panel-card" id="ai-biometrics-profile-section">
             <header class="panel-header">
               <div>
                 <span class="hero-kicker" style="color: #059669;">KEAMANAN BIOMETRIK</span>
@@ -118,7 +118,79 @@
         </div>
       </div>
 
-      <!-- Modal Camera Webcam Capture -->
+      <!-- ===== SECTION: Subscription & Perpanjangan Mandiri ===== -->
+      <section class="panel-card" id="subscription-renewal-section" style="margin-top: 20px; display: none;">
+        <header class="panel-header">
+          <div>
+            <span class="hero-kicker" style="color: #7c3aed;">LISENSI SAAS</span>
+            <h3>Subscription & Perpanjangan Mandiri</h3>
+            <p>Lihat status berlangganan aktif Anda dan ajukan perpanjangan secara mandiri dengan mengunggah bukti transfer pembayaran.</p>
+          </div>
+        </header>
+
+        <!-- Info Card Subscription -->
+        <div id="subscription-info-card" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 20px;">
+          <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px 16px;">
+            <span style="font-size: 11px; font-weight: 700; color: #94a3b8; text-transform: uppercase;">Paket Aktif</span>
+            <strong id="sub-plan-name" style="display: block; font-size: 15px; color: #7c3aed; margin-top: 4px;">-</strong>
+          </div>
+          <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px 16px;">
+            <span style="font-size: 11px; font-weight: 700; color: #94a3b8; text-transform: uppercase;">Kedaluwarsa</span>
+            <strong id="sub-expires-at" style="display: block; font-size: 15px; color: #0f172a; margin-top: 4px;">-</strong>
+          </div>
+          <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px 16px;">
+            <span style="font-size: 11px; font-weight: 700; color: #94a3b8; text-transform: uppercase;">Maks Outlet</span>
+            <strong id="sub-max-outlets" style="display: block; font-size: 15px; color: #0f172a; margin-top: 4px;">-</strong>
+          </div>
+          <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px 16px;">
+            <span style="font-size: 11px; font-weight: 700; color: #94a3b8; text-transform: uppercase;">Status</span>
+            <span id="sub-status-badge" class="status-pill" style="display: inline-flex; margin-top: 6px; font-size: 12px;">-</span>
+          </div>
+        </div>
+
+        <!-- Form Perpanjangan Mandiri -->
+        <div style="border-top: 1px dashed #e2e8f0; padding-top: 18px;">
+          <h4 style="font-size: 14px; font-weight: 700; color: #0f172a; margin-bottom: 4px;">📤 Ajukan Perpanjangan Subscription</h4>
+          <p style="font-size: 12px; color: #64748b; margin-bottom: 14px;">Pilih paket yang ingin Anda gunakan, lakukan transfer ke rekening terdaftar, lalu unggah bukti transfer di bawah. Tim kami akan memverifikasi dan memproses perpanjangan Anda.</p>
+
+          <form id="tenant-renewal-form" style="display: flex; flex-direction: column; gap: 14px;">
+            <input id="tenant-renewal-company-id" type="hidden" />
+
+            <label style="font-size: 13px; font-weight: 600; display: flex; flex-direction: column; gap: 6px;">
+              Pilih Paket Subscription
+              <select id="tenant-renewal-plan" required style="padding: 10px 12px; border-radius: 8px; border: 1.5px solid #cbd5e1; font-size: 14px; font-weight: 600;"></select>
+            </label>
+
+            <div id="tenant-renewal-plan-details" style="background: #f3e8ff; border: 1px solid #d8b4fe; border-radius: 8px; padding: 10px 12px; font-size: 12px; color: #6b21a8; line-height: 1.55;"></div>
+
+            <!-- Payment Account Info -->
+            <div id="tenant-renewal-payment-info" style="background: #fefce8; border: 1px solid #fde047; border-radius: 8px; padding: 10px 14px; font-size: 12px; color: #713f12; display: none;">
+              <strong style="display: block; margin-bottom: 4px;">🏦 Rekening Pembayaran Terdaftar:</strong>
+              <div id="tenant-renewal-payment-accounts"></div>
+            </div>
+
+            <label style="font-size: 13px; font-weight: 600; display: flex; flex-direction: column; gap: 6px;">
+              📎 Upload Bukti Transfer Pembayaran
+              <input id="tenant-renewal-proof-file" accept="image/png,image/jpeg,image/webp" type="file" style="font-size: 13px;" />
+              <input id="tenant-renewal-proof-url" type="hidden" />
+            </label>
+            <div id="tenant-renewal-proof-preview" style="border-radius: 8px; overflow: hidden; max-height: 160px; background: #1e293b; display: none; align-items: center; justify-content: center;">
+              <img id="tenant-renewal-proof-img" src="" alt="Preview Bukti Transfer" style="max-width: 100%; max-height: 160px; object-fit: contain;" />
+            </div>
+            <span id="tenant-renewal-proof-status" style="font-size: 11px; color: #64748b;">Unggah bukti transfer untuk mengajukan perpanjangan subscription Anda.</span>
+
+            <p class="form-feedback" id="tenant-renewal-feedback"></p>
+
+            <div style="display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap;">
+              <button type="submit" id="btn-submit-tenant-renewal" class="primary-button" style="background: #7c3aed; border-color: #7c3aed; font-weight: 700;">
+                ⏳ Ajukan Perpanjangan Subscription
+              </button>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <!-- Modal Camera & Fingerprint remain unchanged below -->
       <div class="modal-backdrop" id="camera-modal-backdrop" hidden>
         <div class="modal-container">
           <section class="modal-dialog" id="camera-modal" style="max-width: 460px;" hidden>

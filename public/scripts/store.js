@@ -388,10 +388,18 @@ function shouldUseGlobalLoading(method, url = "") {
 }
 
 function loadingMessage(method, url = "") {
-  if (method === "GET") return "Memuat data...";
-  if (url.includes("upload") || url.includes("image") || url.includes("logo")) return "Mengunggah file...";
-  if (method === "DELETE") return "Menghapus data...";
-  return "Menyimpan perubahan...";
+  if (url.includes("/api/auth/login") || url.includes("/login/submit")) return "Sedang memverifikasi login...";
+  if (url.includes("face-verify") || url.includes("face")) return "Sedang memverifikasi wajah AI...";
+  if (url.includes("fingerprint")) return "Sedang memverifikasi sidik jari...";
+  if (url.includes("register") || url.includes("resubmit")) return "Sedang memproses pengajuan...";
+  if (url.includes("approve")) return "Sedang memproses persetujuan & provisi database...";
+  if (url.includes("reject") || url.includes("resend-rejection")) return "Sedang memproses penolakan & email perbaikan...";
+  if (url.includes("invite")) return "Sedang mengirim email undangan...";
+  if (url.includes("upload") || url.includes("image") || url.includes("logo") || url.includes("payment")) return "Sedang mengunggah berkas...";
+  if (method === "GET") return "Sedang memuat data...";
+  if (method === "DELETE") return "Sedang menghapus data...";
+  if (method === "PUT") return "Sedang memperbarui data...";
+  return "Sedang memproses data...";
 }
 
 function isJwtExpired(token) {

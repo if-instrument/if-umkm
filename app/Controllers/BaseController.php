@@ -78,7 +78,7 @@ abstract class BaseController extends Controller
         return $response->setContentType('text/html')->setBody($html);
     }
 
-    private function numericCompanyId(string $code): int
+    protected function numericCompanyId(string $code): int
     {
         if ($code === 'company-main') {
             return 1;

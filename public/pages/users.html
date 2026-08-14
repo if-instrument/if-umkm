@@ -32,15 +32,16 @@
         </div>
 
         <section class="workspace-panel wide" data-super-admin-only>
-          <div class="panel-heading">
+          <div class="panel-heading" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
             <div>
               <h3>Super Admin Console</h3>
               <p>Super admin hanya melihat dan membuat perusahaan serta administrator perusahaan. Tidak ada akses operasional outlet.</p>
             </div>
+            <button class="ghost-button compact-button" id="btn-view-all-saas-audit" style="color:#6b21a8; border-color:#c084fc; font-weight:700;" type="button">📜 Riwayat & Audit Pembelian SaaS</button>
           </div>
           <div class="table-wrap">
             <table>
-              <thead><tr><th>Perusahaan</th><th>Admin Perusahaan</th><th>Branding</th><th>Status</th><th>Aksi</th></tr></thead>
+              <thead><tr><th>Perusahaan</th><th>Paket SaaS</th><th>Kuota Outlet</th><th>Masa Aktif Lisensi</th><th>Fitur AI Login</th><th>Admin Perusahaan</th><th>Status</th><th>Aksi</th></tr></thead>
               <tbody id="company-table"></tbody>
             </table>
           </div>
@@ -87,18 +88,39 @@
       </section>
 
       <div class="modal-backdrop" data-modal-backdrop hidden>
-        <section class="modal-dialog" id="company-modal" aria-modal="true" role="dialog" aria-labelledby="company-modal-title" hidden>
+        <section class="modal-dialog" id="company-modal" aria-modal="true" role="dialog" aria-labelledby="company-modal-title" style="max-width: 680px;" hidden>
           <header class="modal-header">
-            <div><span class="hero-kicker">Super Admin</span><h3 id="company-modal-title">Tambah Perusahaan</h3><p>Administrator akan menerima email untuk verifikasi dan membuat password sendiri.</p></div>
+            <div><span class="hero-kicker">Super Admin</span><h3 id="company-modal-title">Tambah Perusahaan</h3><p>Atur data perusahaan, paket SaaS subscription, kuota outlet, dan administrator tenant.</p></div>
             <button class="icon-button" data-close-modal type="button" aria-label="Tutup modal">x</button>
           </header>
           <form class="form-grid input-workflow two-column-form" id="tenant-form">
             <input id="tenant-id" type="hidden" />
-            <label>Nama Perusahaan <input id="tenant-name" required type="text" /></label>
-            <label>Route Company <input id="tenant-route-slug" pattern="[A-Za-z0-9-]+" placeholder="IFressoCoffee" required type="text" /></label>
-            <label>Status <select id="tenant-status"><option value="10">Aktif</option><option value="90">Nonaktif</option></select></label>
-            <label>Nama Admin <input id="tenant-admin-name" required type="text" /></label>
-            <label>Email Admin <input id="tenant-admin-email" required type="email" /></label>
+            <label>Nama Perusahaan <input id="tenant-name" required type="text" placeholder="misal: Kappi Kopi" /></label>
+            <label>Route Company Slug <input id="tenant-route-slug" pattern="[A-Za-z0-9-]+" placeholder="kappi" required type="text" /></label>
+
+            <label>Paket SaaS Subscription
+              <select id="tenant-subscription-plan" required></select>
+            </label>
+            <label>Maksimal Outlet
+              <input id="tenant-max-outlets" min="1" max="999" value="10" required type="number" />
+            </label>
+            <label>Masa Aktif Lisensi (Kadaluarsa Otomatis)
+              <input id="tenant-expires-at" type="date" readonly style="background: #f1f5f9; cursor: not-allowed; opacity: 0.9;" title="Otomatis terhitung sesuai Paket SaaS yang dipilih (view-only)" />
+            </label>
+            <label>Status Perusahaan <select id="tenant-status"><option value="10">Aktif</option><option value="90">Nonaktif</option></select></label>
+
+            <!-- AI Biometrics Feature Status Description (View Only) -->
+            <div class="full-row" style="margin-top: 4px; margin-bottom: 4px;">
+              <span style="font-size: 12px; font-weight: 700; color: var(--muted, #64748b); display: block; margin-bottom: 4px;">Fitur AI Biometrik Login</span>
+              <div id="tenant-ai-status-badge" style="padding: 10px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 8px; background: #ecfdf5; border: 1px solid #a7f3d0; color: #047857;">
+                <span>🤖 <strong>Fitur AI Login Aktif</strong> (Termasuk Pemindaian Wajah & Sidik Jari)</span>
+              </div>
+              <input id="tenant-ai-face-login" type="hidden" value="1" />
+              <input id="tenant-ai-fingerprint" type="hidden" value="1" />
+            </div>
+
+            <label>Nama Admin Perusahaan <input id="tenant-admin-name" required type="text" placeholder="misal: Budi Santoso" /></label>
+            <label>Email Admin Perusahaan <input id="tenant-admin-email" required type="email" placeholder="admin@kappi.com" /></label>
             <label class="logo-upload-field">Logo Perusahaan
               <input id="tenant-logo-url" type="hidden" />
               <span class="logo-upload-control">
@@ -106,9 +128,156 @@
                 <input id="tenant-logo-file" accept="image/png,image/jpeg,image/webp,image/gif" type="file" />
               </span>
             </label>
-            <label>Warna Tema <input id="tenant-theme-color" type="color" /></label>
+            <label>Warna Tema <input id="tenant-theme-color" type="color" value="#3B1F8C" /></label>
             <div class="modal-actions full-row"><button class="ghost-button" data-close-modal type="button">Batal</button><button class="primary-button" type="submit">Simpan Perusahaan</button></div>
           </form>
+        </section>
+
+        <section class="modal-dialog" id="company-approval-modal" aria-modal="true" role="dialog" aria-labelledby="approval-modal-title" style="max-width: 600px;" hidden>
+          <header class="modal-header">
+            <div>
+              <span class="hero-kicker" style="background:#ecfdf5; color:#047857; border:1px solid #a7f3d0;">Verifikasi Pembayaran & Approval</span>
+              <h3 id="approval-modal-title">Persetujuan Pendaftaran Perusahaan</h3>
+              <p>Periksa bukti pembayaran terunggah sebelum menyetujui dan memprovisi database tenant.</p>
+            </div>
+            <button class="icon-button" data-close-modal type="button" aria-label="Tutup modal">x</button>
+          </header>
+          
+          <div style="display: flex; flex-direction: column; gap: 16px; margin-top: 12px;">
+            <input id="approval-company-id" type="hidden" />
+
+            <!-- Company Summary Info Box -->
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; font-size: 13px;">
+              <div>
+                <span style="color: var(--muted); font-size: 11px; display: block;">NAMA PERUSAHAAN</span>
+                <strong id="approval-company-name" style="font-size: 15px; color: var(--brand);">-</strong>
+              </div>
+              <div>
+                <span style="color: var(--muted); font-size: 11px; display: block;">PAKET SAAS & KUOTA</span>
+                <strong id="approval-company-plan" style="color: #047857;">-</strong>
+              </div>
+              <div>
+                <span style="color: var(--muted); font-size: 11px; display: block;">ADMINISTRATOR</span>
+                <span id="approval-admin-email" style="font-weight: 600;">-</span>
+              </div>
+              <div>
+                <span style="color: var(--muted); font-size: 11px; display: block;">CATATAN PENDAFTARAN</span>
+                <span id="approval-payment-notes" style="font-style: italic; color: #475569;">-</span>
+              </div>
+            </div>
+
+            <!-- Uploaded Payment Proof Container -->
+            <div style="display: flex; flex-direction: column; gap: 6px;">
+              <strong style="font-size: 13px; color: #1e293b;">📄 Bukti Transfer / Pembayaran Terunggah:</strong>
+              <div id="approval-proof-container" style="background: #1e293b; border-radius: 10px; padding: 12px; min-height: 200px; max-height: 380px; display: flex; align-items: center; justify-content: center; overflow: hidden;">
+                <img id="approval-proof-image" src="" alt="Bukti Transfer" style="max-width: 100%; max-height: 360px; border-radius: 6px; object-fit: contain; display: none;" />
+                <span id="approval-no-proof" style="color: #94a3b8; font-size: 13px;">Tidak ada bukti transfer gambar yang diunggah.</span>
+              </div>
+              <a id="approval-proof-link" href="#" target="_blank" style="font-size: 12px; color: var(--brand); text-decoration: underline; font-weight: 600; display: none; margin-top: 2px;">↗ Buka Gambar di Tab Baru</a>
+            </div>
+
+            <!-- Modal Action Buttons -->
+            <div class="modal-actions full-row" style="margin-top: 10px; display: flex; gap: 10px; justify-content: flex-end;">
+              <button class="ghost-button" data-close-modal type="button">Batal</button>
+              <button class="ghost-button" id="btn-reject-approval" style="color: #dc2626; border-color: #fca5a5;" type="button">Tolak Pendaftaran</button>
+              <button class="primary-button" id="btn-confirm-approval" style="background: #059669; border-color: #059669;" type="button">✓ Setujui & Buat Tenant DB</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="modal-dialog" id="company-renewal-modal" aria-modal="true" role="dialog" aria-labelledby="renewal-modal-title" style="max-width: 540px;" hidden>
+          <header class="modal-header">
+            <div>
+              <span class="hero-kicker" style="background:#ecfdf5; color:#047857; border:1px solid #a7f3d0;">Perpanjangan Masa Aktif</span>
+              <h3 id="renewal-modal-title">Perpanjang Subscription Perusahaan</h3>
+              <p>Pilih Paket SaaS yang tersedia untuk memperpanjang masa aktif lisensi.</p>
+            </div>
+            <button class="icon-button" data-close-modal type="button" aria-label="Tutup modal">x</button>
+          </header>
+          
+          <form id="company-renewal-form" style="display: flex; flex-direction: column; gap: 14px; margin-top: 12px;">
+            <input id="renewal-company-id" type="hidden" />
+
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px 14px; font-size: 13px;">
+              <span style="color: var(--muted); font-size: 11px; display: block; font-weight: 700;">PERUSAHAAN TARGET</span>
+              <strong id="renewal-company-name" style="font-size: 15px; color: var(--brand); display: block; margin-top: 2px;">-</strong>
+              <small id="renewal-current-expiry" style="color: #64748b; font-weight: 600;">-</small>
+            </div>
+
+            <label style="font-weight: 700; font-size: 13px; color: #1e293b; display: flex; flex-direction: column; gap: 6px;">
+              Pilihan Paket Subscription SaaS
+              <select id="renewal-subscription-plan" required style="padding: 10px 12px; border-radius: 8px; border: 1.5px solid #cbd5e1; font-size: 14px; font-weight: 600;">
+              </select>
+            </label>
+
+            <div id="renewal-plan-details" style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 10px 12px; font-size: 12px; color: #1e40af; line-height: 1.45;">
+              -
+            </div>
+
+            <label style="font-weight: 700; font-size: 13px; color: #1e293b; display: flex; flex-direction: column; gap: 6px;">
+              📄 Bukti Transfer Pembayaran Baru (Wajib Unggah)
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <input id="renewal-payment-proof-file" accept="image/png,image/jpeg,image/webp" type="file" style="flex: 1; font-size: 13px;" />
+                <input id="renewal-payment-proof-url" type="hidden" />
+              </div>
+              <div id="renewal-proof-preview" style="margin-top: 6px; border-radius: 8px; overflow: hidden; max-height: 150px; background: #1e293b; display: none; align-items: center; justify-content: center;">
+                <img id="renewal-proof-img" src="" alt="Preview Bukti Transfer" style="max-width: 100%; max-height: 150px; object-fit: contain;" />
+              </div>
+              <span id="renewal-proof-status" style="font-size: 11px; color: #64748b;">Unggah bukti transfer untuk transaksi perpanjangan ini.</span>
+            </label>
+
+            <div class="modal-actions full-row" style="margin-top: 8px; display: flex; gap: 10px; justify-content: flex-end;">
+              <button class="ghost-button" data-close-modal type="button">Batal</button>
+              <button class="primary-button" id="btn-confirm-renewal" style="background: #059669; border-color: #059669;" type="submit">⏳ Proses Perpanjangan Subscription</button>
+            </div>
+          </form>
+        </section>
+
+        <section class="modal-dialog" id="company-audit-modal" aria-modal="true" role="dialog" aria-labelledby="audit-modal-title" style="max-width: 900px;" hidden>
+          <header class="modal-header">
+            <div>
+              <span class="hero-kicker" style="background:#f0fdf4; color:#166534; border:1px solid #bbf7d0;">Audit Log SaaS</span>
+              <h3 id="audit-modal-title">Riwayat & Audit Pembelian Subscription</h3>
+              <p>Histori transaksi pendaftaran, perpanjangan, upgrade, dan snapshot nilai transaksi.</p>
+            </div>
+            <button class="icon-button" data-close-modal type="button" aria-label="Tutup modal">x</button>
+          </header>
+          
+          <div style="display: flex; flex-direction: column; gap: 14px; margin-top: 12px;">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
+              <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 14px;">
+                <span style="font-size: 11px; color: var(--muted); font-weight: 700; display: block;">TOTAL TRANSAKSI</span>
+                <strong id="audit-total-count" style="font-size: 18px; color: var(--brand);">0 Transaksi</strong>
+              </div>
+              <div style="background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 8px; padding: 10px 14px;">
+                <span style="font-size: 11px; color: #047857; font-weight: 700; display: block;">TOTAL NOMINAL PEMBELIAN</span>
+                <strong id="audit-total-amount" style="font-size: 18px; color: #047857;">Rp 0</strong>
+              </div>
+            </div>
+
+            <div class="table-container" style="max-height: 400px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 8px;">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Waktu & Tanggal</th>
+                    <th>Perusahaan</th>
+                    <th>Tipe Aksi</th>
+                    <th>Transisi Paket</th>
+                    <th>Harga Snapshot</th>
+                    <th>Masa Aktif Baru</th>
+                    <th>Petugas</th>
+                  </tr>
+                </thead>
+                <tbody id="audit-logs-table-body">
+                  <tr><td colspan="7" style="text-align: center; color: var(--muted); padding: 20px;">Memuat riwayat audit...</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="modal-actions full-row" style="display: flex; justify-content: flex-end;">
+              <button class="ghost-button" data-close-modal type="button">Tutup</button>
+            </div>
+          </div>
         </section>
 
         <section class="modal-dialog" id="role-modal" aria-modal="true" role="dialog" aria-labelledby="role-modal-title" hidden>

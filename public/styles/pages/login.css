@@ -275,13 +275,17 @@
 /* ─── SaaS Subscription Plan Cards Showcase ─────────────────────────────── */
 .saas-subscription-showcase {
   background: #ffffff;
-  border: 1px solid #e8edf5;
+  border: 1px solid #e2e8f0;
   border-radius: 14px;
-  padding: 16px;
+  padding: 12px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  box-shadow: 0 8px 24px rgba(15,23,42,0.05);
+  gap: 8px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+  height: 285px !important;
+  max-height: 285px !important;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .saas-badge-title {
@@ -291,7 +295,9 @@
   font-size: 11.5px;
   font-weight: 800;
   color: var(--brand, #3B1F8C);
-  letter-spacing: 0.02em;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  flex-shrink: 0;
 }
 
 .pulse-dot {
@@ -306,53 +312,77 @@
 
 @keyframes pulseDot {
   0%   { box-shadow: 0 0 0 0 rgba(16,185,129,0.45); }
-  60%  { box-shadow: 0 0 0 7px rgba(16,185,129,0); }
+  60%  { box-shadow: 0 0 0 8px rgba(16,185,129,0); }
   100% { box-shadow: 0 0 0 0 rgba(16,185,129,0); }
 }
 
 .saas-plan-cards {
   display: flex;
   flex-direction: column;
-  gap: 7px;
+  gap: 10px;
+  overflow-y: auto !important;
+  max-height: 215px !important;
+  flex: 1 1 auto;
+  min-height: 0;
+  padding-right: 4px;
+  scroll-behavior: smooth;
+}
+
+.saas-plan-cards::-webkit-scrollbar {
+  width: 4px;
+}
+
+.saas-plan-cards::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 4px;
+}
+
+.saas-plan-cards::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+.saas-plan-cards::-webkit-scrollbar-thumb:hover {
+  background: var(--brand, #3B1F8C);
 }
 
 .saas-plan-card {
-  border: 1px solid #e8edf5;
-  border-radius: 10px;
-  padding: 9px 12px;
-  background: #f8fafc;
-  transition: all 0.22s cubic-bezier(0.4,0,0.2,1);
-  cursor: default;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 12px 14px;
+  background: #ffffff;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  flex-shrink: 0 !important;
+  min-height: 75px;
 }
 
 .saas-plan-card.featured-plan {
-  border: 1.5px solid var(--brand, #3B1F8C) !important;
-  background: linear-gradient(135deg, #ffffff, var(--brand-soft, #ede9f9)) !important;
-  box-shadow:
-    0 6px 20px rgba(var(--brand-rgb,59,31,140),0.15),
-    inset 0 1px 0 rgba(255,255,255,0.8) !important;
-  position: relative;
+  border: 2px solid var(--brand, #3B1F8C) !important;
+  background: linear-gradient(145deg, #ffffff 0%, #f4f0ff 100%) !important;
+  box-shadow: 0 8px 24px rgba(59, 31, 140, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.9) !important;
 }
 
 .plan-recommended-badge {
-  background: linear-gradient(135deg, #f59e0b, #d97706);
+  background: linear-gradient(135deg, #7c3aed, #4f46e5);
   color: #ffffff;
-  font-size: 9px;
+  font-size: 9.5px;
   font-weight: 800;
-  padding: 2px 8px;
+  padding: 3px 9px;
   border-radius: 999px;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
-  box-shadow: 0 2px 6px rgba(245,158,11,0.35);
+  letter-spacing: 0.05em;
+  box-shadow: 0 2px 8px rgba(124, 58, 237, 0.35);
   display: inline-block;
   vertical-align: middle;
 }
 
 .saas-plan-card:hover {
-  border-color: var(--brand, #3B1F8C);
-  background: #ffffff;
-  box-shadow: 0 4px 14px rgba(var(--brand-rgb,59,31,140),0.12);
-  transform: translateY(-1px);
+  border-color: var(--brand, #3B1F8C) !important;
+  box-shadow: 0 10px 26px rgba(59, 31, 140, 0.16) !important;
+  transform: translateY(-3px);
 }
 
 .saas-plan-header {
@@ -360,40 +390,178 @@
   justify-content: space-between;
   align-items: center;
   gap: 8px;
+  margin-bottom: 4px;
 }
 
 .saas-plan-header strong {
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 800;
   color: #0f172a;
 }
 
 .saas-plan-price {
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 800;
   color: var(--brand, #3B1F8C);
   white-space: nowrap;
+  background: #f1f5f9;
+  padding: 3px 8px;
+  border-radius: 6px;
 }
 
-.saas-plan-meta {
-  display: block;
+.saas-plan-card.featured-plan .saas-plan-price {
+  background: #ede9f9;
+}
+
+.plan-benefit-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11.5px;
+  color: #334155;
+  line-height: 1.3;
+}
+
+.plan-benefit-item .icon-check {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #dcfce7;
+  color: #15803d;
   font-size: 10px;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.plan-benefit-item .icon-cross {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #f1f5f9;
   color: #94a3b8;
-  margin-top: 3px;
+  font-size: 10px;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.benefit-badge {
+  background: #f1f5f9;
+  color: #334155;
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid #e2e8f0;
+}
+
+.benefit-badge.ai-badge {
+  background: #ecfdf5;
+  color: #047857;
+  border-color: #a7f3d0;
+  font-weight: 700;
+}
+
+.benefit-badge.no-ai-badge {
+  background: #f8fafc;
+  color: #94a3b8;
+  border-color: #e2e8f0;
+}
+
+/* Visual Plan Selector inside Public Register Modal */
+.visual-plan-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.visual-plan-picker-card {
+  border: 1.5px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 12px;
+  background: #ffffff;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  position: relative;
+}
+
+.visual-plan-picker-card:hover {
+  border-color: var(--brand, #3B1F8C);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 14px rgba(59, 31, 140, 0.1);
+}
+
+.visual-plan-picker-card.active {
+  border: 2px solid var(--brand, #3B1F8C) !important;
+  background: #f4f0ff !important;
+  box-shadow: 0 6px 18px rgba(59, 31, 140, 0.16) !important;
+}
+
+.visual-plan-picker-card .radio-indicator {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid #cbd5e1;
+  position: absolute;
+  top: 10px;
+  right: 10px;
+}
+
+.visual-plan-picker-card.active .radio-indicator {
+  border-color: var(--brand, #3B1F8C);
+  background: var(--brand, #3B1F8C);
+  box-shadow: inset 0 0 0 3px #ffffff;
 }
 
 .saas-expiration-notice {
-  font-size: 10px;
-  color: #64748b;
+  font-size: 10.5px;
+  color: #475569;
   background: linear-gradient(135deg, #fffbeb, #fefce8);
   border: 1px solid #fde68a;
-  padding: 9px 10px;
-  border-radius: 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
   display: flex;
-  gap: 7px;
+  gap: 8px;
   line-height: 1.4;
   margin-top: auto;
   box-shadow: 0 2px 6px rgba(245,158,11,0.08);
+  flex-shrink: 0;
+}
+
+/* ─── Button Loading Spinner Utility ────────────────────────────────────── */
+.button-loading {
+  position: relative !important;
+  pointer-events: none !important;
+  opacity: 0.8 !important;
+  cursor: not-allowed !important;
+}
+
+.button-spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-top-color: #ffffff;
+  border-radius: 50%;
+  animation: btnSpin 0.7s linear infinite;
+  vertical-align: middle;
+  margin-right: 6px;
+}
+
+@keyframes btnSpin {
+  to { transform: rotate(360deg); }
 }
 
 /* ─── Company Login Showcase (Tenant Login Page) ─────────────────────────── */
