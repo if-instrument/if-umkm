@@ -131,62 +131,95 @@ class ToolExecutor:
             return []
 
         ssl_ctx = ssl._create_unverified_context()
-        encoded = urllib.parse.quote_plus(query)
         results = []
 
-        # 1. Google News & Media Search (Live Articles & Commodity Reports in Indonesia)
-        try:
-            google_news_url = f"https://news.google.com/rss/search?q={encoded}&hl=id&gl=ID&ceid=ID:id"
-            req_g = urllib.request.Request(
-                google_news_url,
-                headers={"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko)"}
-            )
-            with urllib.request.urlopen(req_g, context=ssl_ctx, timeout=5) as r:
-                xml_data = r.read()
-                root = ET.fromstring(xml_data)
-                items = root.findall(".//item")
-                for it in items[:limit]:
-                    raw_title = it.find("title").text if it.find("title") is not None else query
-                    link = it.find("link").text if it.find("link") is not None else f"https://www.google.com/search?q={encoded}"
-                    source_elem = it.find("source")
-                    source_name = source_elem.text if source_elem is not None else "Google News"
-                    pub_date = it.find("pubDate").text if it.find("pubDate") is not None else ""
+        # 1. Clean and extract the most relevant search keywords
+        stop_words = {"harga", "supplier", "grosir", "indonesia", "2026", "terbaru", "saat", "ini", "untuk", "yang", "dan", "serta", "atau", "kira", "perkiraan", "berapa", "rata", "toko", "cafe", "bisa", "cari", "internet", "coba", "tolong"}
+        raw_parts = re.split(r"[,;&]|\s+dan\s+|\s+serta\s+|\s+atau\s+", query, flags=re.IGNORECASE)
+        search_terms = []
+        for part in raw_parts:
+            words = [w for w in part.split() if w.lower() not in stop_words and len(w) > 2]
+            if words:
+                search_terms.append(" ".join(words[:3]))
 
-                    results.append({
-                        "title": raw_title,
-                        "snippet": f"Publikasi berita/analisis pasar: '{raw_title}' dipublikasikan oleh {source_name} ({pub_date[:16]}).",
-                        "source": f"{source_name} (via Google News)",
-                        "url": link
-                    })
-        except Exception as e:
-            logger.warning(f"Google News RSS search error: {e}")
+        if not search_terms:
+            search_terms = [query[:35]]
 
-        # 2. Wikipedia Indonesia Search (Authoritative Indonesian Encyclopedia)
-        try:
-            wiki_url = f"https://id.wikipedia.org/w/api.php?action=query&list=search&srsearch={encoded}&format=json"
-            req_w = urllib.request.Request(wiki_url, headers={"User-Agent": "AplikasiUMKM/1.0"})
-            with urllib.request.urlopen(req_w, context=ssl_ctx, timeout=4) as rw:
-                wdata = json.loads(rw.read().decode("utf-8"))
-                for item in wdata.get("query", {}).get("search", [])[:(limit - len(results))]:
-                    clean_snippet = re.sub(r"<[^>]+>", "", item.get("snippet", ""))
-                    page_title = item.get("title", "")
-                    page_url = f"https://id.wikipedia.org/wiki/{urllib.parse.quote(page_title.replace(' ', '_'))}"
-                    results.append({
-                        "title": page_title,
-                        "snippet": clean_snippet,
-                        "source": "Wikipedia Indonesia",
-                        "url": page_url
-                    })
-        except Exception as e:
-            logger.warning(f"Wikipedia search error: {e}")
+        # 2. Extract Specific Media Publication Articles (Kompas, Sindonews, Tempo, Detik, dll)
+        for term in search_terms[:2]:
+            if len(results) >= limit:
+                break
+            enc_term = urllib.parse.quote_plus(term)
+            try:
+                google_news_url = f"https://news.google.com/rss/search?q={enc_term}&hl=id&gl=ID&ceid=ID:id"
+                req_g = urllib.request.Request(
+                    google_news_url,
+                    headers={"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko)"}
+                )
+                with urllib.request.urlopen(req_g, context=ssl_ctx, timeout=4) as r:
+                    xml_data = r.read()
+                    root = ET.fromstring(xml_data)
+                    items = root.findall(".//item")
+                    for it in items[:2]:
+                        raw_title = it.find("title").text if it.find("title") is not None else term
+                        link = it.find("link").text if it.find("link") is not None else ""
+                        source_elem = it.find("source")
+                        source_name = source_elem.text if source_elem is not None else "Media Publikasi"
+                        pub_date = it.find("pubDate").text if it.find("pubDate") is not None else ""
 
-        # 3. Google Search Direct Index Link (Always valid and accessible in any browser)
+                        if link:
+                            results.append({
+                                "title": f"{source_name}: {raw_title}",
+                                "snippet": f"Artikel/liputan media: '{raw_title}' dipublikasikan oleh {source_name} ({pub_date[:16]}).",
+                                "source": source_name,
+                                "url": link
+                            })
+            except Exception as e:
+                logger.warning(f"Google News RSS search error for '{term}': {e}")
+
+        # 3. Extract Specific Wikipedia Indonesia Articles
+        for term in search_terms[:2]:
+            if len(results) >= limit:
+                break
+            enc_term = urllib.parse.quote_plus(term)
+            try:
+                wiki_url = f"https://id.wikipedia.org/w/api.php?action=query&list=search&srsearch={enc_term}&format=json"
+                req_w = urllib.request.Request(wiki_url, headers={"User-Agent": "AplikasiUMKM/1.0"})
+                with urllib.request.urlopen(req_w, context=ssl_ctx, timeout=4) as rw:
+                    import json
+                    wdata = json.loads(rw.read().decode("utf-8"))
+                    for item in wdata.get("query", {}).get("search", [])[:1]:
+                        clean_snippet = re.sub(r"<[^>]+>", "", item.get("snippet", ""))
+                        page_title = item.get("title", "")
+                        clean_t = page_title.replace(" ", "_")
+                        page_url = f"https://id.wikipedia.org/wiki/{urllib.parse.quote(clean_t)}"
+                        results.append({
+                            "title": f"Wikipedia Indonesia: {page_title}",
+                            "snippet": clean_snippet,
+                            "source": "Wikipedia Indonesia",
+                            "url": page_url
+                        })
+            except Exception as e:
+                logger.warning(f"Wikipedia search error for '{term}': {e}")
+
+        # 4. Extract Specific Marketplace Catalog & Supplier Directory Links (Tokopedia & Shopee)
+        primary_clean = search_terms[0] if search_terms else query[:30]
+        enc_p = urllib.parse.quote_plus(primary_clean)
+
         if len(results) < limit:
             results.append({
-                "title": f"Hasil Pencarian Google: {query}",
-                "snippet": f"Indeks penelusuran Google langsung untuk kata kunci pasar dan bisnis: '{query}'.",
-                "source": "Google Search Indonesia",
-                "url": f"https://www.google.com/search?q={encoded}"
+                "title": f"Tokopedia: Katalog {primary_clean}",
+                "snippet": f"Daftar produk dan direktori supplier resmi di Tokopedia untuk {primary_clean}.",
+                "source": "Tokopedia",
+                "url": f"https://www.tokopedia.com/search?st=product&q={enc_p}"
+            })
+
+        if len(results) < limit:
+            results.append({
+                "title": f"Shopee Indonesia: Katalog {primary_clean}",
+                "snippet": f"Katalog produk dan harga pasar grosir di Shopee untuk {primary_clean}.",
+                "source": "Shopee Indonesia",
+                "url": f"https://shopee.co.id/search?keyword={enc_p}"
             })
 
         return results[:limit]

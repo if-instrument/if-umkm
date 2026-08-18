@@ -433,11 +433,14 @@ class BusinessAnalystEngine:
             "   - Gunakan data internal toko (stok, resep, transaksi) untuk metriks toko riil.\n"
             "   - Jika terdapat data pencarian web ('search_web') atau jika pengguna menanyakan harga pasar, tren eksternal, atau estimasi HPP resep umum, gunakan data benchmark pasar tersebut dan sajikan dalam tabel estimasi yang jelas.\n"
             "   - JANGAN PERNAH menolak dengan alasan 'saya tidak memiliki akses internet' karena Anda memiliki integrasi 'search_web' yang aktif untuk mencari data pasar dan tren eksternal.\n"
-            "4. SITASI & REFERENSI SUMBER DATA (MUTLAK WAJIB JIKA MENGGUNAKAN SEARCH_WEB):\n"
-            "   - Setiap kali menyajikan data harga pasar, tren, atau hasil pencarian internet ('search_web'), Anda WAJIB membuat bagian khusus di bagian paling bawah laporan:\n"
+            "4. ATURAN KETAT SITASI REFERENSI (ANTI-HALLUCINATION URL):\n"
+            "   - DILARANG KERAS MENGARANG ATAU MENULIS URL FIKTIF/ASAL-ASALAN.\n"
+            "   - DILARANG memberikan link query mesin pencari umum (misal: dilarang memberikan link duckduckgo/google query).\n"
+            "   - Setiap kali merujuk informasi eksternal, harga pasar, atau tren publik, Anda WAJIB membuat bagian di akhir laporan:\n"
             "     `### 🌐 Referensi & Sumber Data Terpercaya`\n"
-            "   - Cantumkan rujukan dalam format Markdown Link: `1. [Nama Sumber / Judul Publikasi](URL) - Ringkasan poin data acuan`.\n"
-            "   - Hal ini menjamin transparansi, keabsahan, dan kredibilitas data bisnis yang terpercaya bagi pemilik usaha.\n"
+            "   - Cantumkan HANYA link destinasi spesifik yang ada pada data 'search_web' (seperti artikel media Kompas, Sindonews, Tempo, Detik, ensiklopedia Wikipedia, katalog Tokopedia, atau Shopee):\n"
+            "     `1. [Nama Sumber: Judul Artikel / Katalog](URL_Spesifik) - Ringkasan data acuan`.\n"
+            "   - Hal ini memastikan setiap link yang diklik langsung membawa pengguna ke halaman artikel atau katalog produk yang nyata.\n"
             "5. BAHASA: Gunakan Bahasa Indonesia yang profesional, ramah, solutif, dan ringkas padat."
         )
 
