@@ -26,9 +26,13 @@ HOST="${HOST:-0.0.0.0}"
 PORT="${PORT:-8081}"
 
 AI_PID=""
+QUEUE_PID=""
 cleanup() {
+  if [[ -n "$QUEUE_PID" ]]; then
+    echo "Menghentikan Background Queue Worker (PID: $QUEUE_PID)..."
+    kill "$QUEUE_PID" 2>/dev/null || true
+  fi
   if [[ -n "$AI_PID" ]]; then
-    echo
     echo "Menghentikan AI Microservice (PID: $AI_PID)..."
     kill "$AI_PID" 2>/dev/null || true
   fi
@@ -42,11 +46,16 @@ if [[ -f scripts/run-ai-service.sh ]]; then
   sleep 1
 fi
 
+echo "Menjalankan Background Queue Worker (php spark queue:work)..."
+"$PHP_BIN" spark queue:work --sleep 3 &
+QUEUE_PID=$!
+
 echo "=================================================="
 echo "Menjalankan IF Instrument UMKM Solution"
-echo "URL Aplikasi POS : http://127.0.0.1:${PORT}"
-echo "URL AI Microservice: http://127.0.0.1:8000"
-echo "Bind            : ${HOST}:${PORT}"
+echo "URL Aplikasi POS    : http://127.0.0.1:${PORT}"
+echo "URL AI Microservice : http://127.0.0.1:8000"
+echo "Queue Worker Daemon : Aktif (PID: ${QUEUE_PID})"
+echo "Bind                : ${HOST}:${PORT}"
 echo "=================================================="
 echo
 
