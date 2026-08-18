@@ -66,8 +66,7 @@ Seluruh routing kini terstandarisasi penuh di bawah prefix `/api/v1/`:
 | `GET` | `/api/v1/ai/capabilities` | Daftar kapabilitas AI yang aktif di sistem |
 | `GET` | `/api/v1/ai/providers` | Daftar LLM provider yang tersedia (OpenAI, Gemini, Anthropic) |
 
-### D. Health Check Probe (`/health` & `/api/v1/health`)
+### D. Health Check Probe (`/api/v1/health`)
 | Method | Endpoint | Deskripsi |
 |---|---|---|
-| `GET` | `/health` | Liveness and health probe untuk monitoring status microservice |
-| `GET` | `/api/v1/health` | Health probe versi API v1 |
+| `GET` | `/api/v1/health` | Health probe dan status liveness microservice |

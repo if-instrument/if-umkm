@@ -19,13 +19,9 @@ def generate_test_image_base64() -> str:
     return "data:image/jpeg;base64," + base64.b64encode(buffer.getvalue()).decode("utf-8")
 
 def test_health():
-    res = client.get("/health")
+    res = client.get("/api/v1/health")
     assert res.status_code == 200
     assert res.json()["status"] == "online"
-
-    res_v1 = client.get("/api/v1/health")
-    assert res_v1.status_code == 200
-    assert res_v1.json()["status"] == "online"
 
 def test_unauthorized_without_api_key():
     res = client.post("/api/v1/face/register", json={

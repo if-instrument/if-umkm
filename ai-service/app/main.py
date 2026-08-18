@@ -69,7 +69,6 @@ api_v1_router.include_router(fingerprint.router, prefix="/fingerprint")
 api_v1_router.include_router(v1_ai.router, prefix="/ai")
 app.include_router(api_v1_router)
 
-@app.get("/health", tags=["Health"])
 @app.get("/api/v1/health", tags=["Health"])
 def health_check():
     return {

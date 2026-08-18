@@ -188,7 +188,7 @@ class DeleteConversationRequest(BaseModel):
 
 @router.get("/conversations/{conversation_id}")
 def get_conversation_details(conversation_id: str, db: Session = Depends(get_db)):
-    from app.models.ai_models import AIConversation
+    from app.models.platform import AIConversation
     conv = db.query(AIConversation).filter(AIConversation.conversation_id == conversation_id).first()
     if not conv:
         return {"ok": False, "message": "Conversation not found."}
@@ -205,7 +205,6 @@ def get_conversation_details(conversation_id: str, db: Session = Depends(get_db)
         }
     }
 
-@router.delete("/conversations/{conversation_id}")
 @router.post("/conversations/{conversation_id}/delete")
 def delete_conversation(conversation_id: str, db: Session = Depends(get_db)):
     from app.services.chat_service import ChatHistoryService
