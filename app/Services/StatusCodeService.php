@@ -167,6 +167,16 @@ class StatusCodeService
         return self::payment($status) === self::PAYMENT_UNPAID;
     }
 
+    public static function isOrderCompleted(?string $status): bool
+    {
+        return self::order($status) === self::ORDER_COMPLETED;
+    }
+
+    public static function isOrderCancelled(?string $status): bool
+    {
+        return self::order($status) === self::ORDER_CANCELLED;
+    }
+
     private static function map(?string $status, array $aliases, string $default): string
     {
         $value = strtolower(trim((string) $status));

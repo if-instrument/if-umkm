@@ -64,9 +64,16 @@ def verify_pose_endpoint(req: VerifyFacePoseRequest):
         "guidance_message": guidance_msg
     }
 
+def get_user_key_variants(user_key: Optional[str]) -> list:
+    if not user_key:
+        return []
+    raw = str(user_key).strip()
+    clean = raw[4:] if raw.startswith("usr-") else raw
+    return list({raw, clean, f"usr-{clean}"})
+
 @router.post("/status")
 def check_face_status(req: FaceStatusRequest, db: Session = Depends(get_db)):
-    query = db.query(FaceEmbedding).filter(FaceEmbedding.user_key == req.user_key)
+    query = db.query(FaceEmbedding).filter(FaceEmbedding.user_key.in_(get_user_key_variants(req.user_key)))
     if req.company_key:
         query = query.filter(FaceEmbedding.company_key == req.company_key)
     records = query.all()
@@ -101,7 +108,7 @@ def register_face(req: RegisterFaceRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"Gagal mengekstrak fitur wajah: {str(e)}")
 
     records = db.query(FaceEmbedding).filter(
-        FaceEmbedding.user_key == req.user_key
+        FaceEmbedding.user_key.in_(get_user_key_variants(req.user_key))
     ).order_by(FaceEmbedding.created_at.asc()).all()
 
     if len(records) >= 20:
@@ -133,7 +140,7 @@ def register_face(req: RegisterFaceRequest, db: Session = Depends(get_db)):
 
 @router.post("/verify")
 def verify_face(req: VerifyFaceRequest, db: Session = Depends(get_db)):
-    query = db.query(FaceEmbedding).filter(FaceEmbedding.user_key == req.user_key)
+    query = db.query(FaceEmbedding).filter(FaceEmbedding.user_key.in_(get_user_key_variants(req.user_key)))
     if req.company_key:
         query = query.filter(FaceEmbedding.company_key == req.company_key)
     records = query.all()

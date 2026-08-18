@@ -1,4 +1,4 @@
-import { apiGet, appPath, applyPermissionControls, canAccessAllOutlets, canUsePermission, clearSession, loadSession, loadState, primaryOutletId, saveSession } from "./store.js";
+import { apiGet, apiLogout, appPath, applyPermissionControls, canAccessAllOutlets, canUsePermission, clearSession, loadSession, loadState, primaryOutletId, saveSession } from "./store.js";
 import { isInactiveStatus } from "./status-codes.js";
 
 const APP_LOGO = "/assets/if-instrument-logo.jpg";
@@ -10,6 +10,12 @@ const navGroups = [
     title: "Beranda",
     items: [
       { page: "dashboard", access: [["dashboard.overview", "read"]], icon: "D", label: "Dashboard", href: "/index.html" }
+    ]
+  },
+  {
+    title: "AI Intelligence",
+    items: [
+      { page: "ai-analyst", icon: "🤖", label: "AI Business Analyst", href: "/pages/ai-analyst.html" }
     ]
   },
   {
@@ -184,7 +190,7 @@ export function renderLayout() {
     window.location.href = appPath(currentPath);
     return;
   }
-  const allowedSuperAdminPages = ["users", "saas-plans", "central-payment-gateway", "profile"];
+  const allowedSuperAdminPages = ["users", "saas-plans", "central-payment-gateway", "profile", "ai-analyst"];
   if (session?.authType === "super_admin" && !allowedSuperAdminPages.includes(document.body.dataset.page)) {
     window.location.href = "/pages/users.html";
     return;
@@ -356,7 +362,7 @@ export function renderLayout() {
   });
 
   document.querySelector("#logout-button").addEventListener("click", () => {
-    clearSession();
+    apiLogout();
     window.location.href = appPath("/login");
   });
 

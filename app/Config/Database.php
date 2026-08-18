@@ -13,7 +13,7 @@ class Database extends Config
         'DSN'      => '',
         'hostname' => 'localhost',
         'username' => 'root',
-        'password' => '',
+        'password' => '1m4mf4154l',
         'database' => 'if_instrument_umkm',
         'DBDriver' => 'MySQLi',
         'DBPrefix' => '',
@@ -27,5 +27,25 @@ class Database extends Config
         'strictOn' => false,
         'failover' => [],
         'port'     => 3306,
+    ];
+
+    public array $tests = [
+        'DSN'         => '',
+        'hostname'    => 'localhost',
+        'username'    => 'root',
+        'password'    => '1m4mf4154l',
+        'database'    => 'if_instrument_umkm',
+        'DBDriver'    => 'MySQLi',
+        'DBPrefix'    => '',
+        'pConnect'    => false,
+        'DBDebug'     => true,
+        'charset'     => 'utf8mb4',
+        'DBCollat'    => 'utf8mb4_unicode_ci',
+        'swapPre'     => '',
+        'encrypt'     => false,
+        'compress'    => false,
+        'strictOn'    => false,
+        'failover'    => [],
+        'port'        => 3306,
     ];
 }

@@ -24,7 +24,31 @@ class AuthController extends BaseController
             return $this->response->setStatusCode($status)->setJSON($result);
         }
 
+        if (! empty($result['token'])) {
+            $this->response->setCookie(
+                'jwt_token',
+                (string) $result['token'],
+                28800,
+                '',
+                '/',
+                '',
+                $this->request->isSecure(),
+                true,
+                'Lax'
+            );
+        }
+
         return $this->response->setJSON($result);
+    }
+
+    public function logout()
+    {
+        $this->response->setCookie('jwt_token', '', -3600, '', '/', '', $this->request->isSecure(), true, 'Lax');
+
+        return $this->response->setJSON([
+            'ok' => true,
+            'message' => 'Berhasil logout.',
+        ]);
     }
 
     public function invitation(string $token)

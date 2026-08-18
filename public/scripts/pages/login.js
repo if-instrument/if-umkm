@@ -1,5 +1,5 @@
 import { applyBrandTheme } from "../layout.js";
-import { apiGet, apiPost, apiUpload, appPath, loadSession, saveSession } from "../store.js";
+import { apiGet, apiPost, apiUpload, appPath, hideGlobalLoading, loadSession, saveSession, showGlobalLoading } from "../store.js";
 import { byId, setText, showAlert, showFeedback } from "../dom.js";
 import { loadPageBootstrap } from "../page-engine.js";
 
@@ -513,12 +513,12 @@ function startAutoFaceScanner() {
 
   let isVerifyingFrame = false;
 
-  faceScanInterval = setInterval(() => {
+  faceScanInterval = setInterval(async () => {
     if (!isFaceScanningActive || isVerifyingFrame) return;
 
     const video = byId("face-login-video");
     const canvas = byId("face-login-canvas");
-    if (!video || !canvas || !pendingLoginResult) return;
+    if (!video || !canvas) return;
 
     isVerifyingFrame = true;
 
@@ -532,7 +532,7 @@ function startAutoFaceScanner() {
 
       const imgBase64 = canvas.toDataURL("image/jpeg", 0.85);
 
-      const res = apiPost("/api/page/login/face-identify", {
+      const res = await apiPost("/api/page/login/face-identify", {
         image: imgBase64,
         companySlug,
         companyId: pendingLoginResult?.user?.companyId || ""
@@ -1203,11 +1203,11 @@ async function handleResubmitTokenFromUrl(token) {
 
   // Biometric Verification Modal Actions
   byId("btn-login-face-direct")?.addEventListener("click", () => {
-    openFaceLoginChallenge({ user: { id: "usr-01", email: byId("login-email")?.value || "" } });
+    openFaceLoginChallenge();
   });
 
   byId("btn-login-fingerprint-direct")?.addEventListener("click", () => {
-    openFingerprintLoginChallenge({ user: { id: "usr-01", email: byId("login-email")?.value || "" } });
+    openFingerprintLoginChallenge();
   });
 
   byId("btn-close-face-login-modal")?.addEventListener("click", closeFaceLoginChallenge);

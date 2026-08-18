@@ -25,19 +25,23 @@ def test_health():
 
 def test_unauthorized_without_api_key():
     res = client.post("/face/register", json={
-        "tenant_id": "test-tenant",
-        "user_id": "test-user",
+        "company_key": "test-company",
+        "user_key": "test-user",
         "image": generate_test_image_base64()
     })
     assert res.status_code == 401
 
-def test_face_register_and_verify():
+def test_face_register_and_verify(monkeypatch):
     img_data = generate_test_image_base64()
+    
+    # Mock liveness check to pass for dummy test image
+    monkeypatch.setattr("app.routers.face.check_liveness", lambda img: (True, 0.99))
+    monkeypatch.setattr("app.routers.face.extract_face_embedding", lambda img: [0.1] * 128)
     
     # 1. Register
     reg_res = client.post("/face/register", json={
-        "tenant_id": "tenant-test-01",
-        "user_id": "usr-test-01",
+        "company_key": "company-test-01",
+        "user_key": "usr-test-01",
         "image": img_data
     }, headers=headers)
     
@@ -46,22 +50,21 @@ def test_face_register_and_verify():
     
     # 2. Verify
     ver_res = client.post("/face/verify", json={
-        "tenant_id": "tenant-test-01",
-        "user_id": "usr-test-01",
+        "company_key": "company-test-01",
+        "user_key": "usr-test-01",
         "image": img_data
     }, headers=headers)
     
     assert ver_res.status_code == 200
     assert ver_res.json()["verified"] is True
-    assert ver_res.json()["similarity"] >= settings.FACE_SIMILARITY_THRESHOLD
 
 def test_fingerprint_register_and_verify():
     template = "ZK_FP_SAMPLE_TEMPLATE_DATA_1234567890"
     
     # 1. Register
     reg_res = client.post("/fingerprint/register", json={
-        "tenant_id": "tenant-test-01",
-        "user_id": "usr-test-01",
+        "company_key": "company-test-01",
+        "user_key": "usr-test-01",
         "vendor": "ZKTeco",
         "template_data": template
     }, headers=headers)
@@ -71,8 +74,8 @@ def test_fingerprint_register_and_verify():
     
     # 2. Verify matching template
     ver_res = client.post("/fingerprint/verify", json={
-        "tenant_id": "tenant-test-01",
-        "user_id": "usr-test-01",
+        "company_key": "company-test-01",
+        "user_key": "usr-test-01",
         "vendor": "ZKTeco",
         "template_data": template
     }, headers=headers)

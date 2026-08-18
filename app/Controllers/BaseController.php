@@ -11,6 +11,8 @@ use Psr\Log\LoggerInterface;
 
 abstract class BaseController extends Controller
 {
+    use \App\Traits\ApiResponseTrait;
+
     /**
      * @var CLIRequest|IncomingRequest
      */

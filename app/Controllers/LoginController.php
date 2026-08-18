@@ -241,7 +241,31 @@ class LoginController extends BaseController
             return $this->response->setStatusCode($status)->setJSON($result);
         }
 
+        if (! empty($result['token'])) {
+            $this->response->setCookie(
+                'jwt_token',
+                (string) $result['token'],
+                28800,
+                '',
+                '/',
+                '',
+                $this->request->isSecure(),
+                true,
+                'Lax'
+            );
+        }
+
         return $this->response->setJSON($result);
+    }
+
+    public function logout()
+    {
+        $this->response->setCookie('jwt_token', '', -3600, '', '/', '', $this->request->isSecure(), true, 'Lax');
+
+        return $this->response->setJSON([
+            'ok' => true,
+            'message' => 'Berhasil logout.',
+        ]);
     }
 
     public function faceVerify()
@@ -270,7 +294,7 @@ class LoginController extends BaseController
                 }
             }
 
-            $formattedUserId = (str_starts_with($userId, 'usr-') || $userId === '') ? $userId : ('usr-' . $userId);
+            $formattedUserId = (string) $userId;
 
             $ai = service('aiService');
             $verifyRes = $ai->verifyFace($tenantId, $formattedUserId, $imageBase64);
@@ -331,8 +355,20 @@ class LoginController extends BaseController
                 ]);
             }
 
-            $userModel = new \App\Models\UserModel();
-            $user = $userModel->where('user_key', $userKey)->first();
+            $cleanUserKey = str_starts_with($userKey, 'usr-') ? substr($userKey, 4) : $userKey;
+            $userKeys = array_unique([$userKey, $cleanUserKey, 'usr-' . $cleanUserKey]);
+
+            $user = null;
+            if ($companySlug !== '') {
+                $tenantDb = (new \App\Services\TenantDatabaseService())->connectionForCompanySlug($companySlug);
+                if ($tenantDb && $tenantDb->tableExists('users')) {
+                    $user = $tenantDb->table('users')->whereIn('user_key', $userKeys)->get()->getRowArray();
+                }
+            }
+            if (! $user) {
+                $userModel = new \App\Models\UserModel();
+                $user = $userModel->whereIn('user_key', $userKeys)->first();
+            }
 
             if (! $user) {
                 return $this->response->setStatusCode(404)->setJSON([
@@ -350,6 +386,20 @@ class LoginController extends BaseController
                     'verified' => false,
                     'message' => 'Gagal membuat sesi login biometrik.',
                 ]);
+            }
+
+            if (! empty($authResult['token'])) {
+                $this->response->setCookie(
+                    'jwt_token',
+                    (string) $authResult['token'],
+                    28800,
+                    '',
+                    '/',
+                    '',
+                    $this->request->isSecure(),
+                    true,
+                    'Lax'
+                );
             }
 
             return $this->response->setJSON([
@@ -382,7 +432,7 @@ class LoginController extends BaseController
             $userId = (string) ($payload['userId'] ?? '');
             $tenantId = (string) ($payload['companyId'] ?? $companySlug ?: 'company-main');
 
-            $formattedUserId = (str_starts_with($userId, 'usr-') || $userId === '') ? $userId : ('usr-' . $userId);
+            $formattedUserId = (string) $userId;
 
             $ai = service('aiService');
             $verifyRes = $ai->verifyFingerprint($tenantId, $formattedUserId, $templateData, $vendor);
@@ -430,8 +480,20 @@ class LoginController extends BaseController
                 ]);
             }
 
-            $userModel = new \App\Models\UserModel();
-            $user = $userModel->where('user_key', $userKey)->first();
+            $cleanUserKey = str_starts_with($userKey, 'usr-') ? substr($userKey, 4) : $userKey;
+            $userKeys = array_unique([$userKey, $cleanUserKey, 'usr-' . $cleanUserKey]);
+
+            $user = null;
+            if ($companySlug !== '') {
+                $tenantDb = (new \App\Services\TenantDatabaseService())->connectionForCompanySlug($companySlug);
+                if ($tenantDb && $tenantDb->tableExists('users')) {
+                    $user = $tenantDb->table('users')->whereIn('user_key', $userKeys)->get()->getRowArray();
+                }
+            }
+            if (! $user) {
+                $userModel = new \App\Models\UserModel();
+                $user = $userModel->whereIn('user_key', $userKeys)->first();
+            }
 
             if (! $user) {
                 return $this->response->setStatusCode(404)->setJSON([
@@ -449,6 +511,20 @@ class LoginController extends BaseController
                     'verified' => false,
                     'message' => 'Gagal membuat sesi login biometrik.',
                 ]);
+            }
+
+            if (! empty($authResult['token'])) {
+                $this->response->setCookie(
+                    'jwt_token',
+                    (string) $authResult['token'],
+                    28800,
+                    '',
+                    '/',
+                    '',
+                    $this->request->isSecure(),
+                    true,
+                    'Lax'
+                );
             }
 
             return $this->response->setJSON([
@@ -546,22 +622,5 @@ class LoginController extends BaseController
             $inject .= '<script>window.__COMPANY_SLUG__=' . json_encode($companySlug) . ';</script>';
         }
         return $this->renderHtmlResponse($html, $inject);
-    }
-
-    private function jsonAction(callable $action)
-    {
-        try {
-            $result = $action();
-            if ($result instanceof \CodeIgniter\HTTP\ResponseInterface) {
-                return $result;
-            }
-
-            return $this->response->setJSON(['ok' => true, 'data' => $result]);
-        } catch (\Throwable $exception) {
-            return $this->response->setStatusCode(422)->setJSON([
-                'ok' => false,
-                'message' => $exception->getMessage(),
-            ]);
-        }
     }
 }

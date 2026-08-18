@@ -457,15 +457,6 @@ class AccessController extends BaseController
         return $companyId;
     }
 
-    private function jsonAction(callable $action)
-    {
-        try {
-            return $this->response->setJSON(['ok' => true, 'data' => $action()]);
-        } catch (\Throwable $exception) {
-            return $this->response->setStatusCode(422)->setJSON(['ok' => false, 'message' => $exception->getMessage()]);
-        }
-    }
-
     private function arrayPage(array $items, array $filters = []): array
     {
         $page = max(1, (int) ($filters['page'] ?? 1));

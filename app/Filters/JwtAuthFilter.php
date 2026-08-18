@@ -13,15 +13,22 @@ class JwtAuthFilter implements FilterInterface
 {
     public function before(RequestInterface $request, $arguments = null)
     {
+        $token = null;
         $header = $request->getHeaderLine('Authorization');
-        if (! preg_match('/^Bearer\s+(.+)$/i', $header, $matches)) {
+        if (preg_match('/^Bearer\s+(.+)$/i', $header, $matches)) {
+            $token = trim($matches[1]);
+        } elseif ($cookieToken = $request->getCookie('jwt_token') ?: $request->getCookie('access_token')) {
+            $token = trim((string) $cookieToken);
+        }
+
+        if (! $token) {
             return service('response')->setStatusCode(401)->setJSON([
                 'ok' => false,
                 'message' => 'Token API wajib dikirim.',
             ]);
         }
 
-        $claims = (new JwtService())->verify($matches[1]);
+        $claims = (new JwtService())->verify($token);
         if (! $claims) {
             return service('response')->setStatusCode(401)->setJSON([
                 'ok' => false,

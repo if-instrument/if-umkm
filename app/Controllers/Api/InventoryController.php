@@ -120,15 +120,4 @@ class InventoryController extends BaseController
         $this->validateScope($companyId, $outletId);
         return [$companyId, $outletId];
     }
-
-    private function jsonAction(callable $action)
-    {
-        try {
-            return $this->response->setJSON(['ok' => true, 'data' => $action()]);
-        } catch (\Throwable $exception) {
-            return $this->response
-                ->setStatusCode(422)
-                ->setJSON(['ok' => false, 'message' => $exception->getMessage()]);
-        }
-    }
 }

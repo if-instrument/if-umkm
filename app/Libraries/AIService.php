@@ -26,7 +26,8 @@ class AIService
             $this->hmacSecret = 'pos_ai_hmac_secret_2026';
         }
 
-        $this->timeout = (int) (env('AI_SERVICE_TIMEOUT') ?: 5);
+        $envTimeout = (int) env('AI_SERVICE_TIMEOUT');
+        $this->timeout = $envTimeout > 0 ? $envTimeout : 60;
     }
 
     public function registerFace(string $companyKey, string $userKey, string $image): array
@@ -219,6 +220,92 @@ class AIService
         ]);
     }
 
+    public function analyze(string $applicationId, string $companyId, string $userId, string $prompt, string $provider = 'openai', string $model = 'gpt-4o-mini', ?string $conversationId = null): array
+    {
+        $context = [
+            'application_id' => $applicationId,
+            'company_id' => $companyId,
+            'user_id' => $userId,
+            'capability' => 'business.analyst',
+        ];
+        if ($conversationId) {
+            $context['conversation_id'] = $conversationId;
+        }
+
+        return $this->post('/api/v1/ai/analyze', [
+            'context' => $context,
+            'prompt' => $prompt,
+            'provider' => $provider,
+            'model' => $model,
+        ]);
+    }
+
+    public function chat(string $applicationId, string $companyId, string $userId, string $prompt, string $provider = 'openai', string $model = 'gpt-4o-mini', ?string $conversationId = null): array
+    {
+        $context = [
+            'application_id' => $applicationId,
+            'company_id' => $companyId,
+            'user_id' => $userId,
+            'capability' => 'business.assistant',
+        ];
+        if ($conversationId) {
+            $context['conversation_id'] = $conversationId;
+        }
+
+        return $this->post('/api/v1/ai/chat', [
+            'context' => $context,
+            'prompt' => $prompt,
+            'provider' => $provider,
+            'model' => $model,
+        ]);
+    }
+
+    public function getAiQuota(string $applicationId, string $companyId): array
+    {
+        return $this->post('/api/v1/ai/quota', [
+            'application_id' => $applicationId,
+            'company_id' => $companyId,
+        ]);
+    }
+
+    public function getAiCapabilities(): array
+    {
+        return $this->get('/api/v1/ai/capabilities');
+    }
+
+    public function getAiProviders(): array
+    {
+        return $this->get('/api/v1/ai/providers');
+    }
+
+    public function getAiDataLogs(string $applicationId = 'umkm-pos', string $companySlug = 'IFresso-Coffee', int $limit = 50): array
+    {
+        return $this->get('/api/v1/ai/data-logs?application_id=' . urlencode($applicationId) . '&company_id=' . urlencode($companySlug) . '&limit=' . $limit);
+    }
+
+    public function listConversations(string $applicationId = 'umkm-pos', string $companySlug = 'IFresso-Coffee', string $userId = 'user_mgr_1'): array
+    {
+        return $this->get('/api/v1/ai/conversations?application_id=' . urlencode($applicationId) . '&company_id=' . urlencode($companySlug) . '&user_id=' . urlencode($userId));
+    }
+
+    public function getConversationMessages(string $conversationId): array
+    {
+        return $this->get('/api/v1/ai/conversations/' . urlencode($conversationId) . '/messages');
+    }
+
+    public function deleteConversation(string $conversationId): array
+    {
+        $res = $this->curlRequest('DELETE', rtrim($this->baseUrl, '/') . '/api/v1/ai/conversations/' . urlencode($conversationId), null, [
+            'X-API-Key: ' . $this->apiKey,
+        ]);
+        if (! ($res['ok'] ?? false)) {
+            $res = $this->post('/api/v1/ai/conversations/delete', [
+                'conversation_id' => $conversationId,
+            ]);
+        }
+        return $res;
+    }
+
     public function isOnline(): bool
     {
         $res = $this->get('/health');
@@ -255,7 +342,7 @@ class AIService
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, $url);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_TIMEOUT, $this->timeout);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 60);
         curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 3);
         curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
 
@@ -271,12 +358,12 @@ class AIService
         $error = curl_error($ch);
         curl_close($ch);
 
-        if ($error || $httpCode >= 500 || $response === false) {
+        if ($error || $response === false) {
             return [
                 'ok' => false,
                 'offline' => true,
                 'status' => $httpCode ?: 503,
-                'message' => 'AI Microservice tidak dapat dihubungi. Menggunakan mode standar.',
+                'message' => 'AI Microservice tidak dapat dihubungi (' . ($error ?: 'Timeout/Connection Error') . '). Menggunakan mode standar.',
             ];
         }
 
@@ -286,6 +373,14 @@ class AIService
                 'ok' => false,
                 'status' => $httpCode,
                 'message' => 'Respon AI Microservice tidak valid.',
+            ];
+        }
+
+        if ($httpCode >= 400) {
+            return [
+                'ok' => false,
+                'status' => $httpCode,
+                'message' => $decoded['detail'] ?? $decoded['message'] ?? 'Gagal memproses permintaan AI.',
             ];
         }
 

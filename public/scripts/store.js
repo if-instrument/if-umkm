@@ -69,6 +69,15 @@ export function clearSession() {
   localStorage.removeItem(SESSION_KEY);
 }
 
+export function apiLogout() {
+  try {
+    apiPost("/api/auth/logout", {});
+  } catch {
+    // Ignore network error on logout
+  }
+  clearSession();
+}
+
 function isValidSessionShape(session) {
   return Boolean(
     session &&
@@ -298,6 +307,7 @@ function sendJson(method, url, payload = null) {
   try {
     const request = new XMLHttpRequest();
     request.open(method, url, false);
+    request.withCredentials = true;
     request.setRequestHeader("Accept", "application/json");
     const token = loadSession()?.token;
     if (token && !url.includes("/api/auth/login")) request.setRequestHeader("Authorization", `Bearer ${token}`);
@@ -320,6 +330,7 @@ function sendMultipart(method, url, formData) {
   try {
     const request = new XMLHttpRequest();
     request.open(method, url, false);
+    request.withCredentials = true;
     request.setRequestHeader("Accept", "application/json");
     const token = loadSession()?.token;
     if (token) request.setRequestHeader("Authorization", `Bearer ${token}`);

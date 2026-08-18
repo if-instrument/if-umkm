@@ -1,0 +1,608 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AI Business Analyst - IF Instrument</title>
+    <link rel="stylesheet" href="../styles.css" />
+    <style>
+      /* AI Platform Custom Styles */
+      .ai-hero-banner {
+        background: linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #4338ca 100%);
+        color: #ffffff;
+        border-radius: 16px;
+        padding: 24px;
+        margin-bottom: 24px;
+        box-shadow: 0 10px 25px -5px rgba(49, 46, 129, 0.4);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 16px;
+      }
+      .ai-hero-title h2 {
+        margin: 4px 0;
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: #ffffff;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .ai-hero-title p {
+        margin: 0;
+        color: #c7d2fe;
+        font-size: 0.9rem;
+      }
+      .ai-hero-badge {
+        background: rgba(255, 255, 255, 0.15);
+        backdrop-filter: blur(8px);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        letter-spacing: 0.5px;
+        color: #e0e7ff;
+        display: inline-block;
+      }
+      .ai-controls-bar {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+      }
+      .ai-select {
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        color: #ffffff;
+        padding: 8px 14px;
+        border-radius: 8px;
+        font-size: 0.85rem;
+        font-weight: 500;
+        outline: none;
+        cursor: pointer;
+      }
+      .ai-select option {
+        background: #1e1b4b;
+        color: #ffffff;
+      }
+      .ai-quota-card {
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        padding: 8px 14px;
+        border-radius: 10px;
+        text-align: right;
+        min-width: 180px;
+      }
+      .ai-quota-card .quota-num {
+        font-size: 0.95rem;
+        font-weight: 700;
+        color: #818cf8;
+      }
+      .ai-quota-card .quota-lbl {
+        font-size: 0.7rem;
+        color: #c7d2fe;
+      }
+
+      /* Preset Prompt Cards Grid */
+      .ai-presets-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+        gap: 14px;
+        margin-bottom: 24px;
+      }
+      .preset-card {
+        background: #ffffff;
+        border: 1px solid #e0e7ff;
+        border-radius: 12px;
+        padding: 16px;
+        cursor: pointer;
+        transition: all 0.2s ease-in-out;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+      }
+      .preset-card:hover {
+        transform: translateY(-3px);
+        border-color: #6366f1;
+        box-shadow: 0 8px 20px rgba(99, 102, 241, 0.15);
+      }
+      .preset-card .icon {
+        font-size: 1.4rem;
+        margin-bottom: 8px;
+        display: inline-block;
+      }
+      .preset-card h4 {
+        margin: 0 0 4px 0;
+        font-size: 0.9rem;
+        color: #1e293b;
+      }
+      .preset-card p {
+        margin: 0;
+        font-size: 0.78rem;
+        color: #64748b;
+        line-height: 1.3;
+      }
+
+      /* Chat Timeline Container */
+      .ai-chat-workspace {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 16px;
+        display: flex;
+        flex-direction: column;
+        height: 600px;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.03);
+        overflow: hidden;
+      }
+      .chat-header {
+        padding: 14px 20px;
+        border-bottom: 1px solid #f1f5f9;
+        background: #f8fafc;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .chat-header h3 {
+        margin: 0;
+        font-size: 0.95rem;
+        color: #0f172a;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .chat-messages {
+        flex: 1;
+        padding: 20px;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        background: #fafafa;
+      }
+
+      /* Message Bubbles */
+      .msg-row {
+        display: flex;
+        gap: 12px;
+        max-width: 85%;
+      }
+      .msg-row.user-msg {
+        align-self: flex-end;
+        flex-direction: row-reverse;
+      }
+      .msg-row.ai-msg {
+        align-self: flex-start;
+      }
+      .msg-avatar {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 0.9rem;
+        flex-shrink: 0;
+      }
+      .user-msg .msg-avatar {
+        background: #4f46e5;
+        color: #ffffff;
+      }
+      .ai-msg .msg-avatar {
+        background: linear-gradient(135deg, #6366f1, #a855f7);
+        color: #ffffff;
+      }
+      .msg-bubble {
+        padding: 14px 18px;
+        border-radius: 14px;
+        font-size: 0.88rem;
+        line-height: 1.5;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+      }
+      .user-msg .msg-bubble {
+        background: #4f46e5;
+        color: #ffffff;
+        border-bottom-right-radius: 2px;
+      }
+      .ai-msg .msg-bubble {
+        background: #ffffff;
+        color: #1e293b;
+        border: 1px solid #e2e8f0;
+        border-bottom-left-radius: 2px;
+      }
+
+      /* Animated AI Lazy Loading Indicator */
+      .ai-avatar-loading {
+        background: linear-gradient(135deg, #6366f1, #a855f7) !important;
+        color: #ffffff !important;
+        animation: avatarGlow 1.5s infinite ease-in-out;
+      }
+      @keyframes avatarGlow {
+        0%, 100% {
+          box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.6);
+        }
+        50% {
+          box-shadow: 0 0 0 10px rgba(168, 85, 247, 0);
+        }
+      }
+
+      .ai-typing-bubble {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 14px 20px;
+        background: linear-gradient(90deg, #ffffff 0%, #f5f3ff 50%, #ffffff 100%);
+        background-size: 200% 100%;
+        animation: lazyShimmer 2s infinite linear;
+        border: 1px solid #c7d2fe;
+        border-radius: 14px;
+        border-bottom-left-radius: 2px;
+        box-shadow: 0 4px 14px rgba(99, 102, 241, 0.12);
+      }
+      @keyframes lazyShimmer {
+        0% { background-position: 200% 0; }
+        100% { background-position: -200% 0; }
+      }
+
+      .ai-typing-dots {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+      }
+      .ai-typing-dots span {
+        width: 8px;
+        height: 8px;
+        background: #6366f1;
+        border-radius: 50%;
+        animation: aiPulse 1.4s infinite ease-in-out both;
+      }
+      .ai-typing-dots span:nth-child(1) { animation-delay: -0.32s; }
+      .ai-typing-dots span:nth-child(2) { animation-delay: -0.16s; }
+      .ai-typing-dots span:nth-child(3) { animation-delay: 0s; }
+
+      @keyframes aiPulse {
+        0%, 80%, 100% {
+          transform: scale(0.6);
+          opacity: 0.4;
+        }
+        40% {
+          transform: scale(1.3);
+          opacity: 1;
+          background: #a855f7;
+        }
+      }
+      .ai-loading-text {
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: #4338ca;
+        letter-spacing: 0.2px;
+      }
+
+      /* Structured Recommendations Cards inside AI Bubble */
+      .recom-grid {
+        margin-top: 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .recom-card {
+        background: #f8fafc;
+        border: 1px solid #cbd5e1;
+        border-left: 4px solid #f59e0b;
+        border-radius: 8px;
+        padding: 12px 14px;
+      }
+      .recom-card-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 6px;
+      }
+      .recom-title {
+        font-weight: 700;
+        color: #0f172a;
+        font-size: 0.88rem;
+      }
+      .recom-badges {
+        display: flex;
+        gap: 6px;
+      }
+      .badge-metric {
+        background: #e2e8f0;
+        color: #334155;
+        padding: 2px 8px;
+        border-radius: 6px;
+        font-size: 0.72rem;
+        font-weight: 600;
+      }
+      .badge-metric.negative {
+        background: #fee2e2;
+        color: #991b1b;
+      }
+      .badge-metric.positive {
+        background: #dcfce7;
+        color: #166534;
+      }
+      .recom-body {
+        font-size: 0.82rem;
+        color: #475569;
+      }
+
+      /* Meta & Tool Execution Pills */
+      .msg-meta-bar {
+        margin-top: 10px;
+        padding-top: 8px;
+        border-top: 1px solid #f1f5f9;
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        flex-wrap: wrap;
+        font-size: 0.72rem;
+        color: #94a3b8;
+      }
+      .meta-pill {
+        background: #f1f5f9;
+        color: #475569;
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-weight: 500;
+      }
+
+      /* Input Bar */
+      .chat-input-bar {
+        padding: 14px;
+        border-top: 1px solid #e2e8f0;
+        background: #ffffff;
+        display: flex;
+        gap: 10px;
+        align-items: center;
+      }
+      .chat-input-bar input {
+        flex: 1;
+        padding: 12px 16px;
+        border: 1px solid #cbd5e1;
+        border-radius: 10px;
+        font-size: 0.88rem;
+        outline: none;
+        transition: border-color 0.2s;
+      }
+      .chat-input-bar input:focus {
+        border-color: #4f46e5;
+        box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+      }
+      .send-btn {
+        background: linear-gradient(135deg, #4f46e5, #6366f1);
+        color: #ffffff;
+        border: none;
+        border-radius: 10px;
+        padding: 12px 20px;
+        font-weight: 600;
+        font-size: 0.88rem;
+        cursor: pointer;
+        transition: opacity 0.2s;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .send-btn:hover {
+        opacity: 0.9;
+      }
+      /* Chat Layout Wrapper with History Sidebar */
+      .ai-chat-layout-wrapper {
+        display: grid;
+        grid-template-columns: 260px 1fr;
+        gap: 20px;
+        align-items: start;
+      }
+      @media (max-width: 868px) {
+        .ai-chat-layout-wrapper {
+          grid-template-columns: 1fr;
+        }
+      }
+      .history-sidebar {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 16px;
+        padding: 16px;
+        height: 600px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.03);
+      }
+      .history-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .history-header h4 {
+        margin: 0;
+        font-size: 0.9rem;
+        color: #1e293b;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .new-chat-btn {
+        background: #4f46e5;
+        color: #ffffff;
+        border: none;
+        padding: 6px 12px;
+        border-radius: 8px;
+        font-size: 0.78rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 0.2s;
+      }
+      .new-chat-btn:hover {
+        background: #4338ca;
+      }
+      .history-list {
+        flex: 1;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .history-group-header {
+        font-size: 0.7rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: #64748b;
+        margin-top: 10px;
+        margin-bottom: 4px;
+        padding-left: 4px;
+      }
+      .history-group-header:first-child {
+        margin-top: 0;
+      }
+      .history-item {
+        padding: 10px 12px;
+        border-radius: 8px;
+        border: 1px solid #f1f5f9;
+        background: #f8fafc;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .history-item:hover, .history-item.active {
+        background: #eef2ff;
+        border-color: #c7d2fe;
+      }
+      .history-item-info {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        overflow: hidden;
+      }
+      .history-title {
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: #334155;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .history-date {
+        font-size: 0.68rem;
+        color: #94a3b8;
+      }
+      .history-del-btn {
+        background: none;
+        border: none;
+        color: #94a3b8;
+        font-size: 0.9rem;
+        cursor: pointer;
+        padding: 2px 4px;
+        border-radius: 4px;
+        opacity: 0;
+        transition: opacity 0.2s;
+      }
+      .history-item:hover .history-del-btn {
+        opacity: 1;
+      }
+      .history-del-btn:hover {
+        color: #ef4444;
+      }
+    </style>
+  </head>
+  <body data-page="ai-analyst" data-title="AI Business Analyst" data-eyebrow="AI Intelligence">
+    <template id="page-content">
+      <section class="content-grid single">
+        
+        <!-- Hero Platform Banner -->
+        <div class="ai-hero-banner">
+          <div class="ai-hero-title">
+            <span class="ai-hero-badge">🤖 GLOBAL REUSABLE AI PLATFORM</span>
+            <h2>AI Business Analyst & Decision Engine</h2>
+            <p>Analisis multi-signal otomatis (penjualan, tren 90 hari, margin kotor, & resep HPP) untuk UMKM.</p>
+          </div>
+          <div class="ai-controls-bar">
+            <select id="ai-provider-select" class="ai-select" title="Pilih LLM Provider & Model">
+              <optgroup label="🟢 Google Gemini (Active Cloud API)">
+                <option value="gemini:gemini-3.6-flash" selected>⚡ Google Gemini 3.6 Flash (Interactions API)</option>
+                <option value="gemini:gemini-3.1-pro">🧠 Google Gemini 3.1 Pro (Analisis Mendalam)</option>
+                <option value="gemini:gemini-1.5-flash">⚡ Google Gemini 1.5 Flash</option>
+                <option value="gemini:gemini-1.5-pro">🧠 Google Gemini 1.5 Pro</option>
+              </optgroup>
+            </select>
+            <div class="ai-quota-card">
+              <div class="quota-num" id="ai-quota-display">1,852,000 / 2M</div>
+              <div class="quota-lbl">Token Kuota Sisa</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Quick-Prompt Presets -->
+        <div class="ai-presets-grid">
+          <div class="preset-card" data-prompt="Produk apa saja yang perlu dimodifikasi karena kurang banyak peminatnya?">
+            <span class="icon">📉</span>
+            <h4>Evaluasi Produk Non-Laku</h4>
+            <p>Deteksi produk dengan omset di bawah rata-rata kategori & tren negatif.</p>
+          </div>
+          <div class="preset-card" data-prompt="Saya ingin membuat resep baru Americano Peach, bahan apa saja yang harus disiapkan?">
+            <span class="icon">🍹</span>
+            <h4>Resep & Estimasi HPP</h4>
+            <p>Rekomendasi takaran bahan baku & hitung perkiraan HPP per porsi.</p>
+          </div>
+          <div class="preset-card" data-prompt="Bagaimana performa penjualan 30 hari terakhir dan proyeksi ke depan?">
+            <span class="icon">📊</span>
+            <h4>Summary Performa Sales</h4>
+            <p>Ringkasan total omset, transaksi, & rata-rata basket size.</p>
+          </div>
+          <div class="preset-card" data-prompt="Tampilkan daftar stok bahan yang berada di bawah batas minimum (Low Stock)">
+            <span class="icon">📦</span>
+            <h4>Audit Stok & Reorder Point</h4>
+            <p>Peringatan dini stok habis & saran pembelian bahan baku.</p>
+          </div>
+        </div>
+
+        <!-- Layout Wrapper: History Sidebar + Main Chat Workspace -->
+        <div class="ai-chat-layout-wrapper">
+          
+          <!-- History Sidebar -->
+          <div class="history-sidebar">
+            <div class="history-header">
+              <h4>💬 Riwayat Obrolan</h4>
+              <button class="new-chat-btn" id="new-chat-btn" type="button">+ Obrolan Baru</button>
+            </div>
+            <div class="history-list" id="history-list">
+              <div style="font-size: 0.8rem; color: #94a3b8; text-align: center; padding: 20px;">Memuat riwayat...</div>
+            </div>
+          </div>
+
+          <!-- Interactive AI Chat Workspace -->
+          <div class="ai-chat-workspace">
+            <div class="chat-header">
+              <h3>🤖 Live AI Analyst Workspace</h3>
+              <span class="badge-metric positive" id="ai-status-indicator">Online · Platform Active</span>
+            </div>
+
+            <div class="chat-messages" id="chat-messages">
+              <div class="msg-row ai-msg">
+                <div class="msg-avatar">AI</div>
+                <div class="msg-bubble">
+                  <strong>Halo! Saya AI Business Analyst Anda.</strong><br/>
+                  Saya siap menganalisis performa toko, evaluasi menu, hitung HPP resep baru, dan memberikan rekomendasi keputusan bisnis otomatis.<br/>
+                  <em>Silakan pilih salah satu kartu preset di atas atau ketik pertanyaan Anda di bawah.</em>
+                </div>
+              </div>
+            </div>
+
+            <div class="chat-input-bar">
+              <input type="text" id="ai-prompt-input" placeholder="Tanyakan analisis bisnis, evaluasi menu, atau rekomendasi resep..." />
+              <button class="send-btn" id="ai-send-btn" type="button">
+                <span>Kirim</span> ➔
+              </button>
+            </div>
+          </div>
+
+        </div>
+
+      </section>
+    </template>
+    <script type="module" src="../scripts/pages/ai-analyst.js"></script>
+  </body>
+</html>

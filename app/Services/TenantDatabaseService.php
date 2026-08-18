@@ -149,7 +149,7 @@ class TenantDatabaseService
         $config['hostname'] = $company['db_host'] ?: ($config['hostname'] ?? 'localhost');
         $config['database'] = $company['db_name'];
         $config['username'] = $company['db_username'] ?: ($config['username'] ?? 'root');
-        $config['password'] = $company['db_password'] ?? ($config['password'] ?? '');
+        $config['password'] = ! empty($company['db_password']) ? $company['db_password'] : ($config['password'] ?? '1m4mf4154l');
         $config['port'] = (int) ($company['db_port'] ?: ($config['port'] ?? 3306));
 
         return $config;

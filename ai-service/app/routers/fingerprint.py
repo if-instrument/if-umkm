@@ -44,9 +44,16 @@ class FingerprintStatusRequest(BaseModel):
     company_key: Optional[str] = Field(None, description="Company slug")
     user_key: str = Field(..., description="Globally unique user GUID")
 
+def get_user_key_variants(user_key: Optional[str]) -> list:
+    if not user_key:
+        return []
+    raw = str(user_key).strip()
+    clean = raw[4:] if raw.startswith("usr-") else raw
+    return list({raw, clean, f"usr-{clean}"})
+
 @router.post("/status")
 def check_fingerprint_status(req: FingerprintStatusRequest, db: Session = Depends(get_db)):
-    query = db.query(FingerprintTemplate).filter(FingerprintTemplate.user_key == req.user_key)
+    query = db.query(FingerprintTemplate).filter(FingerprintTemplate.user_key.in_(get_user_key_variants(req.user_key)))
     if req.company_key:
         query = query.filter(FingerprintTemplate.company_key == req.company_key)
     records = query.all()
@@ -65,7 +72,7 @@ def register_fingerprint(req: RegisterFingerprintRequest, db: Session = Depends(
         raise HTTPException(status_code=400, detail="Data template sidik jari tidak boleh kosong.")
 
     records = db.query(FingerprintTemplate).filter(
-        FingerprintTemplate.user_key == req.user_key
+        FingerprintTemplate.user_key.in_(get_user_key_variants(req.user_key))
     ).order_by(FingerprintTemplate.created_at.asc()).all()
 
     if len(records) >= 10:
@@ -99,7 +106,7 @@ def register_fingerprint(req: RegisterFingerprintRequest, db: Session = Depends(
 
 @router.post("/verify")
 def verify_fingerprint(req: VerifyFingerprintRequest, db: Session = Depends(get_db)):
-    query = db.query(FingerprintTemplate).filter(FingerprintTemplate.user_key == req.user_key)
+    query = db.query(FingerprintTemplate).filter(FingerprintTemplate.user_key.in_(get_user_key_variants(req.user_key)))
     if req.company_key:
         query = query.filter(FingerprintTemplate.company_key == req.company_key)
     records = query.all()

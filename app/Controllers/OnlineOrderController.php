@@ -76,16 +76,4 @@ class OnlineOrderController extends BaseController
         }
         return $this->renderHtmlResponse($html, $inject);
     }
-
-    private function jsonAction(callable $action)
-    {
-        try {
-            return $this->response->setJSON(['ok' => true, 'data' => $action()]);
-        } catch (\Throwable $exception) {
-            return $this->response->setStatusCode(422)->setJSON([
-                'ok' => false,
-                'message' => $exception->getMessage(),
-            ]);
-        }
-    }
 }
