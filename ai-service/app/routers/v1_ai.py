@@ -17,7 +17,7 @@ from app.providers.base_provider import LLMMessage
 from app.services.quota_service import QuotaService, QuotaExceededException
 from app.services.analyst_service import BusinessAnalystEngine
 
-router = APIRouter(prefix="/api/v1/ai", tags=["AI Platform V1"])
+router = APIRouter(tags=["Generative & Predictive AI"])
 
 class ChatRequest(BaseModel):
     context: RequestContext

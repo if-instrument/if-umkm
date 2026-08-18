@@ -9,7 +9,7 @@ from app.config import settings
 from app.models.biometrics import FingerprintTemplate
 from app.services.fingerprint_engine import compute_fingerprint_similarity, verify_enrollment_step
 
-router = APIRouter(prefix="/fingerprint", tags=["Fingerprint Biometrics"])
+router = APIRouter(tags=["Fingerprint Biometrics"])
 
 class RegisterFingerprintRequest(BaseModel):
     company_key: str = Field(..., description="Company slug (e.g. IFresso-Coffee)")

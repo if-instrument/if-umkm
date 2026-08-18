@@ -32,7 +32,7 @@ class AIService
 
     public function registerFace(string $companyKey, string $userKey, string $image): array
     {
-        return $this->post('/face/register', [
+        return $this->post('/api/v1/face/register', [
             'company_key' => $companyKey,
             'user_key' => $userKey,
             'image' => $image,
@@ -41,7 +41,7 @@ class AIService
 
     public function verifyFace(string $companyKey, string $userKey, string $image): array
     {
-        return $this->post('/face/verify', [
+        return $this->post('/api/v1/face/verify', [
             'company_key' => $companyKey,
             'user_key' => $userKey,
             'image' => $image,
@@ -55,7 +55,7 @@ class AIService
         if ($companyKey !== '') {
             $payload['company_key'] = $companyKey;
         }
-        return $this->post('/face/identify', $payload);
+        return $this->post('/api/v1/face/identify', $payload);
     }
 
     public function getFaceStatus(string $userKey, string $companyKey = ''): array
@@ -64,7 +64,7 @@ class AIService
         if ($companyKey !== '') {
             $payload['company_key'] = $companyKey;
         }
-        return $this->post('/face/status', $payload);
+        return $this->post('/api/v1/face/status', $payload);
     }
 
     public function deleteFace(string $userKey, string $companyKey = ''): array
@@ -73,12 +73,12 @@ class AIService
         if ($companyKey !== '') {
             $payload['company_key'] = $companyKey;
         }
-        return $this->post('/face/delete', $payload);
+        return $this->post('/api/v1/face/delete', $payload);
     }
 
     public function verifyFacePose(string $image, string $targetPose): array
     {
-        return $this->post('/face/verify-pose', [
+        return $this->post('/api/v1/face/verify-pose', [
             'image' => $image,
             'target_pose' => $targetPose,
         ]);
@@ -86,7 +86,7 @@ class AIService
 
     public function registerFingerprint(string $companyKey, string $userKey, string $fingerprintData, string $vendor = 'Generic'): array
     {
-        return $this->post('/fingerprint/register', [
+        return $this->post('/api/v1/fingerprint/register', [
             'company_key' => $companyKey,
             'user_key' => $userKey,
             'vendor' => $vendor,
@@ -96,7 +96,7 @@ class AIService
 
     public function verifyFingerprint(string $companyKey, string $userKey, string $fingerprintData, string $vendor = 'Generic', float $threshold = 0.70): array
     {
-        return $this->post('/fingerprint/verify', [
+        return $this->post('/api/v1/fingerprint/verify', [
             'company_key' => $companyKey,
             'user_key' => $userKey,
             'vendor' => $vendor,
@@ -115,7 +115,7 @@ class AIService
         if ($companyKey !== '') {
             $payload['company_key'] = $companyKey;
         }
-        return $this->post('/fingerprint/identify', $payload);
+        return $this->post('/api/v1/fingerprint/identify', $payload);
     }
 
     public function getFingerprintStatus(string $userKey, string $companyKey = ''): array
@@ -124,7 +124,7 @@ class AIService
         if ($companyKey !== '') {
             $payload['company_key'] = $companyKey;
         }
-        return $this->post('/fingerprint/status', $payload);
+        return $this->post('/api/v1/fingerprint/status', $payload);
     }
 
     public function deleteFingerprint(string $userKey, string $companyKey = ''): array
@@ -133,12 +133,12 @@ class AIService
         if ($companyKey !== '') {
             $payload['company_key'] = $companyKey;
         }
-        return $this->post('/fingerprint/delete', $payload);
+        return $this->post('/api/v1/fingerprint/delete', $payload);
     }
 
     public function verifyFingerprintStep(int $currentStep, string $templateData, string $vendor = 'Generic', array $previousSamples = []): array
     {
-        return $this->post('/fingerprint/verify-step', [
+        return $this->post('/api/v1/fingerprint/verify-step', [
             'current_step' => $currentStep,
             'template_data' => $templateData,
             'vendor' => $vendor,
@@ -148,12 +148,12 @@ class AIService
 
     public function listFingerprintDevices(): array
     {
-        return $this->get('/fingerprint/list-devices');
+        return $this->get('/api/v1/fingerprint/list-devices');
     }
 
     public function openFingerprintDevice(string $vendor = 'Generic', int $deviceIndex = 0): array
     {
-        return $this->post('/fingerprint/open-device', [
+        return $this->post('/api/v1/fingerprint/open-device', [
             'vendor' => $vendor,
             'device_index' => $deviceIndex,
         ]);
@@ -161,7 +161,7 @@ class AIService
 
     public function closeFingerprintDevice(string $sessionId): array
     {
-        return $this->post('/fingerprint/close-device', [
+        return $this->post('/api/v1/fingerprint/close-device', [
             'session_id' => $sessionId,
         ]);
     }
@@ -169,7 +169,7 @@ class AIService
     public function captureFingerprintFrame(string $sessionId): array
     {
         // Touch ID blocking prompt can take up to 30s — use extended timeout
-        $url = rtrim($this->baseUrl, '/') . '/fingerprint/capture-frame';
+        $url = rtrim($this->baseUrl, '/') . '/api/v1/fingerprint/capture-frame';
         $payload = json_encode(['session_id' => $sessionId]);
         $headers = [
             'Content-Type: application/json',
@@ -206,7 +206,7 @@ class AIService
 
     public function openCameraDevice(int $cameraIndex = 0): array
     {
-        return $this->post('/face/open-device', [
+        return $this->post('/api/v1/face/open-device', [
             'camera_index' => $cameraIndex,
             'width' => 640,
             'height' => 640,
@@ -215,7 +215,7 @@ class AIService
 
     public function closeCameraDevice(string $sessionId): array
     {
-        return $this->post('/face/close-device', [
+        return $this->post('/api/v1/face/close-device', [
             'session_id' => $sessionId,
         ]);
     }

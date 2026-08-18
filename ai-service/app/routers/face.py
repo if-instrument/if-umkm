@@ -18,7 +18,7 @@ from app.services.face_engine import (
 )
 from app.config import settings
 
-router = APIRouter(prefix="/face", tags=["Face Login"])
+router = APIRouter(tags=["Face Biometrics"])
 
 class RegisterFaceRequest(BaseModel):
     company_key: str = Field(..., description="Company slug (e.g. IFresso-Coffee)")

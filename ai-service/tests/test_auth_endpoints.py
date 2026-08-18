@@ -23,8 +23,12 @@ def test_health():
     assert res.status_code == 200
     assert res.json()["status"] == "online"
 
+    res_v1 = client.get("/api/v1/health")
+    assert res_v1.status_code == 200
+    assert res_v1.json()["status"] == "online"
+
 def test_unauthorized_without_api_key():
-    res = client.post("/face/register", json={
+    res = client.post("/api/v1/face/register", json={
         "company_key": "test-company",
         "user_key": "test-user",
         "image": generate_test_image_base64()
@@ -39,7 +43,7 @@ def test_face_register_and_verify(monkeypatch):
     monkeypatch.setattr("app.routers.face.extract_face_embedding", lambda img: [0.1] * 128)
     
     # 1. Register
-    reg_res = client.post("/face/register", json={
+    reg_res = client.post("/api/v1/face/register", json={
         "company_key": "company-test-01",
         "user_key": "usr-test-01",
         "image": img_data
@@ -49,7 +53,7 @@ def test_face_register_and_verify(monkeypatch):
     assert reg_res.json()["ok"] is True
     
     # 2. Verify
-    ver_res = client.post("/face/verify", json={
+    ver_res = client.post("/api/v1/face/verify", json={
         "company_key": "company-test-01",
         "user_key": "usr-test-01",
         "image": img_data
@@ -62,7 +66,7 @@ def test_fingerprint_register_and_verify():
     template = "ZK_FP_SAMPLE_TEMPLATE_DATA_1234567890"
     
     # 1. Register
-    reg_res = client.post("/fingerprint/register", json={
+    reg_res = client.post("/api/v1/fingerprint/register", json={
         "company_key": "company-test-01",
         "user_key": "usr-test-01",
         "vendor": "ZKTeco",
@@ -73,7 +77,7 @@ def test_fingerprint_register_and_verify():
     assert reg_res.json()["ok"] is True
     
     # 2. Verify matching template
-    ver_res = client.post("/fingerprint/verify", json={
+    ver_res = client.post("/api/v1/fingerprint/verify", json={
         "company_key": "company-test-01",
         "user_key": "usr-test-01",
         "vendor": "ZKTeco",

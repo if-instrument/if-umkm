@@ -1,13 +1,16 @@
-from fastapi import FastAPI, Depends
+from contextlib import asynccontextmanager
+from fastapi import FastAPI, APIRouter, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
-from app.database import engine, Base
 from app.migrations import run_migrations
 from app.security import verify_security
 from app.routers import face, fingerprint, v1_ai
 
-# Run standalone database schema & platform migrations
-run_migrations()
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup: Auto-run schema migrations and seed platform definitions
+    run_migrations()
+    yield
 
 tags_metadata = [
     {
@@ -31,18 +34,19 @@ tags_metadata = [
 app = FastAPI(
     title="IF Instrument AI Microservice Platform",
     description="""
-## 🧠 IF Instrument AI Microservice
+## 🧠 IF Instrument AI Microservice (API v1)
 
-Microservice kecerdasan buatan terdedikasi berkecepatan tinggi yang menyediakan:
-* **Face Biometrics**: Deteksi wajah, ekstraksi vektor embedding 128/512-dimensi, anti-spoofing, dan pencocokan kosinus.
-* **Fingerprint Biometrics**: Template matching sidik jari untuk login kasir hardware.
-* **Predictive & Business Intelligence**: Analisis churn pelanggan, estimasi stok habis (stockout forecast), dan rekomendasi resep menu.
-* **Multi-Tenant Token Quota**: Pelacakan kuota token AI per tenant perusahaan secara real-time.
+Microservice kecerdasan buatan terstandarisasi berkecepatan tinggi yang menyediakan:
+* **Face Biometrics (`/api/v1/face`)**: Deteksi wajah, ekstraksi vektor embedding 128/512-dimensi, anti-spoofing, dan pencocokan kosinus.
+* **Fingerprint Biometrics (`/api/v1/fingerprint`)**: Template matching sidik jari untuk login kasir hardware.
+* **Predictive & Business Intelligence (`/api/v1/ai`)**: Analisis churn pelanggan, estimasi stok habis (stockout forecast), dan rekomendasi resep menu.
+* **Multi-Tenant Token Quota (`/api/v1/ai/quota`)**: Pelacakan kuota token AI per tenant perusahaan secara real-time.
     """,
     version="2.0.0",
     openapi_tags=tags_metadata,
     docs_url="/docs",
     redoc_url="/redoc",
+    lifespan=lifespan,
     contact={
         "name": "IF Instrument AI Engineering Team",
         "email": "if.imam.faisal@gmail.com",
@@ -58,17 +62,22 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Register Routers protected by Security Middleware (X-API-Key / HMAC)
-app.include_router(face.router, dependencies=[Depends(verify_security)])
-app.include_router(fingerprint.router, dependencies=[Depends(verify_security)])
-app.include_router(v1_ai.router, dependencies=[Depends(verify_security)])
+# Standardized Unified API v1 Router
+api_v1_router = APIRouter(prefix="/api/v1", dependencies=[Depends(verify_security)])
+api_v1_router.include_router(face.router, prefix="/face")
+api_v1_router.include_router(fingerprint.router, prefix="/fingerprint")
+api_v1_router.include_router(v1_ai.router, prefix="/ai")
+app.include_router(api_v1_router)
 
 @app.get("/health", tags=["Health"])
+@app.get("/api/v1/health", tags=["Health"])
 def health_check():
     return {
+        "ok": True,
         "status": "online",
         "service": "IF Instrument AI Microservice Platform",
         "version": "2.0.0",
+        "api_prefix": "/api/v1",
         "features": ["face_biometrics", "fingerprint", "v1_ai_business_intelligence"]
     }
 
