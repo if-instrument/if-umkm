@@ -11,6 +11,8 @@ $routes->set404Override();
 $routes->setAutoRoute(false);
 
 $routes->get('/', 'AppPageController::dashboard');
+$routes->get('docs', 'ApiDocsController::index');
+$routes->get('api-docs', 'ApiDocsController::index');
 $routes->get('login', 'LoginController::show');
 $routes->get('login.html', 'LoginController::show');
 

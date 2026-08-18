@@ -1,0 +1,459 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "IF Instrument UMKM Solution - POS & SaaS API",
+    "description": "Dokumentasi REST API Komprehensif untuk Aplikasi UMKM (IF Instrument Solution) yang mencakup manajemen POS Kasir, Multi-Outlet, Multi-Tenancy SaaS, Manajemen Inventaris & Resep, Biometrik AI, dan Pelaporan Keuangan.",
+    "version": "2.0.0",
+    "contact": {
+      "name": "IF Instrument Engineering Team",
+      "email": "if.imam.faisal@gmail.com"
+    }
+  },
+  "servers": [
+    {
+      "url": "http://127.0.0.1:8081",
+      "description": "Local Development Server"
+    }
+  ],
+  "tags": [
+    { "name": "Auth & Session", "description": "Autentikasi Pengguna, Login Kasir, Biometrik, dan Logout" },
+    { "name": "Sales & POS", "description": "Transaksi Kasir, Antrian Pesanan, KDS Dapur, Settlement, dan Pelunasan" },
+    { "name": "Inventory & Stock", "description": "Bahan Baku, Template, Kartu Stok, Purchase Supplier, dan Waste" },
+    { "name": "Products & Recipes", "description": "Katalog Produk, Kategori, Modifier Tambahan, dan Resep HPP" },
+    { "name": "Settings & Operational", "description": "Pengaturan Outlet, Metode Pembayaran, Meja Makan, dan Aturan Kemasan" },
+    { "name": "Access & Multi-Tenancy", "description": "Super Admin, Kelola Tenant Perusahaan, Role Matrix, dan Pengguna" },
+    { "name": "Reports & CRM", "description": "Laporan Laba Rugi, Riwayat Penjualan, CRM Pelanggan, dan Membership" },
+    { "name": "Public Order", "description": "Endpoint Publik Buku Menu Digital & Pemesanan Mandiri Meja" }
+  ],
+  "paths": {
+    "/api/auth/login": {
+      "post": {
+        "tags": ["Auth & Session"],
+        "summary": "Login Pengguna / Kasir",
+        "description": "Autentikasi dengan email dan password. Mengembalikan data user dan menyetel HttpOnly cookie `jwt_token`.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["email", "password"],
+                "properties": {
+                  "email": { "type": "string", "example": "kasir@ifresso.com" },
+                  "password": { "type": "string", "example": "password123" },
+                  "companySlug": { "type": "string", "example": "IFresso-Coffee" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Login Berhasil",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/AuthSuccessResponse" }
+              }
+            }
+          },
+          "422": {
+            "description": "Kredensial Tidak Valid",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests (Rate Limit: 10 req/min)"
+          }
+        }
+      }
+    },
+    "/api/auth/logout": {
+      "post": {
+        "tags": ["Auth & Session"],
+        "summary": "Logout Pengguna",
+        "description": "Menghapus cookie sesi `jwt_token` dan mengakhiri sesi aktif.",
+        "responses": {
+          "200": {
+            "description": "Logout Berhasil",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SuccessResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/page/login/face-identify": {
+      "post": {
+        "tags": ["Auth & Session"],
+        "summary": "Identifikasi Login Wajah (AI Biometrik)",
+        "description": "Mengirimkan frame gambar wajah (base64) untuk pencocokan vektor embedding via Python AI Microservice.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["image"],
+                "properties": {
+                  "image": { "type": "string", "description": "Base64 encoded JPEG/PNG frame" },
+                  "company_id": { "type": "integer", "example": 1 }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Wajah Dikenali dan Login Berhasil",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/AuthSuccessResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/order": {
+      "get": {
+        "tags": ["Sales & POS"],
+        "summary": "Daftar Pesanan / Transaksi POS",
+        "security": [{ "BearerAuth": [] }, { "CookieAuth": [] }],
+        "parameters": [
+          { "name": "company_id", "in": "query", "schema": { "type": "integer" } },
+          { "name": "outlet_id", "in": "query", "schema": { "type": "integer" } },
+          { "name": "status", "in": "query", "schema": { "type": "string" } },
+          { "name": "page", "in": "query", "schema": { "type": "integer", "default": 1 } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Daftar pesanan berhasil dimuat",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/OrderListResponse" }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["Sales & POS"],
+        "summary": "Buat Pesanan Baru / Checkout POS",
+        "security": [{ "BearerAuth": [] }, { "CookieAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CreateOrderPayload" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Pesanan berhasil dibuat",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SuccessResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/order/{id}/status": {
+      "post": {
+        "tags": ["Sales & POS"],
+        "summary": "Update Status Pesanan (Dapur / Kasir)",
+        "security": [{ "BearerAuth": [] }, { "CookieAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["status"],
+                "properties": {
+                  "status": { "type": "string", "example": "ORDER_PREPARING" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Status pesanan berhasil diperbarui"
+          }
+        }
+      }
+    },
+    "/api/ingredient": {
+      "get": {
+        "tags": ["Inventory & Stock"],
+        "summary": "Daftar Bahan Baku Outlet",
+        "security": [{ "BearerAuth": [] }, { "CookieAuth": [] }],
+        "parameters": [
+          { "name": "company_id", "in": "query", "schema": { "type": "integer" } },
+          { "name": "outlet_id", "in": "query", "schema": { "type": "integer" } },
+          { "name": "search", "in": "query", "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Daftar bahan baku berhasil dimuat",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/IngredientListResponse" }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["Inventory & Stock"],
+        "summary": "Tambah Bahan Baku Baru ke Outlet",
+        "security": [{ "BearerAuth": [] }, { "CookieAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["name", "unit"],
+                "properties": {
+                  "name": { "type": "string", "example": "Susu Fresh Milk" },
+                  "category": { "type": "string", "example": "Dairy" },
+                  "unit": { "type": "string", "example": "ml" },
+                  "stock": { "type": "number", "example": 10000 },
+                  "standardCost": { "type": "number", "example": 25 },
+                  "minStock": { "type": "number", "example": 2000 }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Bahan baku berhasil disimpan"
+          }
+        }
+      }
+    },
+    "/api/inventory/purchase": {
+      "post": {
+        "tags": ["Inventory & Stock"],
+        "summary": "Catat Pembelian Bahan (Stock In)",
+        "security": [{ "BearerAuth": [] }, { "CookieAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["ingredientId", "qty", "unitCost"],
+                "properties": {
+                  "ingredientId": { "type": "string", "example": "ing-1" },
+                  "qty": { "type": "number", "example": 10 },
+                  "unitCost": { "type": "number", "example": 25000 },
+                  "expiredAt": { "type": "string", "example": "2026-12-31" },
+                  "notes": { "type": "string", "example": "Faktur Toko A" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Pembelian berhasil dicatat dan stok bertambah" }
+        }
+      }
+    },
+    "/api/product": {
+      "get": {
+        "tags": ["Products & Recipes"],
+        "summary": "Daftar Katalog Produk",
+        "security": [{ "BearerAuth": [] }, { "CookieAuth": [] }],
+        "responses": {
+          "200": { "description": "Katalog produk berhasil dimuat" }
+        }
+      }
+    },
+    "/api/setting": {
+      "get": {
+        "tags": ["Settings & Operational"],
+        "summary": "Pemuatan Pengaturan Outlet & Toko",
+        "security": [{ "BearerAuth": [] }, { "CookieAuth": [] }],
+        "responses": {
+          "200": { "description": "Pengaturan toko berhasil dimuat" }
+        }
+      },
+      "put": {
+        "tags": ["Settings & Operational"],
+        "summary": "Simpan Pengaturan Outlet & Toko",
+        "security": [{ "BearerAuth": [] }, { "CookieAuth": [] }],
+        "responses": {
+          "200": { "description": "Pengaturan toko berhasil disimpan" }
+        }
+      }
+    },
+    "/api/company": {
+      "get": {
+        "tags": ["Access & Multi-Tenancy"],
+        "summary": "Daftar Perusahaan Tenant (Super Admin)",
+        "security": [{ "BearerAuth": [] }, { "CookieAuth": [] }],
+        "responses": {
+          "200": { "description": "Daftar perusahaan berhasil dimuat" }
+        }
+      }
+    },
+    "/api/report/profit-loss": {
+      "get": {
+        "tags": ["Reports & CRM"],
+        "summary": "Laporan Laba Rugi (Profit & Loss)",
+        "security": [{ "BearerAuth": [] }, { "CookieAuth": [] }],
+        "parameters": [
+          { "name": "startDate", "in": "query", "schema": { "type": "string", "example": "2026-08-01" } },
+          { "name": "endDate", "in": "query", "schema": { "type": "string", "example": "2026-08-31" } }
+        ],
+        "responses": {
+          "200": { "description": "Laporan laba rugi berhasil dihitung" }
+        }
+      }
+    },
+    "/api/public/order/bootstrap": {
+      "get": {
+        "tags": ["Public Order"],
+        "summary": "Bootstrap Data Menu Publik Digital",
+        "description": "Endpoint tanpa autentikasi untuk inisialisasi buku menu digital publik dan meja scan QR.",
+        "responses": {
+          "200": { "description": "Data menu publik berhasil dimuat" }
+        }
+      }
+    },
+    "/api/public/order": {
+      "post": {
+        "tags": ["Public Order"],
+        "summary": "Submit Pesanan Publik Mandiri",
+        "description": "Pelanggan melakukan order online / scan meja.",
+        "responses": {
+          "200": { "description": "Pesanan pelanggan berhasil dikirim" }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      },
+      "CookieAuth": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "jwt_token"
+      }
+    },
+    "schemas": {
+      "SuccessResponse": {
+        "type": "object",
+        "properties": {
+          "ok": { "type": "boolean", "example": true },
+          "data": { "type": "object" },
+          "message": { "type": "string", "example": "Operasi berhasil" }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "ok": { "type": "boolean", "example": false },
+          "message": { "type": "string", "example": "Terjadi kesalahan validasi" },
+          "code": { "type": "string", "example": "VALIDATION_ERROR" },
+          "errors": { "type": "object" }
+        }
+      },
+      "AuthSuccessResponse": {
+        "type": "object",
+        "properties": {
+          "ok": { "type": "boolean", "example": true },
+          "token": { "type": "string", "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." },
+          "user": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string", "example": "usr-1" },
+              "name": { "type": "string", "example": "Kasir Utama" },
+              "email": { "type": "string", "example": "kasir@ifresso.com" },
+              "role": { "type": "string", "example": "Kasir" }
+            }
+          }
+        }
+      },
+      "OrderListResponse": {
+        "type": "object",
+        "properties": {
+          "ok": { "type": "boolean", "example": true },
+          "data": {
+            "type": "object",
+            "properties": {
+              "items": { "type": "array", "items": { "type": "object" } },
+              "meta": {
+                "type": "object",
+                "properties": {
+                  "page": { "type": "integer", "example": 1 },
+                  "perPage": { "type": "integer", "example": 50 },
+                  "total": { "type": "integer", "example": 120 }
+                }
+              }
+            }
+          }
+        }
+      },
+      "IngredientListResponse": {
+        "type": "object",
+        "properties": {
+          "ok": { "type": "boolean", "example": true },
+          "data": {
+            "type": "object",
+            "properties": {
+              "items": { "type": "array", "items": { "type": "object" } },
+              "meta": { "type": "object" }
+            }
+          }
+        }
+      },
+      "CreateOrderPayload": {
+        "type": "object",
+        "required": ["items", "grandTotal"],
+        "properties": {
+          "serviceType": { "type": "string", "enum": ["dine_in", "take_away", "delivery"], "example": "dine_in" },
+          "tableName": { "type": "string", "example": "Meja 05" },
+          "customerName": { "type": "string", "example": "Budi Santoso" },
+          "customerPhone": { "type": "string", "example": "08123456789" },
+          "paymentMethod": { "type": "string", "example": "QRIS" },
+          "paymentStatus": { "type": "string", "example": "PAYMENT_PAID" },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["productId", "qty", "price"],
+              "properties": {
+                "productId": { "type": "string", "example": "prd-1" },
+                "qty": { "type": "integer", "example": 2 },
+                "price": { "type": "number", "example": 25000 },
+                "note": { "type": "string", "example": "Less sugar" }
+              }
+            }
+          },
+          "subtotal": { "type": "number", "example": 50000 },
+          "taxAmount": { "type": "number", "example": 5000 },
+          "grandTotal": { "type": "number", "example": 55000 }
+        }
+      }
+    }
+  }
+}
