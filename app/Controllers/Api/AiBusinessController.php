@@ -3,11 +3,9 @@
 namespace App\Controllers\Api;
 
 use App\Controllers\BaseController;
-use CodeIgniter\API\ResponseTrait;
 
 class AiBusinessController extends BaseController
 {
-    use ResponseTrait;
 
     protected $format = 'json';
 

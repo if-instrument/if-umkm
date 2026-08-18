@@ -25,29 +25,31 @@ class AuthService
             $db = $tenantService->connectionForCompanySlug($companySlug) ?: $centralDb;
 
             // Strict Filter by Company ID when accessing tenant portal /{companySlug}/login
-            $user = $db->table('users')
-                ->where('email', $email)
-                ->where('company_id', $companyId)
-                ->whereIn('status', [StatusCodeService::ACTIVE, 'active'])
+            $builder = $db->table('users')->where('email', $email);
+            if ($db->fieldExists('company_id', 'users')) {
+                $builder->where('company_id', $companyId);
+            }
+            $user = $builder->whereIn('status', [StatusCodeService::ACTIVE, 'active'])
                 ->get()
                 ->getRowArray();
 
             if (! $user && $db !== $centralDb) {
-                $user = $centralDb->table('users')
-                    ->where('email', $email)
-                    ->where('company_id', $companyId)
-                    ->whereIn('status', [StatusCodeService::ACTIVE, 'active'])
+                $cBuilder = $centralDb->table('users')->where('email', $email);
+                if ($centralDb->fieldExists('company_id', 'users')) {
+                    $cBuilder->where('company_id', $companyId);
+                }
+                $user = $cBuilder->whereIn('status', [StatusCodeService::ACTIVE, 'active'])
                     ->get()
                     ->getRowArray();
             }
 
             if (! $user) {
                 // Check if user/company for this specific company ID was rejected or pending
-                $rawUser = $centralDb->table('users')
-                    ->where('email', $email)
-                    ->where('company_id', $companyId)
-                    ->get()
-                    ->getRowArray();
+                $rawBuilder = $centralDb->table('users')->where('email', $email);
+                if ($centralDb->fieldExists('company_id', 'users')) {
+                    $rawBuilder->where('company_id', $companyId);
+                }
+                $rawUser = $rawBuilder->get()->getRowArray();
 
                 if ($rawUser) {
                     $cStatus = (string) ($company['status'] ?? '');

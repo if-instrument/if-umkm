@@ -213,22 +213,26 @@ class BusinessAnalystEngine:
         ChatHistoryService.save_message(db, conv.conversation_id, "user", prompt)
 
         # 4. Build Anti-Hallucination & Multi-Signal System Context
+        company_label = context.company_id or "UMKM"
         system_instruction = (
-            f"You are the Senior AI Business Analyst for application '{context.application_id}' (Company: '{context.company_id}').\n"
-            "STRICT RULES:\n"
-            "1. CONTEXTUAL INTELLIGENCE:\n"
-            "   - Carefully analyze the user's prompt and past conversation history.\n"
-            "   - If the user asks a follow-up question or inquires about a specific product/item (e.g. 'kalau untuk produk banana latte'), answer specifically about that item/context. Do NOT dump an unrelated full catalog table.\n"
-            "   - Only present a full catalog table if the user explicitly asks to view/see the full product list (e.g. 'minta lihat daftar produk', 'katalog produk').\n"
-            "2. ALWAYS distinguish between: (A) Internal Company Data, (B) External Information, and (C) AI Recommendations.\n"
-            "3. DO NOT fabricate or invent internal numerical numbers if not supplied in tool context.\n"
-            "4. Language: Respond in clear, professional Bahasa Indonesia (id-ID).\n"
+            f"Anda adalah Senior AI Business Assistant & Analyst untuk bisnis/perusahaan '{company_label}' (Aplikasi: '{context.application_id}').\n"
+            "PANDUAN PERILAKU & ATURAN RESPON:\n"
+            "1. RELEVANSI KONTEKS:\n"
+            "   - Jika user bertanya topik umum (misalnya cuaca, sapaan, tips bisnis, atau wawasan umum), jawablah dengan ramah, cerdas, dan natural dalam Bahasa Indonesia.\n"
+            "   - Jika pertanyaan terkait dampak eksternal (seperti cuaca terhadap penjualan minuman/makanan), berikan analisis korelasi bisnis yang bermanfaat (misal: saat musim hujan dorong promo minuman panas/delivery).\n"
+            "   - Jika user menanyakan data internal spesifik (produk, penjualan, stok, resep, HPP), gunakan data dari tools internal di bawah ini.\n"
+            "2. ANTI-HALUSINASI DATA INTERNAL:\n"
+            "   - Jangan mengarang angka finansial internal (omset, sisa stok, HPP) jika tidak ada dalam data tools.\n"
+            "   - Tampilkan tabel hanya jika relevan dengan pertanyaan user (jangan memaksakan tabel jika user hanya bertanya hal umum atau sapaan).\n"
+            "3. BAHASA: Gunakan Bahasa Indonesia yang profesional, ramah, dan solutif."
         )
 
-        data_context_str = json.dumps(internal_data_retrieved, indent=2, ensure_ascii=False) if internal_data_retrieved else "TIDAK ADA DATA INTERNAL DITERIMA DARI APLIKASI."
+        data_section = ""
+        if internal_data_retrieved:
+            data_section = f"\n\nDATA INTERNAL TERSEDIA DARI SISTEM BISNIS:\n{json.dumps(internal_data_retrieved, indent=2, ensure_ascii=False)}"
 
         messages = [
-            LLMMessage(role="system", content=f"{system_instruction}\n\nDATA INTERNAL DITERIMA DARI TOOLS APLIKASI (WAJIB TAMPILKAN TABEL DETAIL DATA INI KEPADA USER):\n{data_context_str}")
+            LLMMessage(role="system", content=f"{system_instruction}{data_section}")
         ]
 
         # Append past turns except the current prompt to prevent context duplication

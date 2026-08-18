@@ -3,7 +3,6 @@
 namespace App\Controllers\Api;
 
 use App\Controllers\BaseController;
-use CodeIgniter\API\ResponseTrait;
 use App\Services\ProductSuiteService;
 use App\Services\SalesService;
 use App\Services\InventoryService;
@@ -12,7 +11,6 @@ use Config\Database;
 
 class AiBridgeController extends BaseController
 {
-    use ResponseTrait;
 
     protected $format = 'json';
 

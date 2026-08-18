@@ -63,6 +63,41 @@ trait ApiResponseTrait
         return $this->respondError($message, 401, [], 'UNAUTHORIZED');
     }
 
+    public function respond($data = null, ?int $status = null, string $message = ''): ResponseInterface
+    {
+        $status = $status ?? 200;
+        if (is_array($data) && isset($data['ok'])) {
+            $response = $this->response ?? Services::response();
+            return $response->setStatusCode($status)->setJSON($data);
+        }
+        return $this->respondSuccess($data, $message, [], $status);
+    }
+
+    public function fail(string $description = 'Bad Request', int $code = 400, ?string $customCode = null): ResponseInterface
+    {
+        return $this->respondError($description, $code, [], $customCode);
+    }
+
+    public function failUnauthorized(string $description = 'Unauthorized', ?string $code = null): ResponseInterface
+    {
+        return $this->respondError($description, 401, [], $code ?? 'UNAUTHORIZED');
+    }
+
+    public function failForbidden(string $description = 'Forbidden', ?string $code = null): ResponseInterface
+    {
+        return $this->respondError($description, 403, [], $code ?? 'FORBIDDEN');
+    }
+
+    public function failNotFound(string $description = 'Not Found', ?string $code = null): ResponseInterface
+    {
+        return $this->respondError($description, 404, [], $code ?? 'NOT_FOUND');
+    }
+
+    public function failValidationError(string $description = 'Bad Request', ?string $code = null): ResponseInterface
+    {
+        return $this->respondError($description, 400, [], $code ?? 'VALIDATION_ERROR');
+    }
+
     protected function jsonAction(callable $action, string $successMessage = '', int $statusCode = 200): ResponseInterface
     {
         try {
