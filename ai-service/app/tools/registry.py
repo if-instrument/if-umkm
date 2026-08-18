@@ -119,3 +119,28 @@ ToolRegistry.register_tool(
         application_scope="all"
     )
 )
+
+ToolRegistry.register_tool(
+    ToolDefinition(
+        name="search_web",
+        version="1.0",
+        description="Searches the live public internet for current market prices, commodity rates, competitor benchmarks, latest coffee/F&B trends, and external economic data.",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "Search keywords on the internet, e.g. 'harga biji kopi robusta pasar indonesia 2026', 'harga susu segar bulk', 'tren menu kopi kekinian 2026'"
+                },
+                "limit": {
+                    "type": "integer",
+                    "default": 5
+                }
+            },
+            "required": ["query"]
+        },
+        permission="web.search",
+        application_scope="all"
+    )
+)
+

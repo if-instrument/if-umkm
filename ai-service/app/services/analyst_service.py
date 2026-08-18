@@ -285,7 +285,7 @@ class BusinessAnalystEngine:
             first_prompt=prompt
         )
         context.conversation_id = conv.conversation_id
-        past_turns = ChatHistoryService.get_conversation_context(db, conv.conversation_id, limit=6)
+        past_turns = ChatHistoryService.get_conversation_context(db, conv.conversation_id, limit=100)
 
         # 5. Dynamic LLM Tool Planning with Multi-Turn Context Memory
         available_tools = ToolRegistry.list_tools(context.application_id)
@@ -301,16 +301,18 @@ class BusinessAnalystEngine:
             f"You are an AI Internal Data Planner for company '{context.company_id}' ({company.business_type} - {company.description or ''}). "
             "Your primary task is to analyze the user's prompt AND past conversation history turns.\n\n"
             "STRICT PLANNING RULES:\n"
-            "1. If the user was answering an onboarding question and previously asked about sales, revenue, products, inventory, recipes, or performance in earlier turns, "
-            "select the appropriate tools to answer that previous inquiry now!\n"
+            "1. MULTI-TURN CONTEXT RESOLUTION (CRITICAL):\n"
+            "   - If the user prompt refers to previous topics (e.g. 'untuk resep yang kita bicarakan sebelumnya', 'resep tadi', 'produk yang tadi', 'bagaimana jika diubah', 'lanjutkan analisis'), read the past turns history to identify the exact menu/product/item (e.g. Americano Peach, Kopi Susu, dll).\n"
+            "   - If they ask for ingredient stocks, HPP, or modifications of that past item, invoke 'get_recipe_ingredients' or 'search_web' with that specific item name!\n"
             "2. If the user prompt is a general greeting or conversational question without specific internal data request, return {\"needed_tools\": []}.\n"
             "3. TOOL SELECTION RULES:\n"
             "   - IF user asked to view/see the catalog (e.g. 'minta lihat produk', 'daftar produk', 'tampilkan katalog'), select 'get_product_list'.\n"
             "   - IF user asked about product performance, menu evaluation, or specific product stats, select 'get_product_performance'.\n"
             "   - IF user asked for raw materials, ingredients stock, or HPP recipe costs, select 'get_recipe_ingredients'.\n"
             "   - IF user asked for inventory stock levels or low stock warnings, select 'get_inventory_status'.\n"
-            "   - IF user asked for overall revenue, omset, or sales aggregate summary, select 'get_sales_summary'.\n\n"
-            f"AVAILABLE INTERNAL TOOLS:\n{json.dumps(tools_summary, indent=2)}\n\n"
+            "   - IF user asked for overall revenue, omset, or sales aggregate summary, select 'get_sales_summary'.\n"
+            "   - IF user asked to search internet, market prices, commodity rates, latest trends, competitors, external benchmarks, or weather (e.g. 'cari di internet', 'harga pasar', 'kondisi cuaca', 'tren kopi 2026', 'eksternal'), select 'search_web' with concise search query keywords.\n\n"
+            f"AVAILABLE INTERNAL & EXTERNAL TOOLS:\n{json.dumps(tools_summary, indent=2)}\n\n"
             "OUTPUT FORMAT INSTRUCTIONS:\n"
             "Return ONLY a valid JSON object matching this schema:\n"
             "{\n"
@@ -415,7 +417,8 @@ class BusinessAnalystEngine:
             f"Anda adalah Senior AI Business Assistant & Analyst untuk bisnis/perusahaan '{company_label}'{biz_domain_text} "
             f"(Aplikasi: '{context.application_id}').\n\n"
             f"PROFIL BISNIS TERDAFTAR: '{company_label}' bergerak di bidang '{company.business_type}'.{desc_text} "
-            "Berikan analisis, rekomendasi, dan strategi bisnis yang sangat kontekstual dan relevan dengan industri tersebut.\n\n"
+            f"TOPIK UTAMA SESI OBROLAN SAAT INI: '{conv.title}'.\n"
+            "Selalu pertahankan kesinambungan pemahaman terhadap resep, menu, komoditas, atau topik yang dibahas pada awal sesi obrolan ini, terutama ketika pengguna merujuk 'resep tadi / sebelumnya'.\n\n"
             "PANDUAN PERILAKU & ATURAN FORMATTING RESMI:\n"
             f"{onboarding_instruction}"
             "2. STANDAR FORMATTING WAJIB MENGGUNAKAN RICH MARKDOWN:\n"
@@ -426,9 +429,16 @@ class BusinessAnalystEngine:
             "     * Gunakan Teks Tebal (`**angka / istilah penting**`) untuk menonjolkan nominal uang, kuantitas stok, dan nama produk utama.\n"
             "     * Gunakan Garis Horizontal (`---`) sebagai pembatas antar bagian laporan/analisis.\n"
             "     * Gunakan Blockquote (`> ...`) untuk kesimpulan atau highlight rekomendasi kunci.\n"
-            "3. ANTI-HALUSINASI DATA INTERNAL:\n"
-            "   - Jangan mengarang angka finansial internal (omset, sisa stok, HPP) jika tidak ada dalam data tools.\n"
-            "4. BAHASA: Gunakan Bahasa Indonesia yang profesional, ramah, solutif, dan ringkas padat."
+            "3. INTEGRASI DATA INTERNAL & DATA PASAR/INTERNET:\n"
+            "   - Gunakan data internal toko (stok, resep, transaksi) untuk metriks toko riil.\n"
+            "   - Jika terdapat data pencarian web ('search_web') atau jika pengguna menanyakan harga pasar, tren eksternal, atau estimasi HPP resep umum, gunakan data benchmark pasar tersebut dan sajikan dalam tabel estimasi yang jelas.\n"
+            "   - JANGAN PERNAH menolak dengan alasan 'saya tidak memiliki akses internet' karena Anda memiliki integrasi 'search_web' yang aktif untuk mencari data pasar dan tren eksternal.\n"
+            "4. SITASI & REFERENSI SUMBER DATA (MUTLAK WAJIB JIKA MENGGUNAKAN SEARCH_WEB):\n"
+            "   - Setiap kali menyajikan data harga pasar, tren, atau hasil pencarian internet ('search_web'), Anda WAJIB membuat bagian khusus di bagian paling bawah laporan:\n"
+            "     `### 🌐 Referensi & Sumber Data Terpercaya`\n"
+            "   - Cantumkan rujukan dalam format Markdown Link: `1. [Nama Sumber / Judul Publikasi](URL) - Ringkasan poin data acuan`.\n"
+            "   - Hal ini menjamin transparansi, keabsahan, dan kredibilitas data bisnis yang terpercaya bagi pemilik usaha.\n"
+            "5. BAHASA: Gunakan Bahasa Indonesia yang profesional, ramah, solutif, dan ringkas padat."
         )
 
         data_section = ""
@@ -440,7 +450,7 @@ class BusinessAnalystEngine:
         ]
 
         # Append past turns except the current prompt to prevent context duplication
-        past_turns = ChatHistoryService.get_conversation_context(db, conv.conversation_id, limit=6)
+        past_turns = ChatHistoryService.get_conversation_context(db, conv.conversation_id, limit=100)
         for pm in past_turns[:-1]:
             if pm.role in ["user", "assistant"]:
                 messages.append(pm)

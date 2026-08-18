@@ -142,6 +142,7 @@ export function initAiAnalystPage() {
 
   function startNewChat() {
     currentConversationId = null;
+    try { sessionStorage.removeItem("if_ai_active_conv_id"); } catch {}
     if (messagesContainer) {
       messagesContainer.innerHTML = `
         <div class="msg-row ai-msg">
@@ -221,6 +222,18 @@ export function initAiAnalystPage() {
 
         historyListContainer.innerHTML = html;
 
+        // Auto-restore active conversation session if saved in sessionStorage
+        const savedConvId = sessionStorage.getItem("if_ai_active_conv_id");
+        if (savedConvId && (!currentConversationId || currentConversationId === savedConvId)) {
+          const itemToActive = historyListContainer.querySelector(`.history-item[data-id="${savedConvId}"]`);
+          if (itemToActive) {
+            itemToActive.classList.add("active");
+          }
+          if (!currentConversationId) {
+            selectHistorySession(savedConvId);
+          }
+        }
+
         // Bind Item Click Handlers
         historyListContainer.querySelectorAll(".history-item").forEach((item) => {
           item.addEventListener("click", (e) => {
@@ -247,7 +260,9 @@ export function initAiAnalystPage() {
   }
 
   async function selectHistorySession(convId) {
+    if (!convId) return;
     currentConversationId = convId;
+    try { sessionStorage.setItem("if_ai_active_conv_id", convId); } catch {}
     document.querySelectorAll(".history-item").forEach(el => {
       el.classList.toggle("active", el.getAttribute("data-id") === convId);
     });
@@ -351,7 +366,29 @@ export function initAiAnalystPage() {
   // Preset Card Click Handlers
   document.querySelectorAll(".preset-card").forEach((card) => {
     card.addEventListener("click", () => {
-      const promptText = card.getAttribute("data-prompt");
+      const promptType = card.getAttribute("data-prompt-type");
+      let promptText = card.getAttribute("data-prompt") || "";
+
+      if (promptType === "recipe") {
+        const customMenu = prompt("Masukkan nama menu / minuman yang ingin dibuatkan resep & estimasi HPP-nya:", "Americano Peach");
+        if (customMenu !== null) {
+          const menuName = customMenu.trim() || "Americano Peach";
+          promptText = `Saya ingin membuat resep baru ${menuName}, bahan apa saja yang harus disiapkan dan berapa perkiraan HPP-nya?`;
+        } else {
+          // If cancelled by user, populate prompt template in input and highlight [Nama Menu]
+          if (promptInput) {
+            const template = "Saya ingin membuat resep baru [Nama Menu], bahan apa saja yang harus disiapkan dan berapa perkiraan HPP-nya?";
+            promptInput.value = template;
+            promptInput.focus();
+            const startIdx = template.indexOf("[Nama Menu]");
+            if (startIdx !== -1) {
+              promptInput.setSelectionRange(startIdx, startIdx + 11);
+            }
+          }
+          return;
+        }
+      }
+
       if (promptText && promptInput) {
         promptInput.value = promptText;
         executeAnalysis();
@@ -451,6 +488,7 @@ export function initAiAnalystPage() {
       if (res && res.ok && res.data) {
         if (res.meta && res.meta.conversation_id) {
           currentConversationId = res.meta.conversation_id;
+          try { sessionStorage.setItem("if_ai_active_conv_id", currentConversationId); } catch {}
         }
         renderAiResponse(res.data, res.meta);
         loadQuota();
@@ -895,6 +933,8 @@ export function initAiAnalystPage() {
     // Italic: *text* or _text_
     html = html.replace(/\*([^*]+)\*/g, "<em>$1</em>");
     html = html.replace(/_([^_]+)_/g, "<em>$1</em>");
+    // Markdown Links / Citations: [Title](https://...)
+    html = html.replace(/\[([^\]]+)\]\((https?:\/\/[^\s\)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" class="ai-citation-link">🔗 $1</a>');
     return html;
   }
 }

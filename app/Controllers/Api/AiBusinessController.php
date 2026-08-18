@@ -114,9 +114,9 @@ class AiBusinessController extends BaseController
     public function conversations()
     {
         $companySlug = (string) ($this->request->getGet('companySlug') ?: 'IFresso-Coffee');
-        $userId = (string) ($this->request->getGet('userId') ?: 'usr_mgr_1');
+        $userId = (string) ($this->request->getGet('userId') ?: '');
         $ai = service('aiService');
-        $res = $ai->listConversations('umkm-pos', $companySlug, $userId);
+        $res = $ai->listConversations('umkm-pos', $companySlug, $userId ?: null);
         return $this->respond($res);
     }
 

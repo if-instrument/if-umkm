@@ -81,6 +81,19 @@ class ToolExecutor:
             "X-Signature": signature
         }
 
+        # 0. Live Public Internet / Market Search Tool
+        if tool_name in ["search_web", "web_search", "search_internet"]:
+            query = arguments.get("query", "")
+            limit = int(arguments.get("limit", 5))
+            search_data = cls._execute_web_search(query, limit)
+            return sanitize_json_safe({
+                "ok": True,
+                "tool_name": tool_name,
+                "query": query,
+                "data": search_data,
+                "source_note": "Live Public Web & Market Knowledge"
+            })
+
         logger.info(f"Executing remote tool '{tool_name}' for [{application_id}:{company_id}] at {target_url}")
 
         try:
@@ -106,6 +119,77 @@ class ToolExecutor:
             "data": direct_data,
             "source_note": "Tenant MySQL Direct Adapter"
         })
+
+    @classmethod
+    def _execute_web_search(cls, query: str, limit: int = 5) -> List[Dict[str, Any]]:
+        import urllib.parse
+        import xml.etree.ElementTree as ET
+        import ssl
+        import re
+
+        if not query:
+            return []
+
+        ssl_ctx = ssl._create_unverified_context()
+        encoded = urllib.parse.quote_plus(query)
+        results = []
+
+        # 1. Google News & Media Search (Live Articles & Commodity Reports in Indonesia)
+        try:
+            google_news_url = f"https://news.google.com/rss/search?q={encoded}&hl=id&gl=ID&ceid=ID:id"
+            req_g = urllib.request.Request(
+                google_news_url,
+                headers={"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko)"}
+            )
+            with urllib.request.urlopen(req_g, context=ssl_ctx, timeout=5) as r:
+                xml_data = r.read()
+                root = ET.fromstring(xml_data)
+                items = root.findall(".//item")
+                for it in items[:limit]:
+                    raw_title = it.find("title").text if it.find("title") is not None else query
+                    link = it.find("link").text if it.find("link") is not None else f"https://www.google.com/search?q={encoded}"
+                    source_elem = it.find("source")
+                    source_name = source_elem.text if source_elem is not None else "Google News"
+                    pub_date = it.find("pubDate").text if it.find("pubDate") is not None else ""
+
+                    results.append({
+                        "title": raw_title,
+                        "snippet": f"Publikasi berita/analisis pasar: '{raw_title}' dipublikasikan oleh {source_name} ({pub_date[:16]}).",
+                        "source": f"{source_name} (via Google News)",
+                        "url": link
+                    })
+        except Exception as e:
+            logger.warning(f"Google News RSS search error: {e}")
+
+        # 2. Wikipedia Indonesia Search (Authoritative Indonesian Encyclopedia)
+        try:
+            wiki_url = f"https://id.wikipedia.org/w/api.php?action=query&list=search&srsearch={encoded}&format=json"
+            req_w = urllib.request.Request(wiki_url, headers={"User-Agent": "AplikasiUMKM/1.0"})
+            with urllib.request.urlopen(req_w, context=ssl_ctx, timeout=4) as rw:
+                wdata = json.loads(rw.read().decode("utf-8"))
+                for item in wdata.get("query", {}).get("search", [])[:(limit - len(results))]:
+                    clean_snippet = re.sub(r"<[^>]+>", "", item.get("snippet", ""))
+                    page_title = item.get("title", "")
+                    page_url = f"https://id.wikipedia.org/wiki/{urllib.parse.quote(page_title.replace(' ', '_'))}"
+                    results.append({
+                        "title": page_title,
+                        "snippet": clean_snippet,
+                        "source": "Wikipedia Indonesia",
+                        "url": page_url
+                    })
+        except Exception as e:
+            logger.warning(f"Wikipedia search error: {e}")
+
+        # 3. Google Search Direct Index Link (Always valid and accessible in any browser)
+        if len(results) < limit:
+            results.append({
+                "title": f"Hasil Pencarian Google: {query}",
+                "snippet": f"Indeks penelusuran Google langsung untuk kata kunci pasar dan bisnis: '{query}'.",
+                "source": "Google Search Indonesia",
+                "url": f"https://www.google.com/search?q={encoded}"
+            })
+
+        return results[:limit]
 
     @classmethod
     def _query_tenant_db(cls, company_id: str, tool_name: str, arguments: Dict[str, Any]) -> Any:

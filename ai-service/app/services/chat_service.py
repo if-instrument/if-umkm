@@ -97,7 +97,7 @@ class ChatHistoryService:
         cls,
         db: Session,
         conversation_id: str,
-        limit: int = 10
+        limit: int = 100
     ) -> List[LLMMessage]:
         """
         Retrieves the past N messages formatted as LLMMessage objects for multi-turn context memory.
