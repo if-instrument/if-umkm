@@ -12,6 +12,69 @@ export function initAiAnalystPage() {
   const companySlug = slugFromPath || session?.companySlug || window.__COMPANY_SLUG__ || "IFresso-Coffee";
   const userId = session?.userId || "usr_mgr_1";
 
+  // DOM Element References (declared once here to be accessible throughout all inner functions)
+  const newChatBtn         = document.getElementById("new-chat-btn");
+  const historyListContainer = document.getElementById("history-list");
+  const messagesContainer  = document.getElementById("chat-messages");
+  const providerSelect     = document.getElementById("ai-provider-select");
+  const promptInput        = document.getElementById("ai-prompt-input");
+  const sendBtn            = document.getElementById("ai-send-btn");
+  const quotaDisplay       = document.getElementById("ai-quota-display");
+
+  // Mutable conversation state
+  let currentConversationId = null;
+
+  // Realtime USD -> IDR Exchange Rate Converter
+  let usdToIdrRate = 16300; // fallback standard rate
+  let isRateFetched = false;
+
+  async function fetchUsdToIdrRate() {
+    // Check localStorage cache (valid for 1 hour)
+    try {
+      const cached = localStorage.getItem("if_ai_usd_idr_rate");
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed.rate && Date.now() - (parsed.time || 0) < 3600000) {
+          usdToIdrRate = Number(parsed.rate) || 16300;
+          isRateFetched = true;
+          return usdToIdrRate;
+        }
+      }
+    } catch {}
+
+    try {
+      const res = await fetch("https://open.er-api.com/v6/latest/USD");
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.rates?.IDR) {
+          usdToIdrRate = Number(data.rates.IDR);
+          isRateFetched = true;
+          try {
+            localStorage.setItem("if_ai_usd_idr_rate", JSON.stringify({ rate: usdToIdrRate, time: Date.now() }));
+          } catch {}
+        }
+      }
+    } catch (err) {
+      console.warn("Could not fetch realtime USD-IDR exchange rate, using fallback:", err);
+    }
+    return usdToIdrRate;
+  }
+
+  function formatCostToIdr(costUsd) {
+    const cost = Number(costUsd) || 0;
+    if (cost <= 0) return "Rp 0,00 ($0.000000)";
+    const costIdr = cost * usdToIdrRate;
+    let idrString = "";
+    if (costIdr < 1) {
+      idrString = `Rp ${costIdr.toFixed(2).replace(".", ",")}`;
+    } else if (costIdr < 100) {
+      idrString = `Rp ${costIdr.toFixed(2).replace(".", ",")}`;
+    } else {
+      idrString = `Rp ${Math.round(costIdr).toLocaleString("id-ID")}`;
+    }
+    return `<strong style="color: #059669;" title="Kurs Realtime: $1 = Rp ${Math.round(usdToIdrRate).toLocaleString('id-ID')}">${idrString}</strong> <span style="font-size:0.75rem; opacity:0.85;">($${cost.toFixed(6)})</span>`;
+  }
+
   // 1. Fetch Company Settings & Branding Data via Bootstrap
   try {
     const bootstrapRes = loadPageBootstrap("aiAnalyst", state, session);
@@ -67,7 +130,8 @@ export function initAiAnalystPage() {
       .trim();
   }
 
-  // Load Initial Quota Stats, Active Providers, and Chat History List
+  // Load Initial Quota Stats, Exchange Rate, Active Providers, and Chat History List
+  fetchUsdToIdrRate();
   loadQuota();
   loadActiveProviders();
   loadHistoryList();
@@ -196,7 +260,23 @@ export function initAiAnalystPage() {
           if (m.role === "user") {
             renderUserMessage(m.content);
           } else if (m.role === "assistant") {
-            renderAiResponse({ answer: m.content, provider: "ai", model: "assistant" }, { conversation_id: convId });
+            renderAiResponse(
+              {
+                answer: m.content,
+                provider: m.provider || "gemini",
+                model: m.model || "gemini-flash"
+              },
+              {
+                conversation_id: convId,
+                request_id: m.request_id || "",
+                usage: m.usage || {
+                  total_tokens: m.tokens_used || 0,
+                  input_tokens: m.input_tokens || 0,
+                  output_tokens: m.output_tokens || 0,
+                  estimated_cost: m.estimated_cost || 0
+                }
+              }
+            );
           }
         });
         scrollToBottom();
@@ -298,10 +378,20 @@ export function initAiAnalystPage() {
     try {
       const res = await apiGet(`/api/page/ai/quota?companySlug=${encodeURIComponent(companySlug)}`);
       if (res && res.ok && res.data) {
-        const remaining = (res.data.tokens_remaining || 0).toLocaleString();
-        const total = (res.data.monthly_token_quota || 2000000).toLocaleString();
+        const limitNum = Number(res.data.quota_limit || res.data.monthly_token_quota || 10000000);
+        const remainingNum = Number(res.data.tokens_remaining ?? (limitNum - (res.data.tokens_consumed || 0)));
+        
+        let limitFormatted;
+        if (limitNum >= 1000000) {
+          limitFormatted = `${(limitNum / 1000000).toLocaleString('id-ID', { maximumFractionDigits: 1 })}M`;
+        } else {
+          limitFormatted = limitNum.toLocaleString('id-ID');
+        }
+
+        const remainingFormatted = remainingNum.toLocaleString('id-ID');
         if (quotaDisplay) {
-          quotaDisplay.textContent = `${remaining} / ${total}`;
+          quotaDisplay.textContent = `${remainingFormatted} / ${limitFormatted}`;
+          quotaDisplay.title = `Sisa: ${remainingFormatted} dari total kuota ${limitNum.toLocaleString('id-ID')} token (${res.data.plan_code || 'Enterprise'})`;
         }
       }
     } catch (err) {
@@ -450,10 +540,11 @@ export function initAiAnalystPage() {
     }
 
     const usage = meta?.usage || {};
+    const costHtml = formatCostToIdr(usage.estimated_cost || 0);
     const metaBarHtml = `
       <div class="msg-meta-bar">
         <span>⚡ ${usage.total_tokens || 0} Tokens (${usage.input_tokens || 0} in / ${usage.output_tokens || 0} out)</span>
-        <span>· Est. Cost: $${(usage.estimated_cost || 0).toFixed(6)}</span>
+        <span>· Est. Biaya: ${costHtml}</span>
         <span>· Model: ${data.provider || 'openai'} / ${data.model || 'gpt-4o-mini'}</span>
         <span>· RequestID: ${meta?.request_id || ''}</span>
       </div>

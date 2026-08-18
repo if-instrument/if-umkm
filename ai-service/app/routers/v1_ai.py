@@ -265,20 +265,52 @@ def get_conversation_details(conversation_id: str, db: Session = Depends(get_db)
 def get_conversation_messages(conversation_id: str, db: Session = Depends(get_db)):
     from app.services.chat_service import ChatHistoryService
     msgs = ChatHistoryService.get_messages(db, conversation_id)
+    
+    # Query corresponding AI usage ledger logs for this conversation session
+    ledger_logs = db.query(AIUsageLedger).filter(
+        AIUsageLedger.conversation_id == conversation_id
+    ).order_by(AIUsageLedger.id.asc()).all()
+
+    assistant_idx = 0
+    formatted_msgs = []
+    for m in msgs:
+        msg_dict = {
+            "id": m.id,
+            "conversation_id": m.conversation_id,
+            "role": m.role,
+            "content": m.content,
+            "tool_calls": json.loads(m.tool_calls) if m.tool_calls else None,
+            "tokens_used": m.tokens_used,
+            "created_at": m.created_at.isoformat() if m.created_at else None
+        }
+        if m.role == "assistant":
+            if assistant_idx < len(ledger_logs):
+                log_entry = ledger_logs[assistant_idx]
+                msg_dict["provider"] = log_entry.provider
+                msg_dict["model"] = log_entry.model
+                msg_dict["request_id"] = log_entry.request_id
+                msg_dict["usage"] = {
+                    "input_tokens": log_entry.input_tokens,
+                    "output_tokens": log_entry.output_tokens,
+                    "total_tokens": log_entry.total_tokens or m.tokens_used,
+                    "estimated_cost": log_entry.estimated_cost or log_entry.actual_cost
+                }
+                assistant_idx += 1
+            else:
+                msg_dict["provider"] = "gemini"
+                msg_dict["model"] = "gemini-flash"
+                msg_dict["request_id"] = ""
+                msg_dict["usage"] = {
+                    "input_tokens": 0,
+                    "output_tokens": 0,
+                    "total_tokens": m.tokens_used,
+                    "estimated_cost": 0.0
+                }
+        formatted_msgs.append(msg_dict)
+
     return {
         "ok": True,
-        "data": [
-            {
-                "id": m.id,
-                "conversation_id": m.conversation_id,
-                "role": m.role,
-                "content": m.content,
-                "tool_calls": json.loads(m.tool_calls) if m.tool_calls else None,
-                "tokens_used": m.tokens_used,
-                "created_at": m.created_at.isoformat() if m.created_at else None
-            }
-            for m in msgs
-        ]
+        "data": formatted_msgs
     }
 
 @router.delete("/conversations/{conversation_id}", response_model=SimpleActionResponse)
@@ -355,6 +387,7 @@ def get_effective_quota(req: QuotaQueryRequest, db: Session = Depends(get_db)):
             "company_id": req.company_id,
             "plan_code": active_plan_code,
             "quota_limit": company_max,
+            "monthly_token_quota": company_max,
             "tokens_consumed": consumed,
             "tokens_remaining": remaining,
             "is_exhausted": consumed >= company_max
