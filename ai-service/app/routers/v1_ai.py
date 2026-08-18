@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.identity import RequestContext, APIResponse
 from app.models.platform import (
-    AICapability, AIPlan, CompanyAIQuota, UserAIQuota, AIUsageLedger, AIModelPricing
+    AICapability, AIPlan, CompanyAIQuota, UserAIQuota, AIUsageLedger, AIModelPricing, AIConversation, AIMessage
 )
 from app.providers.provider_factory import ProviderFactory
 from app.providers.base_provider import LLMMessage
@@ -19,41 +19,104 @@ from app.services.analyst_service import BusinessAnalystEngine
 
 router = APIRouter(tags=["Generative & Predictive AI"])
 
+# ==================== REQUEST SCHEMAS ====================
+
 class ChatRequest(BaseModel):
     context: RequestContext
-    prompt: str = Field(..., description="User prompt or task instruction")
-    provider: Optional[str] = Field("openai", description="Target provider e.g. openai, anthropic, gemini")
-    model: Optional[str] = Field("gpt-4o-mini", description="Target model name")
-    temperature: Optional[float] = Field(0.7, ge=0.0, le=2.0)
-    max_tokens: Optional[int] = Field(1000, ge=50, le=8000)
+    prompt: str = Field(..., description="User prompt or task instruction", examples=["Berapa total penjualan hari ini?"])
+    provider: Optional[str] = Field("openai", description="Target provider: openai, anthropic, gemini", examples=["openai"])
+    model: Optional[str] = Field("gpt-4o-mini", description="Target model name", examples=["gpt-4o-mini"])
+    temperature: Optional[float] = Field(0.7, ge=0.0, le=2.0, examples=[0.7])
+    max_tokens: Optional[int] = Field(1000, ge=50, le=8000, examples=[1000])
 
 class AnalyzeRequest(BaseModel):
     context: RequestContext
-    prompt: str = Field(..., description="Business analytical prompt")
-    provider: Optional[str] = Field("openai", description="Target provider")
-    model: Optional[str] = Field("gpt-4o-mini", description="Target model")
+    prompt: str = Field(..., description="Business analytical prompt", examples=["Analisis menu yang paling menguntungkan bulan ini."])
+    provider: Optional[str] = Field("openai", description="Target provider", examples=["openai"])
+    model: Optional[str] = Field("gpt-4o-mini", description="Target model", examples=["gpt-4o-mini"])
 
 class QuotaQueryRequest(BaseModel):
-    application_id: str
-    company_id: str
-    user_id: Optional[str] = None
+    application_id: str = Field(..., examples=["umkm-pos"])
+    company_id: str = Field(..., examples=["IFresso-Coffee"])
+    user_id: Optional[str] = Field(None, examples=["usr-101"])
 
 class UsageQueryRequest(BaseModel):
-    application_id: str
-    company_id: str
-    limit: Optional[int] = Field(50, ge=1, le=500)
+    application_id: str = Field(..., examples=["umkm-pos"])
+    company_id: str = Field(..., examples=["IFresso-Coffee"])
+    limit: Optional[int] = Field(50, ge=1, le=500, examples=[50])
 
-@router.get("/health")
-def ai_platform_health():
-    return {
-        "ok": True,
-        "status": "online",
-        "platform": "Global Reusable AI Platform",
-        "version": "1.0.0",
-        "supported_providers": ["openai", "anthropic", "gemini"]
-    }
+class DeleteConversationRequest(BaseModel):
+    conversation_id: str = Field(..., examples=["conv_123456"])
 
-@router.get("/capabilities")
+# ==================== RESPONSE SCHEMAS ====================
+
+class HealthResponse(BaseModel):
+    ok: bool = Field(True, examples=[True])
+    status: str = Field("online", examples=["online"])
+    platform: str = Field("Global Reusable AI Platform", examples=["Global Reusable AI Platform"])
+    version: str = Field("2.0.0", examples=["2.0.0"])
+    supported_providers: List[str] = Field(["openai", "anthropic", "gemini"], examples=[["openai", "anthropic", "gemini"]])
+
+class CapabilityItem(BaseModel):
+    code: str = Field(..., examples=["business.analyst"])
+    name: str = Field(..., examples=["Business Analyst Engine"])
+    category: str = Field(..., examples=["Analytics"])
+    description: Optional[str] = Field(None, examples=["Predictive business intelligence"])
+
+class CapabilitiesResponse(BaseModel):
+    ok: bool = Field(True, examples=[True])
+    data: List[CapabilityItem]
+
+class ProvidersResponse(BaseModel):
+    ok: bool = Field(True, examples=[True])
+    data: Dict[str, List[Dict[str, Any]]] = Field(..., examples=[{"openai": [{"id": "gpt-4o-mini", "name": "GPT-4o Mini"}]}])
+
+class QuotaData(BaseModel):
+    application_id: str = Field(..., examples=["umkm-pos"])
+    company_id: str = Field(..., examples=["IFresso-Coffee"])
+    quota_limit: int = Field(..., examples=[500000])
+    tokens_consumed: int = Field(..., examples=[12450])
+    tokens_remaining: int = Field(..., examples=[487550])
+    is_exhausted: bool = Field(False, examples=[False])
+
+class QuotaResponse(BaseModel):
+    ok: bool = Field(True, examples=[True])
+    data: QuotaData
+
+class UsageLogItem(BaseModel):
+    request_id: str = Field(..., examples=["req_chat_abc123"])
+    user_id: str = Field(..., examples=["usr-101"])
+    capability: str = Field(..., examples=["business.assistant"])
+    provider: str = Field(..., examples=["openai"])
+    model: str = Field(..., examples=["gpt-4o-mini"])
+    input_tokens: int = Field(..., examples=[120])
+    output_tokens: int = Field(..., examples=[85])
+    total_tokens: int = Field(..., examples=[205])
+    actual_cost: float = Field(..., examples=[0.00015])
+    created_at: str = Field(..., examples=["2026-08-18T10:00:00"])
+
+class UsageResponse(BaseModel):
+    ok: bool = Field(True, examples=[True])
+    data: List[UsageLogItem]
+
+class ConversationItem(BaseModel):
+    conversation_id: str = Field(..., examples=["conv_abc123"])
+    title: Optional[str] = Field(None, examples=["Diskusi Penjualan Kopi"])
+    created_at: Optional[str] = Field(None, examples=["2026-08-18T10:00:00"])
+    updated_at: Optional[str] = Field(None, examples=["2026-08-18T10:05:00"])
+
+class ConversationsResponse(BaseModel):
+    ok: bool = Field(True, examples=[True])
+    data: List[ConversationItem]
+
+class SimpleActionResponse(BaseModel):
+    ok: bool = Field(True, examples=[True])
+    conversation_id: Optional[str] = Field(None, examples=["conv_abc123"])
+    message: str = Field(..., examples=["Operasi berhasil."])
+
+# ==================== ENDPOINT HANDLERS ====================
+
+@router.get("/capabilities", response_model=CapabilitiesResponse)
 def list_capabilities(db: Session = Depends(get_db)):
     capabilities = db.query(AICapability).filter(AICapability.is_active == True).all()
     return {
@@ -69,7 +132,7 @@ def list_capabilities(db: Session = Depends(get_db)):
         ]
     }
 
-@router.get("/providers")
+@router.get("/providers", response_model=ProvidersResponse)
 def list_providers(application_id: str = "umkm-pos", company_id: str = "IFresso-Coffee", db: Session = Depends(get_db)):
     from app.providers.gemini_provider import GeminiProvider
     from app.providers.openai_provider import OpenAIProvider
@@ -103,41 +166,7 @@ def list_providers(application_id: str = "umkm-pos", company_id: str = "IFresso-
         "data": grouped
     }
 
-@router.get("/data-logs")
-def list_data_access_logs(application_id: str = "umkm-pos", company_id: Optional[str] = None, limit: int = 50, db: Session = Depends(get_db)):
-    from app.models.platform import AIDataAccessLog
-    query = db.query(AIDataAccessLog)
-    if application_id:
-        query = query.filter(AIDataAccessLog.application_id == application_id)
-    if company_id:
-        query = query.filter(AIDataAccessLog.company_id == company_id)
-    logs = query.order_by(AIDataAccessLog.id.desc()).limit(limit).all()
-
-    items = []
-    for l in logs:
-        items.append({
-            "id": l.id,
-            "request_id": l.request_id,
-            "access_type": l.access_type,
-            "source": l.source,
-            "destination": l.destination,
-            "operation": l.operation,
-            "status": l.status,
-            "records_count": l.records_count,
-            "duration_ms": l.duration_ms,
-            "request_payload": json.loads(l.request_payload) if (l.request_payload and l.request_payload.startswith(("{", "["))) else l.request_payload,
-            "response_content": json.loads(l.response_content) if (l.response_content and l.response_content.startswith(("{", "["))) else l.response_content,
-            "created_at": l.created_at.isoformat() if l.created_at else None,
-            "details": json.loads(l.details_json) if l.details_json else {}
-        })
-
-    return {
-        "ok": True,
-        "total": len(items),
-        "data": items
-    }
-
-@router.get("/conversations")
+@router.get("/conversations", response_model=ConversationsResponse)
 def list_conversations(
     application_id: str = "umkm-pos",
     company_id: str = "IFresso-Coffee",
@@ -153,42 +182,21 @@ def list_conversations(
         user_id=user_id,
         limit=limit
     )
-    items = []
-    for c in convs:
-        items.append({
-            "id": c.id,
-            "conversation_id": c.conversation_id,
-            "application_id": c.application_id,
-            "company_id": c.company_id,
-            "user_id": c.user_id,
-            "title": c.title,
-            "created_at": c.created_at.isoformat() if c.created_at else None,
-            "updated_at": c.updated_at.isoformat() if c.updated_at else None
-        })
-    return {"ok": True, "total": len(items), "data": items}
-
-@router.get("/conversations/{conversation_id}/messages")
-def get_conversation_messages(conversation_id: str, limit: int = 100, db: Session = Depends(get_db)):
-    from app.services.chat_service import ChatHistoryService
-    msgs = ChatHistoryService.get_messages(db, conversation_id, limit=limit)
-    items = []
-    for m in msgs:
-        items.append({
-            "id": m.id,
-            "conversation_id": m.conversation_id,
-            "role": m.role,
-            "content": m.content,
-            "tokens_used": m.tokens_used,
-            "created_at": m.created_at.isoformat() if m.created_at else None
-        })
-    return {"ok": True, "conversation_id": conversation_id, "total": len(items), "data": items}
-
-class DeleteConversationRequest(BaseModel):
-    conversation_id: str
+    return {
+        "ok": True,
+        "data": [
+            {
+                "conversation_id": c.conversation_id,
+                "title": c.title,
+                "created_at": c.created_at.isoformat() if c.created_at else None,
+                "updated_at": c.updated_at.isoformat() if c.updated_at else None
+            }
+            for c in convs
+        ]
+    }
 
 @router.get("/conversations/{conversation_id}")
 def get_conversation_details(conversation_id: str, db: Session = Depends(get_db)):
-    from app.models.platform import AIConversation
     conv = db.query(AIConversation).filter(AIConversation.conversation_id == conversation_id).first()
     if not conv:
         return {"ok": False, "message": "Conversation not found."}
@@ -205,19 +213,19 @@ def get_conversation_details(conversation_id: str, db: Session = Depends(get_db)
         }
     }
 
-@router.post("/conversations/{conversation_id}/delete")
+@router.post("/conversations/{conversation_id}/delete", response_model=SimpleActionResponse)
 def delete_conversation(conversation_id: str, db: Session = Depends(get_db)):
     from app.services.chat_service import ChatHistoryService
     success = ChatHistoryService.delete_conversation(db, conversation_id)
     return {"ok": success, "conversation_id": conversation_id, "message": "Conversation deleted successfully." if success else "Conversation not found."}
 
-@router.post("/conversations/delete")
+@router.post("/conversations/delete", response_model=SimpleActionResponse)
 def delete_conversation_body(req: DeleteConversationRequest, db: Session = Depends(get_db)):
     from app.services.chat_service import ChatHistoryService
     success = ChatHistoryService.delete_conversation(db, req.conversation_id)
     return {"ok": success, "conversation_id": req.conversation_id, "message": "Conversation deleted successfully." if success else "Conversation not found."}
 
-@router.post("/quota")
+@router.post("/quota", response_model=QuotaResponse)
 def get_effective_quota(req: QuotaQueryRequest, db: Session = Depends(get_db)):
     company_max, web_search_max = QuotaService.get_effective_company_quota(db, req.application_id, req.company_id)
     
@@ -227,26 +235,24 @@ def get_effective_quota(req: QuotaQueryRequest, db: Session = Depends(get_db)):
     ).first()
 
     consumed = quota_rec.tokens_consumed if quota_rec else 0
-    reserved = quota_rec.tokens_reserved if quota_rec else 0
+    remaining = max(0, company_max - consumed)
 
     return {
         "ok": True,
         "data": {
             "application_id": req.application_id,
             "company_id": req.company_id,
-            "monthly_token_quota": company_max,
+            "quota_limit": company_max,
             "tokens_consumed": consumed,
-            "tokens_reserved": reserved,
-            "tokens_remaining": max(0, company_max - (consumed + reserved)),
-            "monthly_web_searches_quota": web_search_max,
-            "web_searches_consumed": quota_rec.web_searches_consumed if quota_rec else 0
+            "tokens_remaining": remaining,
+            "is_exhausted": consumed >= company_max
         }
     }
 
 @router.post("/chat", response_model=APIResponse)
 def execute_chat(req: ChatRequest, db: Session = Depends(get_db)):
     ctx = req.context
-    request_id = f"req_{uuid.uuid4().hex[:16]}"
+    request_id = f"req_cht_{uuid.uuid4().hex[:16]}"
     ctx.request_id = request_id
 
     cap = db.query(AICapability).filter(
@@ -426,7 +432,7 @@ def execute_analysis(req: AnalyzeRequest, db: Session = Depends(get_db)):
         }
     )
 
-@router.post("/usage")
+@router.post("/usage", response_model=UsageResponse)
 def query_usage(req: UsageQueryRequest, db: Session = Depends(get_db)):
     logs = db.query(AIUsageLedger).filter(
         AIUsageLedger.application_id == req.application_id,
@@ -446,7 +452,7 @@ def query_usage(req: UsageQueryRequest, db: Session = Depends(get_db)):
                 "output_tokens": l.output_tokens,
                 "total_tokens": l.total_tokens,
                 "actual_cost": l.actual_cost,
-                "created_at": l.created_at.isoformat()
+                "created_at": l.created_at.isoformat() if l.created_at else ""
             }
             for l in logs
         ]

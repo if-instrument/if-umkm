@@ -1,5 +1,5 @@
 import datetime
-from typing import Optional
+from typing import Optional, List, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
@@ -8,41 +8,112 @@ from app.database import get_db
 from app.config import settings
 from app.models.biometrics import FingerprintTemplate
 from app.services.fingerprint_engine import compute_fingerprint_similarity, verify_enrollment_step
+from app.services.python_hardware_driver import PythonHardwareDriver
 
 router = APIRouter(tags=["Fingerprint Biometrics"])
 
+# ==================== REQUEST SCHEMAS ====================
+
 class RegisterFingerprintRequest(BaseModel):
-    company_key: str = Field(..., description="Company slug (e.g. IFresso-Coffee)")
-    user_key: str = Field(..., description="Globally unique user GUID")
-    vendor: str = Field("Generic", description="Hardware vendor")
+    company_key: str = Field(..., description="Company slug (e.g. IFresso-Coffee)", examples=["IFresso-Coffee"])
+    user_key: str = Field(..., description="Globally unique user GUID", examples=["usr-101"])
+    vendor: str = Field("Generic", description="Hardware vendor", examples=["ZKTeco"])
     template_data: str = Field(..., description="Raw or base64 fingerprint template string")
 
 class VerifyStepRequest(BaseModel):
-    current_step: int = Field(..., description="Current enrollment step (1 to 6)")
-    vendor: str = Field("Generic", description="Hardware vendor")
+    current_step: int = Field(..., description="Current enrollment step (1 to 6)", examples=[1])
+    vendor: str = Field("Generic", description="Hardware vendor", examples=["ZKTeco"])
     template_data: str = Field(..., description="Scanned fingerprint template string")
-    previous_samples: Optional[list] = Field(default=[], description="List of previous recorded base64 templates")
+    previous_samples: Optional[List[str]] = Field(default=[], description="List of previous recorded base64 templates")
 
 class VerifyFingerprintRequest(BaseModel):
-    company_key: Optional[str] = Field(None, description="Company slug")
-    user_key: str = Field(..., description="Globally unique user GUID")
-    vendor: str = Field("Generic", description="Hardware vendor")
+    company_key: Optional[str] = Field(None, description="Company slug", examples=["IFresso-Coffee"])
+    user_key: str = Field(..., description="Globally unique user GUID", examples=["usr-101"])
+    vendor: str = Field("Generic", description="Hardware vendor", examples=["ZKTeco"])
     template_data: str = Field(..., description="Scanned fingerprint template string")
-    threshold: Optional[float] = Field(0.70, description="Similarity score threshold")
+    threshold: Optional[float] = Field(0.70, description="Similarity score threshold", examples=[0.70])
 
 class IdentifyFingerprintRequest(BaseModel):
-    company_key: Optional[str] = Field(None, description="Company slug to narrow search scope")
-    vendor: str = Field("Generic", description="Hardware vendor")
+    company_key: Optional[str] = Field(None, description="Company slug to narrow search scope", examples=["IFresso-Coffee"])
+    vendor: str = Field("Generic", description="Hardware vendor", examples=["ZKTeco"])
     template_data: str = Field(..., description="Scanned fingerprint template string")
-    threshold: Optional[float] = Field(0.70, description="Similarity score threshold")
+    threshold: Optional[float] = Field(0.70, description="Similarity score threshold", examples=[0.70])
 
 class DeleteFingerprintRequest(BaseModel):
-    company_key: Optional[str] = Field(None, description="Company slug")
-    user_key: str = Field(..., description="Globally unique user GUID")
+    company_key: Optional[str] = Field(None, description="Company slug", examples=["IFresso-Coffee"])
+    user_key: str = Field(..., description="Globally unique user GUID", examples=["usr-101"])
 
 class FingerprintStatusRequest(BaseModel):
-    company_key: Optional[str] = Field(None, description="Company slug")
-    user_key: str = Field(..., description="Globally unique user GUID")
+    company_key: Optional[str] = Field(None, description="Company slug", examples=["IFresso-Coffee"])
+    user_key: str = Field(..., description="Globally unique user GUID", examples=["usr-101"])
+
+class OpenDeviceRequest(BaseModel):
+    vendor: str = Field("Generic", description="Hardware vendor (ZKTeco, Suprema, DigitalPersona, TouchID, Generic)", examples=["ZKTeco"])
+    device_index: Optional[int] = Field(0, description="USB Device Index", examples=[0])
+
+class CloseDeviceRequest(BaseModel):
+    session_id: str = Field(..., description="Device session ID", examples=["fp_sess_123"])
+
+class CaptureFrameRequest(BaseModel):
+    session_id: str = Field(..., description="Device session ID", examples=["fp_sess_123"])
+
+# ==================== RESPONSE SCHEMAS ====================
+
+class FingerprintStatusResponse(BaseModel):
+    ok: bool = Field(True, examples=[True])
+    user_key: str = Field("usr-101", examples=["usr-101"])
+    company_key: str = Field("IFresso-Coffee", examples=["IFresso-Coffee"])
+    registered: bool = Field(True, examples=[True])
+    sample_count: int = Field(1, examples=[1])
+
+class RegisterFingerprintResponse(BaseModel):
+    ok: bool = Field(True, examples=[True])
+    message: str = Field("Template sidik jari berhasil didaftarkan!", examples=["Template sidik jari berhasil didaftarkan!"])
+    company_key: str = Field("IFresso-Coffee", examples=["IFresso-Coffee"])
+    user_key: str = Field("usr-101", examples=["usr-101"])
+    vendor: str = Field("ZKTeco", examples=["ZKTeco"])
+    sample_count: int = Field(1, examples=[1])
+
+class VerifyFingerprintResponse(BaseModel):
+    verified: bool = Field(True, examples=[True])
+    similarity: float = Field(0.92, examples=[0.92])
+    matched_sample: str = Field("Sampel #1", examples=["Sampel #1"])
+    sample_count: int = Field(1, examples=[1])
+    threshold: float = Field(0.70, examples=[0.70])
+    vendor: str = Field("ZKTeco", examples=["ZKTeco"])
+    message: str = Field("Sidik jari terverifikasi cocok.", examples=["Sidik jari terverifikasi cocok."])
+
+class IdentifyFingerprintResponse(BaseModel):
+    verified: bool = Field(True, examples=[True])
+    user_key: str = Field("usr-101", examples=["usr-101"])
+    similarity: float = Field(0.92, examples=[0.92])
+    matched_sample: str = Field("Sampel #1", examples=["Sampel #1"])
+    sample_count: int = Field(1, examples=[1])
+    threshold: float = Field(0.70, examples=[0.70])
+    message: str = Field("Sidik jari teridentifikasi (92.0%)", examples=["Sidik jari teridentifikasi (92.0%)"])
+
+class DeleteFingerprintResponse(BaseModel):
+    ok: bool = Field(True, examples=[True])
+    deleted_count: int = Field(1, examples=[1])
+    device_cleared: bool = Field(True, examples=[True])
+    message: str = Field("Berhasil menghapus sampel sidik jari.", examples=["Berhasil menghapus sampel sidik jari."])
+
+class VerifyStepResponse(BaseModel):
+    ok: bool = Field(True, examples=[True])
+    step_passed: bool = Field(True, examples=[True])
+    repeat_step: Optional[int] = Field(None, examples=[None])
+    all_completed: bool = Field(False, examples=[False])
+    similarity_score: float = Field(0.88, examples=[0.88])
+    message: str = Field("Sampel langkah 1 valid.", examples=["Sampel langkah 1 valid."])
+
+class HardwareDeviceResponse(BaseModel):
+    ok: bool = Field(True, examples=[True])
+    session_id: Optional[str] = Field(None, examples=["fp_sess_123"])
+    status: Optional[str] = Field(None, examples=["opened"])
+    message: Optional[str] = Field(None, examples=["Device connected successfully."])
+    template: Optional[str] = Field(None, description="Scanned template string")
+
+# ==================== ENDPOINT HANDLERS ====================
 
 def get_user_key_variants(user_key: Optional[str]) -> list:
     if not user_key:
@@ -51,7 +122,7 @@ def get_user_key_variants(user_key: Optional[str]) -> list:
     clean = raw[4:] if raw.startswith("usr-") else raw
     return list({raw, clean, f"usr-{clean}"})
 
-@router.post("/status")
+@router.post("/status", response_model=FingerprintStatusResponse)
 def check_fingerprint_status(req: FingerprintStatusRequest, db: Session = Depends(get_db)):
     query = db.query(FingerprintTemplate).filter(FingerprintTemplate.user_key.in_(get_user_key_variants(req.user_key)))
     if req.company_key:
@@ -66,7 +137,7 @@ def check_fingerprint_status(req: FingerprintStatusRequest, db: Session = Depend
         "sample_count": count
     }
 
-@router.post("/register")
+@router.post("/register", response_model=RegisterFingerprintResponse)
 def register_fingerprint(req: RegisterFingerprintRequest, db: Session = Depends(get_db)):
     if not req.template_data.strip():
         raise HTTPException(status_code=400, detail="Data template sidik jari tidak boleh kosong.")
@@ -104,7 +175,7 @@ def register_fingerprint(req: RegisterFingerprintRequest, db: Session = Depends(
         "sample_count": sample_count
     }
 
-@router.post("/verify")
+@router.post("/verify", response_model=VerifyFingerprintResponse)
 def verify_fingerprint(req: VerifyFingerprintRequest, db: Session = Depends(get_db)):
     query = db.query(FingerprintTemplate).filter(FingerprintTemplate.user_key.in_(get_user_key_variants(req.user_key)))
     if req.company_key:
@@ -114,10 +185,12 @@ def verify_fingerprint(req: VerifyFingerprintRequest, db: Session = Depends(get_
     if not records:
         return {
             "verified": False,
-            "message": "Belum ada sampel sidik jari terdaftar untuk pengguna ini.",
             "similarity": 0.0,
+            "matched_sample": "",
+            "sample_count": 0,
             "threshold": req.threshold,
-            "sample_count": 0
+            "vendor": req.vendor,
+            "message": "Belum ada sampel sidik jari terdaftar untuk pengguna ini."
         }
 
     best_similarity = 0.0
@@ -143,7 +216,7 @@ def verify_fingerprint(req: VerifyFingerprintRequest, db: Session = Depends(get_
         "message": f"Sidik jari terverifikasi cocok dengan Sampel #{best_sample_index} ({round(best_similarity * 100, 1)}%)" if passed else f"Kemiripan ({round(best_similarity * 100, 1)}%) di bawah batas minimal ({round(req.threshold * 100, 1)}%)"
     }
 
-@router.post("/identify")
+@router.post("/identify", response_model=IdentifyFingerprintResponse)
 def identify_fingerprint(req: IdentifyFingerprintRequest, db: Session = Depends(get_db)):
     query = db.query(FingerprintTemplate)
     if req.company_key:
@@ -157,10 +230,11 @@ def identify_fingerprint(req: IdentifyFingerprintRequest, db: Session = Depends(
         return {
             "verified": False,
             "user_key": "",
-            "message": "Belum ada sampel sidik jari terdaftar pada sistem.",
             "similarity": 0.0,
+            "matched_sample": "",
+            "sample_count": 0,
             "threshold": req.threshold,
-            "sample_count": 0
+            "message": "Belum ada sampel sidik jari terdaftar pada sistem."
         }
 
     best_similarity = 0.0
@@ -186,7 +260,7 @@ def identify_fingerprint(req: IdentifyFingerprintRequest, db: Session = Depends(
         "message": f"Sidik jari teridentifikasi ({round(best_similarity * 100, 1)}%)" if passed else f"Sidik jari tidak teridentifikasi ({round(best_similarity * 100, 1)}%)"
     }
 
-@router.post("/delete")
+@router.post("/delete", response_model=DeleteFingerprintResponse)
 def delete_fingerprint(req: DeleteFingerprintRequest, db: Session = Depends(get_db)):
     query = db.query(FingerprintTemplate).filter(FingerprintTemplate.user_key == req.user_key)
     if req.company_key:
@@ -195,7 +269,6 @@ def delete_fingerprint(req: DeleteFingerprintRequest, db: Session = Depends(get_
     deleted_count = query.delete(synchronize_session=False)
     db.commit()
 
-    # Clear driver memory cache and active device hardware session buffers
     driver_res = PythonHardwareDriver.clear_device_data(req.user_key)
 
     return {
@@ -205,18 +278,6 @@ def delete_fingerprint(req: DeleteFingerprintRequest, db: Session = Depends(get_
         "message": f"Berhasil menghapus {deleted_count} sampel sidik jari dari database dan memori perangkat."
     }
 
-from app.services.python_hardware_driver import PythonHardwareDriver
-
-class OpenDeviceRequest(BaseModel):
-    vendor: str = Field("Generic", description="Hardware vendor (ZKTeco, Suprema, DigitalPersona, TouchID, Generic)")
-    device_index: Optional[int] = Field(0, description="USB Device Index")
-
-class CloseDeviceRequest(BaseModel):
-    session_id: str = Field(..., description="Device session ID")
-
-class CaptureFrameRequest(BaseModel):
-    session_id: str = Field(..., description="Device session ID")
-
 @router.get("/list-devices")
 def list_fingerprint_devices():
     """Scan and return all available fingerprint devices (Touch ID + USB)."""
@@ -225,28 +286,19 @@ def list_fingerprint_devices():
 @router.post("/open-device")
 def open_fingerprint_device(req: OpenDeviceRequest):
     """Open a fingerprint device and start a session."""
-    res = PythonHardwareDriver.open_device(vendor=req.vendor, device_index=req.device_index)
-    return res
+    return PythonHardwareDriver.open_device(vendor=req.vendor, device_index=req.device_index)
 
 @router.post("/close-device")
 def close_fingerprint_device(req: CloseDeviceRequest):
     """Close the fingerprint device and release the session."""
-    res = PythonHardwareDriver.close_device(session_id=req.session_id)
-    return res
+    return PythonHardwareDriver.close_device(session_id=req.session_id)
 
 @router.post("/capture-frame")
 def capture_fingerprint_frame(req: CaptureFrameRequest):
-    """
-    Read a real biometric frame from the active device session.
-    
-    - TouchID: triggers native macOS Touch ID prompt (blocking up to 30s).
-    - USB scanner: reads raw minutiae bytes from USB endpoint.
-    """
-    res = PythonHardwareDriver.capture_frame(session_id=req.session_id)
-    return res
+    """Read a real biometric frame from the active device session."""
+    return PythonHardwareDriver.capture_frame(session_id=req.session_id)
 
-
-@router.post("/verify-step")
+@router.post("/verify-step", response_model=VerifyStepResponse)
 def verify_fingerprint_step(req: VerifyStepRequest):
     res = verify_enrollment_step(
         current_step=req.current_step,

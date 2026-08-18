@@ -69,7 +69,25 @@ api_v1_router.include_router(fingerprint.router, prefix="/fingerprint")
 api_v1_router.include_router(v1_ai.router, prefix="/ai")
 app.include_router(api_v1_router)
 
-@app.get("/api/v1/health", tags=["Health"])
+from typing import List
+from pydantic import BaseModel, Field
+
+class GlobalHealthResponse(BaseModel):
+    ok: bool = Field(True, examples=[True])
+    status: str = Field("online", examples=["online"])
+    service: str = Field("IF Instrument AI Microservice Platform", examples=["IFresso-AI-Platform"])
+    version: str = Field("2.0.0", examples=["2.0.0"])
+    api_prefix: str = Field("/api/v1", examples=["/api/v1"])
+    features: List[str] = Field(
+        ["face_biometrics", "fingerprint", "v1_ai_business_intelligence"],
+        examples=[["face_biometrics", "fingerprint", "v1_ai_business_intelligence"]]
+    )
+    supported_providers: List[str] = Field(
+        ["openai", "anthropic", "gemini"],
+        examples=[["openai", "anthropic", "gemini"]]
+    )
+
+@app.get("/api/v1/health", response_model=GlobalHealthResponse, tags=["Health"])
 def health_check():
     return {
         "ok": True,
@@ -77,7 +95,8 @@ def health_check():
         "service": "IF Instrument AI Microservice Platform",
         "version": "2.0.0",
         "api_prefix": "/api/v1",
-        "features": ["face_biometrics", "fingerprint", "v1_ai_business_intelligence"]
+        "features": ["face_biometrics", "fingerprint", "v1_ai_business_intelligence"],
+        "supported_providers": ["openai", "anthropic", "gemini"]
     }
 
 if __name__ == "__main__":

@@ -7,7 +7,7 @@ client = TestClient(app)
 headers = {"X-API-Key": settings.API_KEY}
 
 def test_ai_health_endpoint():
-    res = client.get("/api/v1/ai/health", headers=headers)
+    res = client.get("/api/v1/health")
     assert res.status_code == 200
     data = res.json()
     assert data["ok"] is True
