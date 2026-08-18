@@ -1,4 +1,4 @@
-import { apiGet, apiLogout, appPath, applyPermissionControls, canAccessAllOutlets, canUsePermission, clearSession, loadSession, loadState, primaryOutletId, saveSession } from "./store.js";
+import { apiGet, apiLogout, appPath, applyPermissionControls, canAccessAllOutlets, canUsePermission, clearSession, currentCompanySlug, loadSession, loadState, primaryOutletId, saveSession } from "./store.js";
 import { isInactiveStatus } from "./status-codes.js";
 
 const APP_LOGO = "/assets/if-instrument-logo.jpg";
@@ -101,7 +101,7 @@ function applyAccessState(state, session) {
 
 function activeCompany(state, session) {
   const contextCompany = session?.accessContext?.company;
-  const slug = session?.companySlug || window.__COMPANY_SLUG__ || "";
+  const slug = currentCompanySlug() || session?.companySlug || window.__COMPANY_SLUG__ || "";
   const companyId = session?.companyId || state.activeCompanyId;
 
   if (contextCompany && (contextCompany.slug === slug || contextCompany.routeSlug === slug || contextCompany.id === companyId || !slug)) {
@@ -167,6 +167,33 @@ function updateFavicon(iconUrl) {
     document.head.appendChild(link);
   }
   link.href = iconUrl;
+}
+
+/**
+ * Update sidebar brand mark (logo + name) and favicon dynamically.
+ * Call this after settings bootstrap completes so the logo reflects the tenant DB record
+ * even if the session was created before logo_path was synced to central DB.
+ */
+export function updateSidebarBrand(logoUrl, companyName) {
+  if (!logoUrl) return;
+  // Update favicon
+  updateFavicon(logoUrl);
+  // Update brand mark img in sidebar
+  const brandMark = document.querySelector(".brand-mark");
+  if (brandMark) {
+    const existing = brandMark.querySelector("img");
+    if (existing) {
+      existing.src = logoUrl;
+      if (companyName) existing.alt = companyName;
+    } else {
+      brandMark.innerHTML = `<img src="${logoUrl}" alt="${companyName || ""}" />`;
+    }
+  }
+  // Update brand title
+  if (companyName) {
+    const brandTitle = document.querySelector(".brand-name");
+    if (brandTitle) brandTitle.textContent = companyName;
+  }
 }
 
 function formatSlugToTitle(slug) {

@@ -3,11 +3,10 @@ import datetime
 import logging
 from typing import Dict, Any, Optional, Tuple
 from sqlalchemy.orm import Session
-from sqlalchemy import text
 
 from app.models.platform import (
-    Application, Company, User, AIPlan, CompanyAISubscription,
-    CompanyAIQuota, UserAIQuota, AIUsageReservation, AIUsageLedger, AIAuditLog
+    AIPlan, CompanyAISubscription, CompanyAIQuota,
+    AIUsageReservation, AIUsageLedger
 )
 
 logger = logging.getLogger("quota_service")
@@ -18,7 +17,7 @@ class QuotaExceededException(Exception):
 class QuotaService:
     """
     Multi-Tenant AI Quota & Atomic Token Reservation Engine.
-    Evaluates: Plan Quota -> Company Override -> User Quota.
+    Evaluates: Plan Quota -> Company Override.
     """
 
     @classmethod
@@ -108,40 +107,13 @@ class QuotaService:
         if current_usage + estimated_tokens > max_company_tokens:
             msg = f"Company AI Token Quota Exceeded! (Limit: {max_company_tokens:,}, Used/Reserved: {current_usage:,}, Requested: {estimated_tokens:,})"
             logger.warning(f"[{application_id}:{company_id}] {msg}")
-            
-            # Audit log
-            audit = AIAuditLog(
-                application_id=application_id,
-                company_id=company_id,
-                user_id=user_id,
-                action="quota_exceeded",
-                details=msg
-            )
-            db.add(audit)
-            db.commit()
             raise QuotaExceededException(msg)
-
-        # Check optional User Quota limit
-        u_quota = db.query(UserAIQuota).filter(
-            UserAIQuota.application_id == application_id,
-            UserAIQuota.company_id == company_id,
-            UserAIQuota.user_id == user_id
-        ).first()
-
-        if u_quota and u_quota.monthly_token_limit is not None:
-            user_current = u_quota.tokens_consumed + u_quota.tokens_reserved
-            if user_current + estimated_tokens > u_quota.monthly_token_limit:
-                msg = f"User AI Token Limit Exceeded! (User Limit: {u_quota.monthly_token_limit:,}, Used: {user_current:,})"
-                logger.warning(f"[{application_id}:{company_id}:{user_id}] {msg}")
-                raise QuotaExceededException(msg)
 
         # Reserve
         reservation_id = f"res_{uuid.uuid4().hex[:16]}"
         expires_at = now + datetime.timedelta(minutes=5)
 
         c_quota.tokens_reserved += estimated_tokens
-        if u_quota:
-            u_quota.tokens_reserved += estimated_tokens
 
         res_record = AIUsageReservation(
             reservation_id=reservation_id,
@@ -183,7 +155,7 @@ class QuotaService:
             logger.warning(f"Reservation {reservation_id} not found or already processed.")
             # Fallback direct commit
             res_tokens = 0
-            app_id = "default"
+            app_id = "umkm-pos"
             comp_id = "default"
             usr_id = "default"
         else:
@@ -204,17 +176,6 @@ class QuotaService:
         if c_quota:
             c_quota.tokens_reserved = max(0, c_quota.tokens_reserved - res_tokens)
             c_quota.tokens_consumed += total_tokens
-
-        # Adjust UserAIQuota
-        u_quota = db.query(UserAIQuota).filter(
-            UserAIQuota.application_id == app_id,
-            UserAIQuota.company_id == comp_id,
-            UserAIQuota.user_id == usr_id
-        ).first()
-
-        if u_quota:
-            u_quota.tokens_reserved = max(0, u_quota.tokens_reserved - res_tokens)
-            u_quota.tokens_consumed += total_tokens
 
         # Create Immutable Usage Ledger Record
         ledger = AIUsageLedger(
@@ -260,13 +221,5 @@ class QuotaService:
         ).first()
         if c_quota:
             c_quota.tokens_reserved = max(0, c_quota.tokens_reserved - res_tokens)
-
-        u_quota = db.query(UserAIQuota).filter(
-            UserAIQuota.application_id == res_record.application_id,
-            UserAIQuota.company_id == res_record.company_id,
-            UserAIQuota.user_id == res_record.user_id
-        ).first()
-        if u_quota:
-            u_quota.tokens_reserved = max(0, u_quota.tokens_reserved - res_tokens)
 
         db.commit()

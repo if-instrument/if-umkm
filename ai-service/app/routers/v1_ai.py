@@ -6,11 +6,10 @@ from typing import Optional, List, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
-
 from app.database import get_db
 from app.models.identity import RequestContext, APIResponse
 from app.models.platform import (
-    AICapability, AIPlan, CompanyAIQuota, UserAIQuota, AIUsageLedger, AIModelPricing, AIConversation, AIMessage
+    Company, AIPlan, CompanyAISubscription, CompanyAIQuota, AIUsageLedger, AIConversation, AIMessage
 )
 from app.providers.provider_factory import ProviderFactory
 from app.providers.base_provider import LLMMessage
@@ -18,6 +17,53 @@ from app.services.quota_service import QuotaService, QuotaExceededException
 from app.services.analyst_service import BusinessAnalystEngine
 
 router = APIRouter(tags=["Generative & Predictive AI"])
+
+# ==================== PLATFORM CAPABILITIES ====================
+
+SUPPORTED_CAPABILITIES: List[Dict[str, Any]] = [
+    {
+        "code": "biometric.face",
+        "name": "Face Recognition Biometrics",
+        "category": "biometric",
+        "description": "Face recognition embedding and cosine verification",
+        "is_active": True,
+    },
+    {
+        "code": "biometric.fingerprint",
+        "name": "Fingerprint Biometrics",
+        "category": "biometric",
+        "description": "Hardware and ISO/ANSI template fingerprint biometric matcher",
+        "is_active": True,
+    },
+    {
+        "code": "business.assistant",
+        "name": "AI Conversational Assistant",
+        "category": "business",
+        "description": "Conversational AI assistant for staff and business owners",
+        "is_active": True,
+    },
+    {
+        "code": "business.analyst",
+        "name": "AI Deep Business Analyst",
+        "category": "business",
+        "description": "Deep predictive intelligence and sales trend analysis",
+        "is_active": True,
+    },
+    {
+        "code": "business.web_search",
+        "name": "External Knowledge Web Search",
+        "category": "business",
+        "description": "Real-time web retrieval for market trends and competitors",
+        "is_active": True,
+    },
+    {
+        "code": "business.action",
+        "name": "AI Propose & Action Execution",
+        "category": "business",
+        "description": "Automated business proposal and action triggers",
+        "is_active": True,
+    },
+]
 
 # ==================== REQUEST SCHEMAS ====================
 
@@ -39,6 +85,7 @@ class QuotaQueryRequest(BaseModel):
     application_id: str = Field(..., examples=["umkm-pos"])
     company_id: str = Field(..., examples=["IFresso-Coffee"])
     user_id: Optional[str] = Field(None, examples=["usr-101"])
+    plan_code: Optional[str] = Field(None, description="Assign or upgrade to an AI Plan (e.g. free, basic, professional, enterprise)", examples=["professional"])
 
 class UsageQueryRequest(BaseModel):
     application_id: str = Field(..., examples=["umkm-pos"])
@@ -47,6 +94,7 @@ class UsageQueryRequest(BaseModel):
 
 class DeleteConversationRequest(BaseModel):
     conversation_id: str = Field(..., examples=["conv_123456"])
+
 
 # ==================== RESPONSE SCHEMAS ====================
 
@@ -74,9 +122,10 @@ class ProvidersResponse(BaseModel):
 class QuotaData(BaseModel):
     application_id: str = Field(..., examples=["umkm-pos"])
     company_id: str = Field(..., examples=["IFresso-Coffee"])
-    quota_limit: int = Field(..., examples=[500000])
+    plan_code: str = Field("professional", examples=["professional"])
+    quota_limit: int = Field(..., examples=[2000000])
     tokens_consumed: int = Field(..., examples=[12450])
-    tokens_remaining: int = Field(..., examples=[487550])
+    tokens_remaining: int = Field(..., examples=[1987550])
     is_exhausted: bool = Field(False, examples=[False])
 
 class QuotaResponse(BaseModel):
@@ -117,18 +166,17 @@ class SimpleActionResponse(BaseModel):
 # ==================== ENDPOINT HANDLERS ====================
 
 @router.get("/capabilities", response_model=CapabilitiesResponse)
-def list_capabilities(db: Session = Depends(get_db)):
-    capabilities = db.query(AICapability).filter(AICapability.is_active == True).all()
+def list_capabilities():
     return {
         "ok": True,
         "data": [
             {
-                "code": c.code,
-                "name": c.name,
-                "category": c.category,
-                "description": c.description
+                "code": c["code"],
+                "name": c["name"],
+                "category": c["category"],
+                "description": c["description"]
             }
-            for c in capabilities
+            for c in SUPPORTED_CAPABILITIES if c.get("is_active", True)
         ]
     }
 
@@ -213,6 +261,27 @@ def get_conversation_details(conversation_id: str, db: Session = Depends(get_db)
         }
     }
 
+@router.get("/conversations/{conversation_id}/messages")
+def get_conversation_messages(conversation_id: str, db: Session = Depends(get_db)):
+    from app.services.chat_service import ChatHistoryService
+    msgs = ChatHistoryService.get_messages(db, conversation_id)
+    return {
+        "ok": True,
+        "data": [
+            {
+                "id": m.id,
+                "conversation_id": m.conversation_id,
+                "role": m.role,
+                "content": m.content,
+                "tool_calls": json.loads(m.tool_calls) if m.tool_calls else None,
+                "tokens_used": m.tokens_used,
+                "created_at": m.created_at.isoformat() if m.created_at else None
+            }
+            for m in msgs
+        ]
+    }
+
+@router.delete("/conversations/{conversation_id}", response_model=SimpleActionResponse)
 @router.post("/conversations/{conversation_id}/delete", response_model=SimpleActionResponse)
 def delete_conversation(conversation_id: str, db: Session = Depends(get_db)):
     from app.services.chat_service import ChatHistoryService
@@ -227,8 +296,50 @@ def delete_conversation_body(req: DeleteConversationRequest, db: Session = Depen
 
 @router.post("/quota", response_model=QuotaResponse)
 def get_effective_quota(req: QuotaQueryRequest, db: Session = Depends(get_db)):
+    # 1. If plan_code is provided, assign/upgrade company subscription
+    if req.plan_code:
+        clean_code = req.plan_code.lower().strip()
+        # Auto-map common aliases (e.g. starter -> basic)
+        if clean_code in ["starter"]:
+            clean_code = "basic"
+
+        plan = db.query(AIPlan).filter(AIPlan.code == clean_code).first()
+        if plan:
+            # Update or create subscription
+            sub = db.query(CompanyAISubscription).filter(
+                CompanyAISubscription.application_id == req.application_id,
+                CompanyAISubscription.company_id == req.company_id
+            ).first()
+            if not sub:
+                db.add(CompanyAISubscription(
+                    application_id=req.application_id,
+                    company_id=req.company_id,
+                    plan_code=plan.code,
+                    status="active"
+                ))
+            else:
+                sub.plan_code = plan.code
+                sub.status = "active"
+
+            # Clear manual numeric override so plan quota takes effect
+            quota_rec = db.query(CompanyAIQuota).filter(
+                CompanyAIQuota.application_id == req.application_id,
+                CompanyAIQuota.company_id == req.company_id
+            ).first()
+            if quota_rec:
+                quota_rec.monthly_token_quota_override = None
+            db.commit()
+
     company_max, web_search_max = QuotaService.get_effective_company_quota(db, req.application_id, req.company_id)
     
+    # Resolve active plan code
+    active_sub = db.query(CompanyAISubscription).filter(
+        CompanyAISubscription.application_id == req.application_id,
+        CompanyAISubscription.company_id == req.company_id,
+        CompanyAISubscription.status == "active"
+    ).first()
+    active_plan_code = active_sub.plan_code if active_sub else "free"
+
     quota_rec = db.query(CompanyAIQuota).filter(
         CompanyAIQuota.application_id == req.application_id,
         CompanyAIQuota.company_id == req.company_id
@@ -242,6 +353,7 @@ def get_effective_quota(req: QuotaQueryRequest, db: Session = Depends(get_db)):
         "data": {
             "application_id": req.application_id,
             "company_id": req.company_id,
+            "plan_code": active_plan_code,
             "quota_limit": company_max,
             "tokens_consumed": consumed,
             "tokens_remaining": remaining,
@@ -255,11 +367,8 @@ def execute_chat(req: ChatRequest, db: Session = Depends(get_db)):
     request_id = f"req_cht_{uuid.uuid4().hex[:16]}"
     ctx.request_id = request_id
 
-    cap = db.query(AICapability).filter(
-        AICapability.code == ctx.capability,
-        AICapability.is_active == True
-    ).first()
-    if not cap:
+    valid_codes = {c["code"] for c in SUPPORTED_CAPABILITIES if c.get("is_active", True)}
+    if ctx.capability not in valid_codes:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Capability '{ctx.capability}' tidak aktif atau belum terdaftar."
@@ -411,13 +520,16 @@ def execute_analysis(req: AnalyzeRequest, db: Session = Depends(get_db)):
     return APIResponse(
         ok=True,
         data={
-            "answer": res["answer"],
-            "sources": res["sources"],
-            "recommendations": res["recommendations"],
-            "proposed_actions": res["proposed_actions"],
-            "tool_calls_executed": res["tool_calls_executed"],
+            "answer": res.get("answer", ""),
+            "sources": res.get("data_sources", []),
+            "recommendations": res.get("recommendations", []),
+            "proposed_actions": res.get("proposed_actions", []),
+            "tool_calls_executed": res.get("tool_calls", []),
+            "tool_calls": res.get("tool_calls", []),
+            "is_onboarded": res.get("is_onboarded", True),
+            "business_type": res.get("business_type"),
             "provider": provider_name,
-            "model": res["model"]
+            "model": res.get("model", "")
         },
         meta={
             "request_id": request_id,

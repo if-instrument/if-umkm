@@ -105,11 +105,14 @@ class AiBridgeController extends BaseController
 
         $hasOrderItems = $db->tableExists('order_items');
 
-        $builder = $db->table('products')
-            ->select('id, sku, name as product_name, selling_price as price, status');
+        $builder = $db->table('products p')
+            ->select('p.id, p.sku, p.name as product_name, p.selling_price as price, p.status, c.name as category_name')
+            ->join('product_outlet_categories poc', 'poc.product_id = p.id', 'left')
+            ->join('categories c', 'c.id = poc.category_id', 'left')
+            ->where('p.deleted_at', null);
 
         if ($search !== '') {
-            $builder->like('name', $search);
+            $builder->like('p.name', $search);
         }
 
         $products = $builder->limit($limit)->get()->getResultArray();
@@ -119,8 +122,6 @@ class AiBridgeController extends BaseController
 
         return array_map(function ($r) use ($db, $hasOrderItems) {
             $price = (float) ($r['price'] ?? 0);
-            $cost = round($price * 0.35, 2);
-            $margin = $price > 0 ? round((($price - $cost) / $price) * 100, 1) : 0.0;
 
             $salesVol = 0;
             if ($hasOrderItems) {
@@ -133,11 +134,11 @@ class AiBridgeController extends BaseController
             }
 
             return [
-                'product_name' => $r['product_name'],
+                'sku' => $r['sku'] ?? '',
+                'product_name' => $r['product_name'] ?? '',
+                'category' => ! empty($r['category_name']) ? $r['category_name'] : 'General',
+                'selling_price' => $price,
                 'sales_volume' => $salesVol,
-                'category_avg' => 0,
-                'trend_percent' => 0,
-                'margin_percent' => "{$margin}%",
             ];
         }, $products);
     }
@@ -148,6 +149,7 @@ class AiBridgeController extends BaseController
             $row = $db->table('orders')
                 ->selectSum('grand_total', 'total_revenue')
                 ->selectCount('id', 'total_orders')
+                ->where('status !=', 'cancelled')
                 ->get()
                 ->getRowArray();
 
@@ -160,7 +162,6 @@ class AiBridgeController extends BaseController
                 'total_revenue' => $totalRevenue,
                 'total_orders' => $totalOrders,
                 'average_basket_size' => $avgBasket,
-                'growth_rate' => 'N/A',
             ];
         }
 
@@ -173,8 +174,9 @@ class AiBridgeController extends BaseController
 
         if ($tableName !== '') {
             $rows = $db->table($tableName)
-                ->select('name as item_name, stock_qty as current_stock, unit, minimum_stock as reorder_point')
-                ->limit(15)
+                ->select('name as item_name, category, stock_qty as current_stock, unit, minimum_stock as reorder_point, average_cost')
+                ->where('deleted_at', null)
+                ->limit(20)
                 ->get()
                 ->getResultArray();
 
@@ -197,8 +199,9 @@ class AiBridgeController extends BaseController
 
         if ($tableName !== '') {
             $rows = $db->table($tableName)
-                ->select('name as ingredient, stock_qty as stock, unit, average_cost as unit_cost')
-                ->limit(15)
+                ->select('name as ingredient, category, stock_qty as stock, unit, average_cost as unit_cost')
+                ->where('deleted_at', null)
+                ->limit(20)
                 ->get()
                 ->getResultArray();
 
@@ -223,11 +226,14 @@ class AiBridgeController extends BaseController
             return [];
         }
 
-        $builder = $db->table('products')
-            ->select('id, sku, name as product_name, selling_price as price, status');
+        $builder = $db->table('products p')
+            ->select('p.id, p.sku, p.name as product_name, p.selling_price as price, p.status, c.name as category_name')
+            ->join('product_outlet_categories poc', 'poc.product_id = p.id', 'left')
+            ->join('categories c', 'c.id = poc.category_id', 'left')
+            ->where('p.deleted_at', null);
 
         if ($search !== '') {
-            $builder->like('name', $search);
+            $builder->like('p.name', $search);
         }
 
         $rows = $builder->limit($limit)->get()->getResultArray();
@@ -238,9 +244,8 @@ class AiBridgeController extends BaseController
             return [
                 'sku' => ! empty($r['sku']) ? $r['sku'] : ('PRD-' . str_pad($r['id'] ?? 1, 4, '0', STR_PAD_LEFT)),
                 'product_name' => $r['product_name'] ?? 'Produk',
-                'category' => 'Beverage',
+                'category' => ! empty($r['category_name']) ? $r['category_name'] : 'General',
                 'price' => $price,
-                'cost_price' => round($price * 0.35, 2),
                 'status' => $st,
             ];
         }, $rows);

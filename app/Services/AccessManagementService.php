@@ -12,10 +12,52 @@ class AccessManagementService
 {
     use \App\Services\Shared\MappingHelperTrait;
 
+    private function centralDb()
+    {
+        $tenantDb = service('tenantDatabaseService');
+        return $tenantDb ? $tenantDb->centralConnection() : Database::connect();
+    }
+
+    /**
+     * Sync branding fields (logo, theme_color, name) to tenant DB companies table.
+     * This ensures the sidebar logo and favicon always match the central DB record.
+     */
+    private function syncBrandingToTenantDb(int $companyId, array $row): void
+    {
+        try {
+            $tenantService = service('tenantDatabaseService');
+            if (! $tenantService) return;
+
+            // Get company slug from central DB to find tenant connection
+            $centralDb = $this->centralDb();
+            $companyRow = $centralDb->table('companies')->where('id', $companyId)->get()->getRowArray();
+            if (! $companyRow || empty($companyRow['route_slug'])) return;
+
+            $tenantDb = $tenantService->connectionForCompanySlug($companyRow['route_slug']);
+            if (! $tenantDb || ! $tenantDb->tableExists('companies')) return;
+
+            $syncFields = array_filter([
+                'name'        => $row['name'] ?? null,
+                'logo_path'   => $row['logo_path'] ?? null,
+                'theme_color' => $row['theme_color'] ?? null,
+                'route_slug'  => $row['route_slug'] ?? null,
+                'updated_at'  => date('Y-m-d H:i:s'),
+            ], fn ($v) => $v !== null && $v !== '');
+
+            if (! empty($syncFields)) {
+                $tenantDb->table('companies')->where('id', 1)->update($syncFields);
+            }
+        } catch (\Throwable $e) {
+            // Non-fatal: log but don't interrupt main flow
+            log_message('warning', '[syncBrandingToTenantDb] ' . $e->getMessage());
+        }
+    }
+
     public function data(): array
     {
+        $centralDb = $this->centralDb();
         $db = Database::connect();
-        $companies = (new CompanyModel())->orderBy('id')->findAll();
+        $companies = $centralDb->table('companies')->orderBy('id', 'ASC')->get()->getResultArray();
         $outlets = $db->tableExists('outlets') ? (new OutletModel())->orderBy('id')->findAll() : [];
         $roles = $db->tableExists('roles') ? (new RoleModel())->orderBy('id')->findAll() : [];
         $users = (new UserModel())->orderBy('id')->findAll();
@@ -95,7 +137,7 @@ class AccessManagementService
         $expiresDate = date('Y-m-d', $expiresTime);
 
         if (! empty($row['id'])) {
-            Database::connect()->table('companies')->where('id', (int) $row['id'])->update(['expires_at' => $expiresDate]);
+            $this->centralDb()->table('companies')->where('id', (int) $row['id'])->update(['expires_at' => $expiresDate]);
         }
 
         return $expiresDate;
@@ -233,6 +275,8 @@ class AccessManagementService
         ];
         if ($id) {
             $model->update($id, $row);
+            // Sync branding fields to tenant DB so sidebar logo/favicon is always up-to-date
+            $this->syncBrandingToTenantDb($id, $row);
         } else {
             $tenantProvisioning = new TenantDatabaseProvisioningService();
             $tenantDbName = trim((string) ($payload['dbName'] ?? '')) ?: $tenantProvisioning->databaseNameForSlug($slug);

@@ -9,6 +9,16 @@ export let activeUserTab = ["users", "roles", "outlets"].includes(setupParams.ge
 
 export function setActiveUserTab(tab) {
   activeUserTab = tab;
+  // Update tab button active states
+  document.querySelectorAll("[data-user-tab]").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.userTab === tab);
+  });
+  // Show/hide tab panels based on active tab
+  document.querySelectorAll("[data-user-tab-panel]").forEach((panel) => {
+    const isActive = panel.dataset.userTabPanel === tab;
+    panel.classList.toggle("active", isActive);
+    panel.hidden = !isActive;
+  });
 }
 
 export const crudActions = [

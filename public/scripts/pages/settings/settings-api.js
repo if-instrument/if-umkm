@@ -3,6 +3,7 @@ import { activeCompany, setLogoValue } from "./settings-helpers.js";
 import { apiDelete, apiPost, apiPut, apiUpload, scopedPayload } from "../../store.js";
 import { byId, showFeedback } from "../../dom.js";
 import { loadPageBootstrap } from "../../page-engine.js";
+import { updateSidebarBrand } from "../../layout.js";
 
 let renderSettingsHandler = null;
 let setQrisImageHandler = null;
@@ -32,6 +33,10 @@ export function refreshSettingsData() {
   state.activeCompanyId = data.activeCompanyId || session?.companyId || state.activeCompanyId;
   state.settings = { ...state.settings, ...(data.settings || {}) };
   state.ingredients = (data.ingredients || []).map((item) => ({ ...item, minStock: item.minStock || 0, avgCost: item.avgCost || 0 }));
+  // Refresh sidebar logo and favicon from the latest DB values
+  if (state.settings?.companyLogoUrl) {
+    updateSidebarBrand(state.settings.companyLogoUrl, state.settings.companyName);
+  }
   if (renderSettingsHandler) renderSettingsHandler();
 }
 

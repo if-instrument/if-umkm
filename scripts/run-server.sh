@@ -59,4 +59,5 @@ echo "Bind                : ${HOST}:${PORT}"
 echo "=================================================="
 echo
 
+export PHP_CLI_SERVER_WORKERS=4
 "$PHP_BIN" spark serve --host "$HOST" --port "$PORT"

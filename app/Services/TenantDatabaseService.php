@@ -138,7 +138,7 @@ class TenantDatabaseService
         return $this->companyBySlug((string) ($claims['companySlug'] ?? ''));
     }
 
-    private function centralConnection(): BaseConnection
+    public function centralConnection(): BaseConnection
     {
         return DatabaseConfig::connect($this->centralConfig, false);
     }

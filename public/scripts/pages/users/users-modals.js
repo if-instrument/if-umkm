@@ -143,8 +143,9 @@ export function refreshTables() {
   renderUsers();
   enhanceAllDataTables();
   applyPermissionControls(document, state, session);
-  if (setActiveUserTabHandler) setActiveUserTabHandler(activeUserTab);
   applyAccessMode();
+  // Apply tab switching last so it's not overridden by applyAccessMode
+  if (setActiveUserTabHandler) setActiveUserTabHandler(activeUserTab);
 }
 
 export function applyAccessMode() {
@@ -157,6 +158,8 @@ export function applyAccessMode() {
     section.style.display = isSuperAdmin ? "" : "none";
   });
   document.querySelectorAll("[data-company-admin-only]").forEach((section) => {
+    // Tab panels are managed by setActiveUserTab, skip them here
+    if (section.dataset.userTabPanel) return;
     section.hidden = isSuperAdmin;
     section.style.display = isSuperAdmin ? "none" : "";
   });

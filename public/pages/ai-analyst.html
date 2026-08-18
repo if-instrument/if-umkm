@@ -6,14 +6,14 @@
     <title>AI Business Analyst - IF Instrument</title>
     <link rel="stylesheet" href="../styles.css" />
     <style>
-      /* AI Platform Custom Styles */
+      /* AI Platform Custom Styles - Fully Synced with Company Brand Theme */
       .ai-hero-banner {
-        background: linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #4338ca 100%);
+        background: linear-gradient(135deg, var(--sidebar-bg, #1e1b4b) 0%, var(--brand-strong, #312e81) 50%, var(--brand, #4338ca) 100%);
         color: #ffffff;
         border-radius: 16px;
         padding: 24px;
         margin-bottom: 24px;
-        box-shadow: 0 10px 25px -5px rgba(49, 46, 129, 0.4);
+        box-shadow: 0 10px 25px -5px rgba(var(--brand-rgb, 49, 46, 129), 0.35);
         display: flex;
         justify-content: space-between;
         align-items: center;
@@ -31,19 +31,45 @@
       }
       .ai-hero-title p {
         margin: 0;
-        color: #c7d2fe;
+        color: var(--brand-soft, #c7d2fe);
         font-size: 0.9rem;
+        opacity: 0.95;
+      }
+      .ai-hero-brand-line {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 8px;
+      }
+      .ai-hero-company-avatar {
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.2);
+        backdrop-filter: blur(4px);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 0.95rem;
+        overflow: hidden;
+        border: 1px solid rgba(255, 255, 255, 0.3);
+      }
+      .ai-hero-company-avatar img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
       }
       .ai-hero-badge {
-        background: rgba(255, 255, 255, 0.15);
+        background: rgba(255, 255, 255, 0.18);
         backdrop-filter: blur(8px);
-        border: 1px solid rgba(255, 255, 255, 0.2);
+        border: 1px solid rgba(255, 255, 255, 0.25);
         padding: 4px 12px;
         border-radius: 20px;
         font-size: 0.75rem;
         font-weight: 600;
         letter-spacing: 0.5px;
-        color: #e0e7ff;
+        color: #ffffff;
         display: inline-block;
       }
       .ai-controls-bar {
@@ -52,7 +78,7 @@
         align-items: center;
       }
       .ai-select {
-        background: rgba(255, 255, 255, 0.1);
+        background: rgba(255, 255, 255, 0.12);
         border: 1px solid rgba(255, 255, 255, 0.3);
         color: #ffffff;
         padding: 8px 14px;
@@ -61,14 +87,18 @@
         font-weight: 500;
         outline: none;
         cursor: pointer;
+        transition: background 0.2s;
+      }
+      .ai-select:hover {
+        background: rgba(255, 255, 255, 0.18);
       }
       .ai-select option {
-        background: #1e1b4b;
+        background: var(--sidebar-bg, #1e1b4b);
         color: #ffffff;
       }
       .ai-quota-card {
-        background: rgba(255, 255, 255, 0.1);
-        border: 1px solid rgba(255, 255, 255, 0.2);
+        background: rgba(255, 255, 255, 0.12);
+        border: 1px solid rgba(255, 255, 255, 0.25);
         padding: 8px 14px;
         border-radius: 10px;
         text-align: right;
@@ -77,11 +107,13 @@
       .ai-quota-card .quota-num {
         font-size: 0.95rem;
         font-weight: 700;
-        color: #818cf8;
+        color: #ffffff;
+        text-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
       }
       .ai-quota-card .quota-lbl {
         font-size: 0.7rem;
-        color: #c7d2fe;
+        color: var(--brand-soft, #c7d2fe);
+        opacity: 0.9;
       }
 
       /* Preset Prompt Cards Grid */
@@ -93,7 +125,7 @@
       }
       .preset-card {
         background: #ffffff;
-        border: 1px solid #e0e7ff;
+        border: 1px solid rgba(var(--brand-rgb, 99, 102, 241), 0.15);
         border-radius: 12px;
         padding: 16px;
         cursor: pointer;
@@ -102,8 +134,8 @@
       }
       .preset-card:hover {
         transform: translateY(-3px);
-        border-color: #6366f1;
-        box-shadow: 0 8px 20px rgba(99, 102, 241, 0.15);
+        border-color: var(--brand, #6366f1);
+        box-shadow: 0 8px 20px rgba(var(--brand-rgb, 99, 102, 241), 0.16);
       }
       .preset-card .icon {
         font-size: 1.4rem;
@@ -184,11 +216,11 @@
         flex-shrink: 0;
       }
       .user-msg .msg-avatar {
-        background: #4f46e5;
+        background: var(--brand, #4f46e5);
         color: #ffffff;
       }
       .ai-msg .msg-avatar {
-        background: linear-gradient(135deg, #6366f1, #a855f7);
+        background: linear-gradient(135deg, var(--brand, #6366f1), var(--brand-strong, #312e81));
         color: #ffffff;
       }
       .msg-bubble {
@@ -199,7 +231,7 @@
         box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
       }
       .user-msg .msg-bubble {
-        background: #4f46e5;
+        background: var(--brand, #4f46e5);
         color: #ffffff;
         border-bottom-right-radius: 2px;
       }
@@ -212,16 +244,16 @@
 
       /* Animated AI Lazy Loading Indicator */
       .ai-avatar-loading {
-        background: linear-gradient(135deg, #6366f1, #a855f7) !important;
+        background: linear-gradient(135deg, var(--brand, #6366f1), var(--brand-strong, #312e81)) !important;
         color: #ffffff !important;
         animation: avatarGlow 1.5s infinite ease-in-out;
       }
       @keyframes avatarGlow {
         0%, 100% {
-          box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.6);
+          box-shadow: 0 0 0 0 rgba(var(--brand-rgb, 99, 102, 241), 0.6);
         }
         50% {
-          box-shadow: 0 0 0 10px rgba(168, 85, 247, 0);
+          box-shadow: 0 0 0 10px rgba(var(--brand-rgb, 99, 102, 241), 0);
         }
       }
 
@@ -230,13 +262,13 @@
         align-items: center;
         gap: 12px;
         padding: 14px 20px;
-        background: linear-gradient(90deg, #ffffff 0%, #f5f3ff 50%, #ffffff 100%);
+        background: linear-gradient(90deg, #ffffff 0%, rgba(var(--brand-rgb, 99, 102, 241), 0.08) 50%, #ffffff 100%);
         background-size: 200% 100%;
         animation: lazyShimmer 2s infinite linear;
-        border: 1px solid #c7d2fe;
+        border: 1px solid rgba(var(--brand-rgb, 99, 102, 241), 0.25);
         border-radius: 14px;
         border-bottom-left-radius: 2px;
-        box-shadow: 0 4px 14px rgba(99, 102, 241, 0.12);
+        box-shadow: 0 4px 14px rgba(var(--brand-rgb, 99, 102, 241), 0.12);
       }
       @keyframes lazyShimmer {
         0% { background-position: 200% 0; }
@@ -251,7 +283,7 @@
       .ai-typing-dots span {
         width: 8px;
         height: 8px;
-        background: #6366f1;
+        background: var(--brand, #6366f1);
         border-radius: 50%;
         animation: aiPulse 1.4s infinite ease-in-out both;
       }
@@ -267,13 +299,13 @@
         40% {
           transform: scale(1.3);
           opacity: 1;
-          background: #a855f7;
+          background: var(--brand-strong, #a855f7);
         }
       }
       .ai-loading-text {
         font-size: 0.85rem;
         font-weight: 600;
-        color: #4338ca;
+        color: var(--brand-strong, #4338ca);
         letter-spacing: 0.2px;
       }
 
@@ -329,8 +361,8 @@
 
       /* Meta & Tool Execution Pills */
       .msg-meta-bar {
-        margin-top: 10px;
-        padding-top: 8px;
+        margin-top: 12px;
+        padding-top: 10px;
         border-top: 1px solid #f1f5f9;
         display: flex;
         gap: 8px;
@@ -345,6 +377,158 @@
         padding: 2px 8px;
         border-radius: 4px;
         font-weight: 500;
+      }
+
+      /* ==================== RICH MARKDOWN & TABLE FORMATTING ==================== */
+      .ai-content {
+        color: #1e293b;
+        font-size: 0.88rem;
+        line-height: 1.6;
+        word-break: break-word;
+      }
+      .ai-content h1, .ai-content h2, .ai-content h3, .ai-content h4 {
+        margin-top: 16px;
+        margin-bottom: 8px;
+        font-weight: 700;
+        color: #0f172a;
+      }
+      .ai-content h1 { font-size: 1.15rem; border-bottom: 2px solid #e2e8f0; padding-bottom: 6px; }
+      .ai-content h2 { font-size: 1.05rem; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; }
+      .ai-content h3 { font-size: 0.96rem; color: var(--brand-strong, var(--brand, #4338ca)); }
+      .ai-content h4 { font-size: 0.90rem; }
+
+      .ai-content p {
+        margin: 6px 0;
+      }
+      .ai-content hr {
+        border: 0;
+        height: 1px;
+        background: #e2e8f0;
+        margin: 14px 0;
+      }
+      .ai-content ul, .ai-content ol {
+        margin: 6px 0 10px 20px;
+        padding: 0;
+      }
+      .ai-content li {
+        margin-bottom: 4px;
+        line-height: 1.55;
+      }
+      .ai-content blockquote {
+        border-left: 3px solid var(--brand, #6366f1);
+        background: #f8fafc;
+        margin: 10px 0;
+        padding: 8px 12px;
+        color: #475569;
+        border-radius: 0 6px 6px 0;
+      }
+      .ai-content code {
+        background: #f1f5f9;
+        color: #0f172a;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        font-size: 0.82rem;
+        padding: 2px 5px;
+        border-radius: 4px;
+        border: 1px solid #e2e8f0;
+      }
+      .ai-content pre {
+        background: #0f172a;
+        color: #f8fafc;
+        padding: 12px 14px;
+        border-radius: 8px;
+        overflow-x: auto;
+        font-size: 0.82rem;
+        margin: 10px 0;
+      }
+      .ai-content pre code {
+        background: transparent;
+        color: inherit;
+        border: none;
+        padding: 0;
+      }
+
+      /* Premium Markdown Table Card */
+      .ai-table-wrapper {
+        margin: 14px 0;
+        overflow-x: auto;
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+      }
+      .ai-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.84rem;
+        text-align: left;
+      }
+      .ai-table thead {
+        background: #f8fafc;
+        border-bottom: 2px solid #e2e8f0;
+      }
+      .ai-table th {
+        padding: 10px 14px;
+        font-weight: 700;
+        color: #334155;
+        white-space: nowrap;
+      }
+      .ai-table td {
+        padding: 9px 14px;
+        border-bottom: 1px solid #f1f5f9;
+        color: #334155;
+      }
+      .ai-table tbody tr:last-child td {
+        border-bottom: none;
+      }
+      .ai-table tbody tr:hover {
+        background: rgba(var(--brand-rgb, 99, 102, 241), 0.04);
+      }
+      .ai-status-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 3px 8px;
+        border-radius: 6px;
+        font-size: 0.74rem;
+        font-weight: 600;
+        line-height: 1.2;
+      }
+      .ai-status-badge.normal, .ai-status-badge.success {
+        background: #dcfce7;
+        color: #166534;
+        border: 1px solid #bbf7d0;
+      }
+      .ai-status-badge.low, .ai-status-badge.danger {
+        background: #fee2e2;
+        color: #991b1b;
+        border: 1px solid #fecaca;
+      }
+      .ai-status-badge.warning {
+        background: #fef3c7;
+        color: #92400e;
+        border: 1px solid #fde68a;
+      }
+      .ai-status-badge.active, .ai-status-badge.info {
+        background: rgba(var(--brand-rgb, 99, 102, 241), 0.12);
+        color: var(--brand-strong, #3730a3);
+        border: 1px solid rgba(var(--brand-rgb, 99, 102, 241), 0.25);
+      }
+      .cell-item {
+        display: block;
+        margin: 2px 0;
+      }
+      .cell-bullet {
+        display: flex;
+        align-items: flex-start;
+        gap: 6px;
+        margin: 3px 0;
+        font-size: 0.82rem;
+      }
+      .cell-bullet::before {
+        content: "•";
+        color: var(--brand, #6366f1);
+        font-weight: bold;
+        flex-shrink: 0;
       }
 
       /* Input Bar */
@@ -366,11 +550,11 @@
         transition: border-color 0.2s;
       }
       .chat-input-bar input:focus {
-        border-color: #4f46e5;
-        box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+        border-color: var(--brand, #4f46e5);
+        box-shadow: 0 0 0 3px rgba(var(--brand-rgb, 79, 70, 229), 0.15);
       }
       .send-btn {
-        background: linear-gradient(135deg, #4f46e5, #6366f1);
+        background: linear-gradient(135deg, var(--brand, #4f46e5), var(--brand-hover, #6366f1));
         color: #ffffff;
         border: none;
         border-radius: 10px;
@@ -378,13 +562,14 @@
         font-weight: 600;
         font-size: 0.88rem;
         cursor: pointer;
-        transition: opacity 0.2s;
+        transition: opacity 0.2s, transform 0.1s;
         display: flex;
         align-items: center;
         gap: 6px;
       }
       .send-btn:hover {
-        opacity: 0.9;
+        opacity: 0.92;
+        transform: translateY(-1px);
       }
       /* Chat Layout Wrapper with History Sidebar */
       .ai-chat-layout-wrapper {
@@ -423,7 +608,7 @@
         gap: 6px;
       }
       .new-chat-btn {
-        background: #4f46e5;
+        background: var(--brand, #4f46e5);
         color: #ffffff;
         border: none;
         padding: 6px 12px;
@@ -434,7 +619,7 @@
         transition: background 0.2s;
       }
       .new-chat-btn:hover {
-        background: #4338ca;
+        background: var(--brand-hover, #4338ca);
       }
       .history-list {
         flex: 1;
@@ -468,8 +653,8 @@
         align-items: center;
       }
       .history-item:hover, .history-item.active {
-        background: #eef2ff;
-        border-color: #c7d2fe;
+        background: rgba(var(--brand-rgb, 79, 70, 229), 0.08);
+        border-color: rgba(var(--brand-rgb, 79, 70, 229), 0.25);
       }
       .history-item-info {
         display: flex;
@@ -515,9 +700,12 @@
         <!-- Hero Platform Banner -->
         <div class="ai-hero-banner">
           <div class="ai-hero-title">
-            <span class="ai-hero-badge">🤖 GLOBAL REUSABLE AI PLATFORM</span>
-            <h2>AI Business Analyst & Decision Engine</h2>
-            <p>Analisis multi-signal otomatis (penjualan, tren 90 hari, margin kotor, & resep HPP) untuk UMKM.</p>
+            <div class="ai-hero-brand-line">
+              <span class="ai-hero-company-avatar" id="ai-hero-company-avatar">☕</span>
+              <span class="ai-hero-badge" id="ai-hero-tenant-badge">🏢 IFresso Coffee · AI Intelligence</span>
+            </div>
+            <h2 id="ai-hero-title-text">AI Business Analyst & Strategic Advisor</h2>
+            <p id="ai-hero-desc-text">Asisten analitik cerdas & rekomendasi keputusan bisnis otomatis untuk IFresso Coffee.</p>
           </div>
           <div class="ai-controls-bar">
             <select id="ai-provider-select" class="ai-select" title="Pilih LLM Provider & Model">
@@ -603,6 +791,7 @@
 
       </section>
     </template>
+    <script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
     <script type="module" src="../scripts/pages/ai-analyst.js"></script>
   </body>
 </html>

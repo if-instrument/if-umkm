@@ -1,22 +1,71 @@
-import { renderLayout } from "../layout.js";
-import { apiGet, apiPost, apiDelete, loadSession } from "../store.js";
+import { renderLayout, applyBrandTheme } from "../layout.js";
+import { apiGet, apiPost, apiDelete, loadSession, loadState, currentCompanySlug } from "../store.js";
+import { loadPageBootstrap } from "../page-engine.js";
 
+// Initial Layout Render
 renderLayout();
 
 export function initAiAnalystPage() {
   const session = loadSession();
-  const companySlug = session?.companySlug || window.__COMPANY_SLUG__ || "IFresso-Coffee";
+  const state = loadState();
+  const slugFromPath = currentCompanySlug();
+  const companySlug = slugFromPath || session?.companySlug || window.__COMPANY_SLUG__ || "IFresso-Coffee";
   const userId = session?.userId || "usr_mgr_1";
 
-  let currentConversationId = null;
+  // 1. Fetch Company Settings & Branding Data via Bootstrap
+  try {
+    const bootstrapRes = loadPageBootstrap("aiAnalyst", state, session);
+    if (bootstrapRes && bootstrapRes.ok && bootstrapRes.data) {
+      const data = bootstrapRes.data;
+      state.companies = data.companies || state.companies || [];
+      state.settings = { ...state.settings, ...(data.settings || {}) };
+      state.outlets = data.outlets || state.outlets || [];
+      state.activeCompanyId = data.activeCompanyId || state.activeCompanyId;
+    }
+  } catch (bErr) {
+    console.warn("Could not load AI analyst bootstrap:", bErr);
+  }
 
-  const promptInput = document.getElementById("ai-prompt-input");
-  const sendBtn = document.getElementById("ai-send-btn");
-  const messagesContainer = document.getElementById("chat-messages");
-  const providerSelect = document.getElementById("ai-provider-select");
-  const quotaDisplay = document.getElementById("ai-quota-display");
-  const historyListContainer = document.getElementById("history-list");
-  const newChatBtn = document.getElementById("new-chat-btn");
+  // 2. Identify active company & apply theme
+  const matchedCompany = (state.companies || []).find((c) => (c.routeSlug || "").toLowerCase() === companySlug.toLowerCase() || (c.slug || "").toLowerCase() === companySlug.toLowerCase()) || (state.companies || [])[0] || session?.accessContext?.company || {};
+
+  const companyTheme = matchedCompany.themeColor || matchedCompany.theme_color || state.settings.themeColor || session?.themeColor || session?.theme_color || "#3B1F8C";
+  applyBrandTheme(companyTheme);
+
+  // 3. Format and apply Company Brand Title & Logo in AI Analyst Header
+  const companyName = matchedCompany.name || matchedCompany.brand_name || state.settings.companyName || session?.accessContext?.company?.name || formatSlug(companySlug);
+  const companyLogo = matchedCompany.logoUrl || matchedCompany.logo_url || matchedCompany.logo_path || state.settings.companyLogoUrl || session?.accessContext?.company?.logoUrl || "";
+
+  const heroTenantBadge = document.getElementById("ai-hero-tenant-badge");
+  const heroAvatar = document.getElementById("ai-hero-company-avatar");
+  const heroTitle = document.getElementById("ai-hero-title-text");
+  const heroDesc = document.getElementById("ai-hero-desc-text");
+
+  if (heroTenantBadge) {
+    heroTenantBadge.textContent = `🏢 ${companyName} · AI Intelligence`;
+  }
+  if (heroAvatar) {
+    if (companyLogo) {
+      heroAvatar.innerHTML = `<img src="${companyLogo}" alt="${escapeHtml(companyName)}" />`;
+    } else {
+      heroAvatar.textContent = companyName.slice(0, 2).toUpperCase();
+    }
+  }
+  if (heroTitle) {
+    heroTitle.textContent = `${companyName} AI Analyst & Strategic Advisor`;
+  }
+  if (heroDesc) {
+    heroDesc.textContent = `Asisten analitik cerdas & rekomendasi keputusan bisnis otomatis untuk ${companyName}.`;
+  }
+
+  function formatSlug(slug) {
+    if (!slug) return "IFresso Coffee";
+    return slug
+      .replace(/([a-z])([A-Z])/g, "$1 $2")
+      .replace(/[-_]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
 
   // Load Initial Quota Stats, Active Providers, and Chat History List
   loadQuota();
@@ -455,10 +504,306 @@ export function initAiAnalystPage() {
 
   function formatMarkdown(text) {
     if (!text) return "";
-    let html = escapeHtml(text);
-    html = html.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
-    html = html.replace(/\*(.*?)\*/g, "<em>$1</em>");
-    html = html.replace(/\n/g, "<br/>");
+
+    // 1. Preprocess: Protect existing <br> / <br/> tags from getting destroyed
+    let preprocessed = text
+      .replace(/<br\s*\/?>/gi, " [[BR_TOKEN]] ")
+      .replace(/\r\n/g, "\n");
+
+    // 2. Preprocess: Normalize tab-separated tables (\t) into pipe tables
+    const rawLines = preprocessed.split("\n");
+    const normalizedLines = [];
+    let inTabTable = false;
+
+    for (let idx = 0; idx < rawLines.length; idx++) {
+      let l = rawLines[idx];
+      if (l.includes("\t") && l.split("\t").length >= 2) {
+        const parts = l.split("\t").map((p) => p.trim());
+        const pipeRow = "| " + parts.join(" | ") + " |";
+        if (!inTabTable) {
+          inTabTable = true;
+          normalizedLines.push(pipeRow);
+          // Auto inject markdown header separator if not present
+          const sep = "| " + parts.map(() => "---").join(" | ") + " |";
+          normalizedLines.push(sep);
+        } else {
+          normalizedLines.push(pipeRow);
+        }
+      } else {
+        inTabTable = false;
+        normalizedLines.push(l);
+      }
+    }
+
+    preprocessed = normalizedLines.join("\n");
+
+    // 3. Fix asymmetric/malformed asterisks (e.g. *text** -> **text**, point* -> point)
+    preprocessed = preprocessed
+      .replace(/\*([^*\n]+)\*\*/g, "**$1**")
+      .replace(/\*\*([^*\n]+)\*/g, "**$1**");
+
+    // 4. If Marked.js is available from CDN, use it with custom table/badge post-processing
+    if (typeof window !== "undefined" && window.marked && typeof window.marked.parse === "function") {
+      try {
+        let parsedHtml = window.marked.parse(preprocessed, {
+          gfm: true,
+          breaks: true
+        });
+
+        // Restore protected BR tokens
+        parsedHtml = parsedHtml.replace(/\[\[BR_TOKEN\]\]/g, "<br/>");
+
+        // Wrap <table> with responsive container and add style classes
+        parsedHtml = parsedHtml.replace(/<table>/gi, '<div class="ai-table-wrapper"><table class="ai-table">');
+        parsedHtml = parsedHtml.replace(/<\/table>/gi, '</table></div>');
+
+        // Post-process table cells for Status Badges & Bullet formatting
+        const tempDiv = document.createElement("div");
+        tempDiv.innerHTML = parsedHtml;
+
+        tempDiv.querySelectorAll("td, th").forEach((cell) => {
+          let cellHtml = cell.innerHTML;
+
+          // Convert internal bullets into stylish cell items
+          if (cellHtml.includes("&lt;br&gt;") || cellHtml.includes("<br>")) {
+            cellHtml = cellHtml.replace(/&lt;br\s*\/?&gt;/gi, "<br/>");
+          }
+
+          // Format bullet lists inside table cells
+          if (cellHtml.includes("• ") || cellHtml.includes("- ")) {
+            const items = cellHtml.split(/<br\s*\/?>/i);
+            if (items.length > 1) {
+              cellHtml = items.map(it => {
+                const cleanIt = it.replace(/^[\s•\-]+/, "").trim();
+                return cleanIt ? `<div class="cell-bullet">${cleanIt}</div>` : "";
+              }).join("");
+            }
+          }
+
+          // Format Status Badges inside table cells
+          const textOnly = cell.textContent.trim();
+          if (/^(NORMAL|AMAN|SANGAT AMAN|ACTIVE|AKTIF|LANCAR)$/i.test(textOnly) || textOnly.includes("✅")) {
+            cellHtml = `<span class="ai-status-badge success">${cellHtml}</span>`;
+          } else if (/^(LOW_STOCK|HABIS|KRITIS|NONAKTIF|INACTIVE)$/i.test(textOnly) || textOnly.includes("⚠️") || textOnly.includes("RAWAN")) {
+            cellHtml = `<span class="ai-status-badge warning">${cellHtml}</span>`;
+          } else if (textOnly.includes("MENIPIS")) {
+            cellHtml = `<span class="ai-status-badge warning">${cellHtml}</span>`;
+          }
+
+          cell.innerHTML = cellHtml;
+        });
+
+        return `<div class="ai-content">${tempDiv.innerHTML}</div>`;
+      } catch (markedErr) {
+        console.warn("Marked parser fallback:", markedErr);
+      }
+    }
+
+    // 5. High-Performance Built-in Parser (Fallback)
+    const lines = preprocessed.split("\n");
+    let result = [];
+    let inTable = false;
+    let tableRows = [];
+    let inList = false;
+    let listType = null;
+    let inCodeBlock = false;
+    let codeContent = [];
+
+    const closeList = () => {
+      if (inList) {
+        result.push(listType === "ol" ? "</ol>" : "</ul>");
+        inList = false;
+        listType = null;
+      }
+    };
+
+    const flushTable = () => {
+      if (tableRows.length >= 2) {
+        const headerLine = tableRows[0];
+        const separatorLine = tableRows[1];
+        const dataLines = tableRows.slice(2);
+
+        const parseCells = (line) => {
+          return line
+            .trim()
+            .replace(/^\|/, "")
+            .replace(/\|$/, "")
+            .split("|")
+            .map((c) => c.trim());
+        };
+
+        const headers = parseCells(headerLine);
+        const alignments = parseCells(separatorLine).map((align) => {
+          if (align.startsWith(":") && align.endsWith(":")) return "center";
+          if (align.endsWith(":")) return "right";
+          return "left";
+        });
+
+        let tableHtml = '<div class="ai-table-wrapper"><table class="ai-table"><thead><tr>';
+        headers.forEach((h, idx) => {
+          const align = alignments[idx] || "left";
+          tableHtml += `<th style="text-align:${align}">${formatInline(h)}</th>`;
+        });
+        tableHtml += "</tr></thead><tbody>";
+
+        dataLines.forEach((rowLine) => {
+          const cells = parseCells(rowLine);
+          tableHtml += "<tr>";
+          cells.forEach((cell, idx) => {
+            const align = alignments[idx] || "left";
+            let formattedCell = formatInline(cell);
+            
+            // Format bullet lists inside cell
+            if (formattedCell.includes("<br/>") || formattedCell.includes("•") || formattedCell.includes("- ")) {
+              const items = formattedCell.split(/<br\s*\/?>/i);
+              if (items.length > 1) {
+                formattedCell = items.map(it => {
+                  const cleanIt = it.replace(/^[\s•\-]+/, "").trim();
+                  return cleanIt ? `<div class="cell-bullet">${cleanIt}</div>` : "";
+                }).join("");
+              }
+            }
+
+            // Auto Badge Formatter for Status Cells
+            const cleanText = cell.replace(/\[\[BR_TOKEN\]\]/g, " ").trim();
+            if (/^(NORMAL|AMAN|SANGAT AMAN|ACTIVE|AKTIF)$/i.test(cleanText) || cleanText.includes("✅")) {
+              formattedCell = `<span class="ai-status-badge success">${formattedCell}</span>`;
+            } else if (/^(LOW_STOCK|HABIS|KRITIS|INACTIVE|NONAKTIF)$/i.test(cleanText) || cleanText.includes("⚠️") || cleanText.includes("RAWAN") || cleanText.includes("MENIPIS")) {
+              formattedCell = `<span class="ai-status-badge warning">${formattedCell}</span>`;
+            }
+            tableHtml += `<td style="text-align:${align}">${formattedCell}</td>`;
+          });
+          tableHtml += "</tr>";
+        });
+
+        tableHtml += "</tbody></table></div>";
+        result.push(tableHtml);
+      }
+      inTable = false;
+      tableRows = [];
+    };
+
+    for (let i = 0; i < lines.length; i++) {
+      let line = lines[i];
+
+      // Code Block Handling (```)
+      if (line.trim().startsWith("```")) {
+        closeList();
+        if (inTable) flushTable();
+        if (inCodeBlock) {
+          result.push(`<pre><code>${escapeHtml(codeContent.join("\n"))}</code></pre>`);
+          inCodeBlock = false;
+          codeContent = [];
+        } else {
+          inCodeBlock = true;
+          codeContent = [];
+        }
+        continue;
+      }
+      if (inCodeBlock) {
+        codeContent.push(line);
+        continue;
+      }
+
+      // Markdown Table Detection
+      if (line.trim().startsWith("|") && (line.trim().endsWith("|") || line.includes("|"))) {
+        closeList();
+        inTable = true;
+        tableRows.push(line);
+        continue;
+      } else if (inTable) {
+        flushTable();
+      }
+
+      // Horizontal Rule
+      if (/^(\*\*\*|---|___)$/.test(line.trim())) {
+        closeList();
+        result.push("<hr/>");
+        continue;
+      }
+
+      // Headings
+      if (line.startsWith("#### ")) {
+        closeList();
+        result.push(`<h4>${formatInline(line.slice(5))}</h4>`);
+        continue;
+      }
+      if (line.startsWith("### ")) {
+        closeList();
+        result.push(`<h3>${formatInline(line.slice(4))}</h3>`);
+        continue;
+      }
+      if (line.startsWith("## ")) {
+        closeList();
+        result.push(`<h2>${formatInline(line.slice(3))}</h2>`);
+        continue;
+      }
+      if (line.startsWith("# ")) {
+        closeList();
+        result.push(`<h1>${formatInline(line.slice(2))}</h1>`);
+        continue;
+      }
+
+      // Blockquotes
+      if (line.startsWith("> ")) {
+        closeList();
+        result.push(`<blockquote>${formatInline(line.slice(2))}</blockquote>`);
+        continue;
+      }
+
+      // Unordered Lists (*, -)
+      const ulMatch = line.match(/^(\s*)([-*])\s+(.+)$/);
+      if (ulMatch) {
+        if (!inList || listType !== "ul") {
+          closeList();
+          result.push("<ul>");
+          inList = true;
+          listType = "ul";
+        }
+        result.push(`<li>${formatInline(ulMatch[3])}</li>`);
+        continue;
+      }
+
+      // Ordered Lists (1., 2.)
+      const olMatch = line.match(/^(\s*)(\d+)\.\s+(.+)$/);
+      if (olMatch) {
+        if (!inList || listType !== "ol") {
+          closeList();
+          result.push("<ol>");
+          inList = true;
+          listType = "ol";
+        }
+        result.push(`<li>${formatInline(olMatch[3])}</li>`);
+        continue;
+      }
+
+      // Regular line
+      closeList();
+      if (line.trim() === "") {
+        result.push("<div style='height: 6px;'></div>");
+      } else {
+        result.push(`<p>${formatInline(line)}</p>`);
+      }
+    }
+
+    closeList();
+    if (inTable) flushTable();
+
+    return `<div class="ai-content">${result.join("")}</div>`;
+  }
+
+  function formatInline(str) {
+    if (!str) return "";
+    let html = escapeHtml(str);
+    // Restore protected BR token
+    html = html.replace(/\[\[BR_TOKEN\]\]/g, "<br/>");
+    // Inline Code: `code`
+    html = html.replace(/`([^`]+)`/g, "<code>$1</code>");
+    // Bold: **text**
+    html = html.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+    // Italic: *text* or _text_
+    html = html.replace(/\*([^*]+)\*/g, "<em>$1</em>");
+    html = html.replace(/_([^_]+)_/g, "<em>$1</em>");
     return html;
   }
 }

@@ -1,9 +1,11 @@
 import { apiGet, scopedApiUrl } from "./store.js";
+import { updateSidebarBrand } from "./layout.js";
 
 const PAGE_ENDPOINTS = {
   login: "/api/page/login/bootstrap",
   pos: "/api/page/pos/bootstrap",
   settings: "/api/page/settings/bootstrap",
+  aiAnalyst: "/api/page/settings/bootstrap",
   users: "/api/page/users/bootstrap",
   products: "/api/page/products/bootstrap",
   categories: "/api/page/products/bootstrap",
@@ -34,8 +36,14 @@ export function loadPageBootstrap(page, state, session, params = {}) {
     if (value !== undefined && value !== null && value !== "") query.set(key, value);
   });
   const url = query.toString() ? `${endpoint}?${query.toString()}` : endpoint;
-  return apiGet(scopedApiUrl(url, state, session));
+  const response = apiGet(scopedApiUrl(url, state, session));
+  // Auto-refresh sidebar logo/favicon from the latest DB values on every bootstrap load
+  const logoUrl = response?.data?.settings?.companyLogoUrl;
+  const companyName = response?.data?.settings?.companyName;
+  if (logoUrl) updateSidebarBrand(logoUrl, companyName);
+  return response;
 }
+
 
 export function applyPageBootstrap(targetState, data, fields = []) {
   if (!data) return targetState;

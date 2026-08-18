@@ -8,12 +8,11 @@ from sqlalchemy import inspect, text
 from sqlalchemy.orm import sessionmaker
 from app.database import engine, Base
 
-# Import all ORM models so Base.metadata knows about them
+# Import all active ORM models
 from app.models.biometrics import FaceEmbedding, FingerprintTemplate
 from app.models.platform import (
-    Application, Company, User, AICapability, AIPlan,
-    CompanyAISubscription, CompanyAIQuota, UserAIQuota, CompanyAIProviderKey,
-    AIUsageLedger, AIUsageReservation, AIToolRegistry, AIModelPricing, AIAuditLog,
+    Company, AIPlan, CompanyAISubscription, CompanyAIQuota,
+    CompanyAIProviderKey, AIUsageLedger, AIUsageReservation,
     AIConversation, AIMessage, AIDataAccessLog
 )
 
@@ -23,59 +22,20 @@ SessionLocal = sessionmaker(bind=engine)
 def seed_initial_data():
     db = SessionLocal()
     try:
-        # Seed AI Capabilities if empty
-        if db.query(AICapability).count() == 0:
-            capabilities = [
-                AICapability(code="biometric.face", name="Face Recognition Biometrics", category="biometric"),
-                AICapability(code="biometric.fingerprint", name="Fingerprint Biometrics", category="biometric"),
-                AICapability(code="business.assistant", name="AI Conversational Assistant", category="business"),
-                AICapability(code="business.analyst", name="AI Deep Business Analyst", category="business"),
-                AICapability(code="business.web_search", name="External Knowledge Web Search", category="business"),
-                AICapability(code="business.action", name="AI Propose & Action Execution", category="business"),
-            ]
-            db.add_all(capabilities)
-            logger.info("Seeded default AI capabilities.")
-
-        # Seed AI Plans if empty
-        if db.query(AIPlan).count() == 0:
-            plans = [
-                AIPlan(code="free", name="Free Plan", monthly_token_quota=100000, monthly_web_search_quota=50, price_monthly=0.0),
-                AIPlan(code="basic", name="Basic Plan", monthly_token_quota=500000, monthly_web_search_quota=200, price_monthly=15.0),
-                AIPlan(code="professional", name="Professional Plan", monthly_token_quota=2000000, monthly_web_search_quota=1000, price_monthly=50.0),
-                AIPlan(code="enterprise", name="Enterprise Plan", monthly_token_quota=20000000, monthly_web_search_quota=10000, price_monthly=200.0),
-            ]
-            db.add_all(plans)
-            logger.info("Seeded default AI plans.")
-
-        # Seed or Update AI Model Pricing
-        default_pricings = [
-            ("openai", "gpt-4o", 2.50, 10.00, "OpenAI GPT-4o Flagship"),
-            ("openai", "gpt-4o-mini", 0.15, 0.60, "OpenAI GPT-4o Mini"),
-            ("anthropic", "claude-3-5-sonnet-20241022", 3.00, 15.00, "Claude 3.5 Sonnet"),
-            ("anthropic", "claude-3-5-haiku", 0.80, 4.00, "Claude 3.5 Haiku"),
-            ("gemini", "gemini-3.6-flash", 0.075, 0.30, "Google Gemini 3.6 Flash (Interactions API)"),
-            ("gemini", "gemini-3.1-pro", 1.25, 5.00, "Google Gemini 3.1 Pro (Interactions API)"),
-            ("gemini", "gemini-1.5-flash", 0.075, 0.30, "Google Gemini 1.5 Flash"),
-            ("gemini", "gemini-1.5-pro", 1.25, 5.00, "Google Gemini 1.5 Pro"),
+        # Seed Standard AI Subscription Plans
+        default_plans = [
+            ("free", "Free Plan", 100000, 50, 0.0),
+            ("basic", "Basic Plan", 500000, 200, 15.0),
+            ("professional", "Professional Plan", 2000000, 1000, 50.0),
+            ("enterprise", "Enterprise Plan", 20000000, 10000, 200.0),
         ]
-        for prov, mdl, in_cost, out_cost, _ in default_pricings:
-            existing = db.query(AIModelPricing).filter(AIModelPricing.provider == prov, AIModelPricing.model == mdl).first()
-            if not existing:
-                db.add(AIModelPricing(provider=prov, model=mdl, input_cost_per_1m=in_cost, output_cost_per_1m=out_cost))
+        for code, name, t_quota, w_quota, price in default_plans:
+            existing_plan = db.query(AIPlan).filter(AIPlan.code == code).first()
+            if not existing_plan:
+                db.add(AIPlan(code=code, name=name, monthly_token_quota=t_quota, monthly_web_search_quota=w_quota, price_monthly=price, is_active=True))
         db.commit()
-        logger.info("Ensured default AI model pricings.")
+        logger.info("Ensured AI plans seeded.")
 
-        # Seed Default Application if empty
-        if db.query(Application).count() == 0:
-            app_rec = Application(
-                app_id="umkm-pos",
-                name="UMKM POS & Retail Application",
-                description="Default registered application adapter for UMKM POS SaaS"
-            )
-            db.add(app_rec)
-            logger.info("Seeded default application 'umkm-pos'.")
-
-        db.commit()
     except Exception as e:
         db.rollback()
         logger.error(f"Error seeding initial data: {str(e)}")
@@ -85,12 +45,23 @@ def seed_initial_data():
 def run_migrations():
     logger.info("Running standalone AI Platform database migrations...")
     
-    # 1. Ensure all tables exist in MySQL
+    # 1. Clean up / drop obsolete tables if they exist
+    inspector = inspect(engine)
+    obsolete_tables = [
+        "users", "user_ai_quotas", "ai_audit_logs", "ai_model_pricing",
+        "applications", "ai_tool_registry", "ai_capabilities"
+    ]
+    
+    with engine.begin() as conn:
+        for t in obsolete_tables:
+            if inspector.has_table(t):
+                logger.info(f"Dropping obsolete table: {t}")
+                conn.execute(text(f"DROP TABLE IF EXISTS `{t}`;"))
+    
+    # 2. Ensure all active tables exist in MySQL
     Base.metadata.create_all(bind=engine)
     
-    # 2. Column-level migrations for legacy biometric schema
-    inspector = inspect(engine)
-    
+    # 3. Column-level migrations for biometrics & logs
     with engine.begin() as conn:
         for table_name in ["face_embeddings", "fingerprint_templates"]:
             if not inspector.has_table(table_name):

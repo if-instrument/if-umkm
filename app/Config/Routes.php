@@ -133,8 +133,8 @@ $routes->group('api', ['namespace' => 'App\Controllers\Api', 'filter' => 'jwt-au
     $routes->get('page/ai/conversations', 'AiBusinessController::conversations');
     $routes->post('page/ai/conversations/delete', 'AiBusinessController::deleteConversation');
     $routes->get('page/ai/conversations/(:segment)/messages', 'AiBusinessController::messages/$1');
-    $routes->match(['delete', 'post'], 'page/ai/conversations/(:segment)', 'AiBusinessController::deleteConversation/$1');
-    $routes->match(['delete', 'post'], 'page/ai/conversations/(:segment)/delete', 'AiBusinessController::deleteConversation/$1');
+    $routes->delete('page/ai/conversations/(:segment)', 'AiBusinessController::deleteConversation/$1');
+    $routes->post('page/ai/conversations/(:segment)/delete', 'AiBusinessController::deleteConversation/$1');
     $routes->get('setting', 'SettingsController::getGeneral');
     $routes->put('setting', 'SettingsController::general');
     $routes->get('setting/central-gateway-master', 'SettingsController::getCentralPaymentGatewayMaster');

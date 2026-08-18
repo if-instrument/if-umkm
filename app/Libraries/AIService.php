@@ -278,6 +278,15 @@ class AIService
         return $this->get('/api/v1/ai/providers');
     }
 
+    public function syncTenantPlan(string $companySlug, string $planCode = 'professional', string $applicationId = 'umkm-pos'): array
+    {
+        return $this->post('/api/v1/ai/quota', [
+            'application_id' => $applicationId,
+            'company_id' => $companySlug,
+            'plan_code' => strtolower($planCode),
+        ]);
+    }
+
     public function getAiDataLogs(string $applicationId = 'umkm-pos', string $companySlug = 'IFresso-Coffee', int $limit = 50): array
     {
         return $this->get('/api/v1/ai/data-logs?application_id=' . urlencode($applicationId) . '&company_id=' . urlencode($companySlug) . '&limit=' . $limit);
@@ -295,20 +304,14 @@ class AIService
 
     public function deleteConversation(string $conversationId): array
     {
-        $res = $this->curlRequest('DELETE', rtrim($this->baseUrl, '/') . '/api/v1/ai/conversations/' . urlencode($conversationId), null, [
-            'X-API-Key: ' . $this->apiKey,
+        return $this->post('/api/v1/ai/conversations/' . urlencode($conversationId) . '/delete', [
+            'conversation_id' => $conversationId,
         ]);
-        if (! ($res['ok'] ?? false)) {
-            $res = $this->post('/api/v1/ai/conversations/delete', [
-                'conversation_id' => $conversationId,
-            ]);
-        }
-        return $res;
     }
 
     public function isOnline(): bool
     {
-        $res = $this->get('/health');
+        $res = $this->get('/api/v1/health');
         return ($res['status'] ?? '') === 'online';
     }
 
@@ -348,6 +351,11 @@ class AIService
 
         if ($method === 'POST') {
             curl_setopt($ch, CURLOPT_POST, true);
+            if ($body !== null) {
+                curl_setopt($ch, CURLOPT_POSTFIELDS, $body);
+            }
+        } elseif ($method !== 'GET') {
+            curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $method);
             if ($body !== null) {
                 curl_setopt($ch, CURLOPT_POSTFIELDS, $body);
             }
