@@ -15,15 +15,27 @@ async def lifespan(app: FastAPI):
 tags_metadata = [
     {
         "name": "Face Biometrics",
-        "description": "Ekstraksi embedding wajah, verifikasi 1-to-1, dan identifikasi 1-to-many untuk login kasir & absensi.",
+        "description": "Ekstraksi embedding wajah, verifikasi 1-to-1, pendaftaran foto, dan identifikasi 1-to-many untuk login kasir.",
     },
     {
         "name": "Fingerprint Biometrics",
-        "description": "Pendaftaran sidik jari ANSI/ISO template dan verifikasi biometrik hardware.",
+        "description": "Pendaftaran template sidik jari ISO/ANSI dan verifikasi biometrik hardware scanner.",
     },
     {
-        "name": "Generative & Predictive AI",
-        "description": "Analisis prediksi bisnis UMKM, rekomendasi stok otomatis, asisten chat bisnis, dan kuota pemakaian token AI.",
+        "name": "AI Business Intelligence",
+        "description": "Inferensi analitik bisnis, evaluasi menu & margin, chat assistant, dan deteksi kapabilitas AI.",
+    },
+    {
+        "name": "AI Conversations & History",
+        "description": "Manajemen sesi obrolan multi-turn, pengambilan riwayat pesan dengan audit usage, update judul, dan penghapusan sesi.",
+    },
+    {
+        "name": "AI Tool Registry & Function Calling",
+        "description": "Katalog schema tools yang dapat dipanggil secara otomatis oleh LLM serta endpoint pendaftaran tool dinamis.",
+    },
+    {
+        "name": "AI Quota & Usage Audit",
+        "description": "Pelacakan kuota token bulanan per tenant dan audit ledger konsumsi token per request.",
     },
     {
         "name": "Health",

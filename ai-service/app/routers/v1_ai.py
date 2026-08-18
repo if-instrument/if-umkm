@@ -16,7 +16,7 @@ from app.providers.base_provider import LLMMessage
 from app.services.quota_service import QuotaService, QuotaExceededException
 from app.services.analyst_service import BusinessAnalystEngine
 
-router = APIRouter(tags=["Generative & Predictive AI"])
+router = APIRouter()
 
 # ==================== PLATFORM CAPABILITIES ====================
 
@@ -165,7 +165,7 @@ class SimpleActionResponse(BaseModel):
 
 # ==================== ENDPOINT HANDLERS ====================
 
-@router.get("/capabilities", response_model=CapabilitiesResponse)
+@router.get("/capabilities", response_model=CapabilitiesResponse, tags=["AI Business Intelligence"], summary="Daftar Kapabilitas AI Platform")
 def list_capabilities():
     return {
         "ok": True,
@@ -180,7 +180,7 @@ def list_capabilities():
         ]
     }
 
-@router.get("/providers", response_model=ProvidersResponse)
+@router.get("/providers", response_model=ProvidersResponse, tags=["AI Business Intelligence"], summary="Daftar LLM Provider & Model Aktif")
 def list_providers(application_id: str = "umkm-pos", company_id: str = "IFresso-Coffee", db: Session = Depends(get_db)):
     from app.providers.gemini_provider import GeminiProvider
     from app.providers.openai_provider import OpenAIProvider
@@ -214,7 +214,60 @@ def list_providers(application_id: str = "umkm-pos", company_id: str = "IFresso-
         "data": grouped
     }
 
-@router.get("/conversations", response_model=ConversationsResponse)
+class ToolRegisterRequest(BaseModel):
+    name: str = Field(..., description="Nama unik function call tool", example="get_expense_summary")
+    version: str = Field("1.0", description="Versi schema", example="1.0")
+    description: str = Field(..., description="Instruksi jelas untuk LLM kapan harus memanggil tool ini", example="Mengembalikan rekap beban operasional toko per kategori dalam periode tertentu.")
+    input_schema: Dict[str, Any] = Field(..., description="JSON Schema parameter input", example={"type": "object", "properties": {"period": {"type": "string", "default": "30d"}}})
+    output_schema: Optional[Dict[str, Any]] = None
+    permission: str = Field("read", description="Hak akses RBAC", example="analytics.expenses.read")
+    timeout: int = Field(10, description="Batas timeout detik", example=10)
+    enabled: bool = Field(True, description="Status aktif tool", example=True)
+    application_scope: str = Field("all", description="Scope aplikasi (e.g. 'umkm-pos' atau 'all')", example="umkm-pos")
+
+@router.get("/tools", summary="Daftar Tool & Schema Function Calling", tags=["AI Tool Registry & Function Calling"])
+def list_registered_tools(application_id: Optional[str] = None):
+    """
+    Mengembalikan seluruh katalog Tools & JSON Schema yang dapat dipanggil secara otomatis oleh LLM.
+    Tersedia untuk pengujian interaktif langsung di Swagger UI dan ReDoc.
+    """
+    from app.tools.registry import ToolRegistry
+    tools = ToolRegistry.list_tools(application_id)
+    return {
+        "ok": True,
+        "count": len(tools),
+        "data": [t.dict() for t in tools]
+    }
+
+@router.post("/tools/register", summary="Daftarkan Tool Dinamis Baru (POST)", tags=["AI Tool Registry & Function Calling"])
+@router.put("/tools/{name}", summary="Update Definisi Tool (PUT)", tags=["AI Tool Registry & Function Calling"])
+def register_dynamic_tool(req: ToolRegisterRequest, name: Optional[str] = None):
+    """
+    Mendaftarkan atau memperbarui tool kustom dari aplikasi klien ke dalam AI Microservice Tool Registry.
+    Mendukung POST /tools/register dan PUT /tools/{name}.
+    """
+    from app.tools.registry import ToolRegistry, ToolDefinition
+    tool_name = name or req.name
+    tool_def = ToolDefinition(
+        name=tool_name,
+        version=req.version,
+        description=req.description,
+        input_schema=req.input_schema,
+        output_schema=req.output_schema,
+        permission=req.permission,
+        timeout=req.timeout,
+        enabled=req.enabled,
+        application_scope=req.application_scope
+    )
+    ToolRegistry.register_tool(tool_def)
+    return {
+        "ok": True,
+        "message": f"Tool '{tool_name}' berhasil didaftarkan ke Tool Registry.",
+        "data": tool_def.dict()
+    }
+
+
+@router.get("/conversations", response_model=ConversationsResponse, tags=["AI Conversations & History"], summary="Daftar Sesi Obrolan")
 def list_conversations(
     application_id: str = "umkm-pos",
     company_id: str = "IFresso-Coffee",
@@ -243,7 +296,7 @@ def list_conversations(
         ]
     }
 
-@router.get("/conversations/{conversation_id}")
+@router.get("/conversations/{conversation_id}", tags=["AI Conversations & History"], summary="Detail Sesi Obrolan")
 def get_conversation_details(conversation_id: str, db: Session = Depends(get_db)):
     conv = db.query(AIConversation).filter(AIConversation.conversation_id == conversation_id).first()
     if not conv:
@@ -261,7 +314,7 @@ def get_conversation_details(conversation_id: str, db: Session = Depends(get_db)
         }
     }
 
-@router.get("/conversations/{conversation_id}/messages")
+@router.get("/conversations/{conversation_id}/messages", tags=["AI Conversations & History"], summary="Riwayat Pesan & Audit Usage")
 def get_conversation_messages(conversation_id: str, db: Session = Depends(get_db)):
     from app.services.chat_service import ChatHistoryService
     msgs = ChatHistoryService.get_messages(db, conversation_id)
@@ -313,20 +366,46 @@ def get_conversation_messages(conversation_id: str, db: Session = Depends(get_db
         "data": formatted_msgs
     }
 
-@router.delete("/conversations/{conversation_id}", response_model=SimpleActionResponse)
-@router.post("/conversations/{conversation_id}/delete", response_model=SimpleActionResponse)
-def delete_conversation(conversation_id: str, db: Session = Depends(get_db)):
+@router.delete("/conversations/{conversation_id}", response_model=SimpleActionResponse, tags=["AI Conversations & History"], summary="Hapus Sesi Obrolan (DELETE)")
+@router.post("/conversations/{conversation_id}/delete", response_model=SimpleActionResponse, include_in_schema=False)
+@router.post("/conversations/delete", response_model=SimpleActionResponse, include_in_schema=False)
+def delete_conversation(
+    conversation_id: Optional[str] = None,
+    req: Optional[DeleteConversationRequest] = None,
+    db: Session = Depends(get_db)
+):
+    target_id = conversation_id or (req.conversation_id if req else "")
     from app.services.chat_service import ChatHistoryService
-    success = ChatHistoryService.delete_conversation(db, conversation_id)
-    return {"ok": success, "conversation_id": conversation_id, "message": "Conversation deleted successfully." if success else "Conversation not found."}
+    success = ChatHistoryService.delete_conversation(db, target_id)
+    return {"ok": success, "conversation_id": target_id, "message": "Sesi obrolan berhasil dihapus." if success else "Sesi obrolan tidak ditemukan."}
 
-@router.post("/conversations/delete", response_model=SimpleActionResponse)
-def delete_conversation_body(req: DeleteConversationRequest, db: Session = Depends(get_db)):
-    from app.services.chat_service import ChatHistoryService
-    success = ChatHistoryService.delete_conversation(db, req.conversation_id)
-    return {"ok": success, "conversation_id": req.conversation_id, "message": "Conversation deleted successfully." if success else "Conversation not found."}
+class UpdateConversationRequest(BaseModel):
+    title: Optional[str] = Field(None, description="Judul baru sesi obrolan", example="Evaluasi Stok & Resep Kopi")
 
-@router.post("/quota", response_model=QuotaResponse)
+@router.put("/conversations/{conversation_id}", tags=["AI Conversations & History"], summary="Update Judul Sesi Obrolan (PUT)")
+@router.patch("/conversations/{conversation_id}", include_in_schema=False)
+@router.post("/conversations/{conversation_id}/update", include_in_schema=False)
+def update_conversation(conversation_id: str, req: UpdateConversationRequest, db: Session = Depends(get_db)):
+    conv = db.query(AIConversation).filter(AIConversation.conversation_id == conversation_id).first()
+    if not conv:
+        raise HTTPException(status_code=404, detail="Sesi obrolan tidak ditemukan.")
+    if req.title:
+        conv.title = req.title.strip()
+        conv.updated_at = datetime.datetime.utcnow()
+        db.commit()
+        db.refresh(conv)
+    return {
+        "ok": True,
+        "message": "Sesi obrolan berhasil diperbarui.",
+        "data": {
+            "conversation_id": conv.conversation_id,
+            "title": conv.title,
+            "updated_at": conv.updated_at.isoformat() if conv.updated_at else None
+        }
+    }
+
+@router.post("/quota", response_model=QuotaResponse, tags=["AI Quota & Usage Audit"], summary="Query & Update Kuota Token")
+@router.put("/quota", response_model=QuotaResponse, include_in_schema=False)
 def get_effective_quota(req: QuotaQueryRequest, db: Session = Depends(get_db)):
     # 1. If plan_code is provided, assign/upgrade company subscription
     if req.plan_code:
@@ -394,7 +473,7 @@ def get_effective_quota(req: QuotaQueryRequest, db: Session = Depends(get_db)):
         }
     }
 
-@router.post("/chat", response_model=APIResponse)
+@router.post("/chat", response_model=APIResponse, tags=["AI Business Intelligence"], summary="AI Chat Assistant")
 def execute_chat(req: ChatRequest, db: Session = Depends(get_db)):
     ctx = req.context
     request_id = f"req_cht_{uuid.uuid4().hex[:16]}"
@@ -489,7 +568,7 @@ def execute_chat(req: ChatRequest, db: Session = Depends(get_db)):
         }
     )
 
-@router.post("/analyze", response_model=APIResponse)
+@router.post("/analyze", response_model=APIResponse, tags=["AI Business Intelligence"], summary="AI Deep Business Analyst")
 def execute_analysis(req: AnalyzeRequest, db: Session = Depends(get_db)):
     ctx = req.context
     ctx.capability = "business.analyst"
@@ -577,7 +656,7 @@ def execute_analysis(req: AnalyzeRequest, db: Session = Depends(get_db)):
         }
     )
 
-@router.post("/usage", response_model=UsageResponse)
+@router.post("/usage", response_model=UsageResponse, tags=["AI Quota & Usage Audit"], summary="Audit Ledger Konsumsi Token")
 def query_usage(req: UsageQueryRequest, db: Session = Depends(get_db)):
     logs = db.query(AIUsageLedger).filter(
         AIUsageLedger.application_id == req.application_id,

@@ -9,6 +9,7 @@ Dokumentasi resmi untuk **AI Microservice Platform (Face & Fingerprint Biometric
 - **Swagger UI**: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
 - **ReDoc**: [http://127.0.0.1:8000/redoc](http://127.0.0.1:8000/redoc)
 - **OpenAPI 3.1.0 Spec**: [http://127.0.0.1:8000/openapi.json](http://127.0.0.1:8000/openapi.json) (Juga tersimpan di `ai-service/docs/openapi.json`)
+- **📖 Panduan Integrasi Developer & Format Chat**: [AI_DEVELOPER_INTEGRATION_GUIDE.md](file:///Users/imamfaisal/Documents/Aplikasi%20UMKM/ai-service/docs/AI_DEVELOPER_INTEGRATION_GUIDE.md)
 
 ---
 

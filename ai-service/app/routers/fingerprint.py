@@ -261,15 +261,22 @@ def identify_fingerprint(req: IdentifyFingerprintRequest, db: Session = Depends(
     }
 
 @router.post("/delete", response_model=DeleteFingerprintResponse)
-def delete_fingerprint(req: DeleteFingerprintRequest, db: Session = Depends(get_db)):
-    query = db.query(FingerprintTemplate).filter(FingerprintTemplate.user_key == req.user_key)
-    if req.company_key:
-        query = query.filter(FingerprintTemplate.company_key == req.company_key)
+@router.delete("/{user_key}", response_model=DeleteFingerprintResponse)
+def delete_fingerprint(req: Optional[DeleteFingerprintRequest] = None, user_key: Optional[str] = None, company_key: Optional[str] = None, db: Session = Depends(get_db)):
+    target_user_key = user_key or (req.user_key if req else "")
+    target_company_key = company_key or (req.company_key if req else None)
+
+    if not target_user_key:
+        raise HTTPException(status_code=400, detail="user_key wajib diisi.")
+
+    query = db.query(FingerprintTemplate).filter(FingerprintTemplate.user_key == target_user_key)
+    if target_company_key:
+        query = query.filter(FingerprintTemplate.company_key == target_company_key)
 
     deleted_count = query.delete(synchronize_session=False)
     db.commit()
 
-    driver_res = PythonHardwareDriver.clear_device_data(req.user_key)
+    driver_res = PythonHardwareDriver.clear_device_data(target_user_key)
 
     return {
         "ok": True,
@@ -277,6 +284,7 @@ def delete_fingerprint(req: DeleteFingerprintRequest, db: Session = Depends(get_
         "device_cleared": driver_res.get("ok", True),
         "message": f"Berhasil menghapus {deleted_count} sampel sidik jari dari database dan memori perangkat."
     }
+
 
 @router.get("/list-devices")
 def list_fingerprint_devices():

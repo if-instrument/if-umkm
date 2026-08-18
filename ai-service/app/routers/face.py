@@ -348,10 +348,17 @@ def close_camera_device(req: CloseCameraDeviceRequest):
     return res
 
 @router.post("/delete", response_model=DeleteFaceResponse)
-def delete_face(req: DeleteFaceRequest, db: Session = Depends(get_db)):
-    query = db.query(FaceEmbedding).filter(FaceEmbedding.user_key.in_(get_user_key_variants(req.user_key)))
-    if req.company_key:
-        query = query.filter(FaceEmbedding.company_key == req.company_key)
+@router.delete("/{user_key}", response_model=DeleteFaceResponse)
+def delete_face(req: Optional[DeleteFaceRequest] = None, user_key: Optional[str] = None, company_key: Optional[str] = None, db: Session = Depends(get_db)):
+    target_user_key = user_key or (req.user_key if req else "")
+    target_company_key = company_key or (req.company_key if req else None)
+
+    if not target_user_key:
+        raise HTTPException(status_code=400, detail="user_key wajib diisi.")
+
+    query = db.query(FaceEmbedding).filter(FaceEmbedding.user_key.in_(get_user_key_variants(target_user_key)))
+    if target_company_key:
+        query = query.filter(FaceEmbedding.company_key == target_company_key)
 
     deleted_count = query.delete(synchronize_session=False)
     db.commit()
@@ -361,3 +368,4 @@ def delete_face(req: DeleteFaceRequest, db: Session = Depends(get_db)):
         "deleted_count": deleted_count,
         "message": f"Berhasil menghapus {deleted_count} sampel foto wajah."
     }
+
